@@ -24,6 +24,8 @@ use bevy::{
     },
 };
 
+// TEST
+
 #[derive(Component, Reflect)]
 pub struct Occluder {
     pub shape: OccluderShape,
