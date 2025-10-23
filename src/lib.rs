@@ -1,41 +1,31 @@
+use std::path::PathBuf;
+
 use bevy::{
-    color::palettes::css::{BLUE, PINK},
-    core_pipeline::{
-        core_2d::graph::{Core2d, Node2d},
-        fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+    asset::{
+        AssetPath, embedded_asset,
+        io::{
+            AssetReader, AssetSource, AssetSourceId, file::FileAssetReader,
+            memory::MemoryAssetReader,
+        },
+        load_internal_asset, weak_handle,
     },
-    ecs::system::lifetimeless::Read,
+    color::palettes::css::{BLUE, PINK},
+    core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
-        RenderApp, RenderSet,
-        extract_component::{
-            ComponentUniforms, DynamicUniformIndex, ExtractComponent, ExtractComponentPlugin,
-            UniformComponentPlugin,
-        },
-        gpu_component_array_buffer,
-        render_graph::{NodeRunError, RenderGraphApp, RenderLabel, ViewNode, ViewNodeRunner},
-        render_resource::{
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferDescriptor,
-            BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            GpuArrayBuffer, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            ShaderType, TextureFormat, TextureSampleType,
-            binding_types::{sampler, texture_2d, uniform_buffer},
-        },
-        renderer::RenderDevice,
+        Render, RenderApp, RenderSet,
+        render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner},
         sync_world::SyncToRenderWorld,
         texture::CachedTexture,
-        view::{
-            ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms, VisibilityClass, visibility,
-        },
+        view::{VisibilityClass, visibility},
     },
 };
 
 use crate::{
-    extract::{ExtractPlugin, ExtractedPointLight},
+    extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
-    prepare::{LightingData, LightingDataBuffer, PreparePlugin},
+    prepare::PreparePlugin,
 };
 
 mod extract;
@@ -72,11 +62,41 @@ struct CreateLightmapLabel;
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct ApplyLightmapLabel;
 
+const CREATE_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
+const APPLY_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
+const TYPES_SHADER: Handle<Shader> = weak_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
+const UTILS_SHADER: Handle<Shader> = weak_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
+
 pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, draw_gizmos);
+
+        load_internal_asset!(
+            app,
+            CREATE_LIGHTMAP_SHADER,
+            "../shaders/create_lightmap.wgsl",
+            Shader::from_wgsl
+        );
+        load_internal_asset!(
+            app,
+            APPLY_LIGHTMAP_SHADER,
+            "../shaders/apply_lightmap.wgsl",
+            Shader::from_wgsl
+        );
+        load_internal_asset!(
+            app,
+            TYPES_SHADER,
+            "../shaders/types.wgsl",
+            Shader::from_wgsl
+        );
+        load_internal_asset!(
+            app,
+            UTILS_SHADER,
+            "../shaders/utils.wgsl",
+            Shader::from_wgsl
+        );
 
         app.add_plugins((PreparePlugin, ExtractPlugin));
 

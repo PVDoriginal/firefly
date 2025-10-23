@@ -1,7 +1,7 @@
 use bevy::{
     prelude::*,
     render::{
-        Extract, RenderApp, extract_component::ExtractComponent,
+        Extract, MainWorld, RenderApp, extract_component::ExtractComponent,
         gpu_component_array_buffer::GpuComponentArrayBufferPlugin, render_resource::ShaderType,
         sync_world::RenderEntity,
     },

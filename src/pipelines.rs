@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use bevy::{
+    asset::AssetLoader,
     core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     prelude::*,
     render::{
@@ -16,15 +17,16 @@ use bevy::{
     },
 };
 
-use crate::{extract::ExtractedPointLight, prepare::LightingData};
+use crate::{
+    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, extract::ExtractedPointLight,
+    prepare::LightingData,
+};
 
 #[derive(Resource)]
 pub(crate) struct LightmapCreationPipeline {
     pub layout: BindGroupLayout,
     pub pipeline_id: CachedRenderPipelineId,
 }
-
-const CREATION_SHADER: &str = "shaders/create_lightmap.wgsl";
 
 #[derive(Resource)]
 pub(crate) struct LightmapApplicationPipeline {
@@ -33,7 +35,7 @@ pub(crate) struct LightmapApplicationPipeline {
     pub pipeline_id: CachedRenderPipelineId,
 }
 
-const APPLICATON_SHADER: &str = "shaders/apply_lightmap.wgsl";
+const APPLICATON_SHADER: &str = "apply_lightmap.wgsl";
 
 impl FromWorld for LightmapCreationPipeline {
     fn from_world(world: &mut World) -> Self {
@@ -51,11 +53,13 @@ impl FromWorld for LightmapCreationPipeline {
             ),
         );
 
+        //let shader = world.resource::<Shaders>().create_lightmap.clone();
+
         let pipeline_id = new_pipeline(
             world,
             Some(Cow::Borrowed("lightmap creation pipeline")),
             layout.clone(),
-            world.load_asset(CREATION_SHADER),
+            CREATE_LIGHTMAP_SHADER,
             Cow::Borrowed("fragment"),
             TextureFormat::Rgba16Float,
         );
@@ -84,12 +88,13 @@ impl FromWorld for LightmapApplicationPipeline {
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        // let shader = world.resource::<Shaders>().apply_lightmap.clone();
 
         let pipeline_id = new_pipeline(
             world,
             Some(Cow::Borrowed("lightmap application pipeline")),
             layout.clone(),
-            world.load_asset(APPLICATON_SHADER),
+            APPLY_LIGHTMAP_SHADER,
             Cow::Borrowed("fragment"),
             TextureFormat::bevy_default(),
         );
