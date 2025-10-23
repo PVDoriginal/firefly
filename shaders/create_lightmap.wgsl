@@ -16,16 +16,17 @@ var<storage> lights: array<PointLight>;
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
+    var res = vec4<f32>(0, 0, 0, 1);
 
     for (var i = 0u; i < data.n_lights; i++) {
         let light = lights[i].pos; 
         let dist = distance(pos, light) + 0.01; 
 
         if (dist < 100.) {
-            // let x = 1. - dist / 100.;
-            return vec4<f32>(vec3<f32>(1), 1);
+            let x = dist / 100.;
+            res += vec4<f32>(vec3<f32>(1. - x * x), 0);
         }
     }
-
-    return vec4<f32>(1);
+    
+    return min(res, vec4<f32>(1, 1, 1, 1));
 }
