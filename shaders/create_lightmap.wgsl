@@ -25,6 +25,8 @@ var<storage> occluders: array<OccluderMeta>;
 @group(0) @binding(6)
 var<storage> vertices: array<Vertex>;
 
+const PI2: f32 = 6.28318530718;
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
@@ -74,7 +76,10 @@ fn is_occluded_test(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {
-    let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+    let raw_angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+
+    let angle = (raw_angle - occluders[occluder].seam) + PI2 * floor((occluders[occluder].seam - raw_angle) / PI2);
+
     let maybe_prev = bs_vertex(angle, start_vertex, occluders[occluder].n_vertices);
 
     if maybe_prev == -1 {

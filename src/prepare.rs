@@ -1,6 +1,7 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, f32::consts::PI};
 
 use bevy::{
+    math::ops::floor,
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
@@ -34,7 +35,7 @@ pub(crate) struct LightingDataBuffer(pub UniformBuffer<LightingData>);
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct OccluderMeta {
     pub n_vertices: u32,
-    pub offset_angle: f32,
+    pub seam: f32,
 }
 
 #[repr(C, align(16))]
@@ -160,14 +161,22 @@ fn prepare_data(
         for occluder in occluders {
             let mut meta: OccluderMeta = default();
 
-            meta.offset_angle =
-                (occluder.vertices[0].y - light.pos.y).atan2(occluder.vertices[0].x - light.pos.x);
+            let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
+
+            let ref_angle = angle(occluder.vertices[0], light.pos);
+
+            if ref_angle > 0. {
+                meta.seam = ref_angle - PI;
+            } else {
+                meta.seam = ref_angle + PI;
+            }
 
             let vertices: Vec<_> = occluder
                 .vertices
                 .iter()
                 .map(|&pos| Vertex {
-                    angle: (pos.y - light.pos.y).atan2(pos.x - light.pos.x),
+                    angle: (angle(pos, light.pos) - meta.seam)
+                        + 2. * PI * floor((meta.seam - angle(pos, light.pos)) / (2. * PI)),
                     pos,
                 })
                 .collect();
