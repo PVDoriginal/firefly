@@ -1,21 +1,10 @@
-use std::path::PathBuf;
-
 use bevy::{
-    asset::{
-        AssetPath, embedded_asset,
-        io::{
-            AssetReader, AssetSource, AssetSourceId, file::FileAssetReader,
-            memory::MemoryAssetReader,
-        },
-        load_internal_asset, weak_handle,
-    },
+    asset::{load_internal_asset, weak_handle},
     color::palettes::css::{BLUE, PINK},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
-    ecs::schedule::ScheduleBuildSettings,
-    gizmos::{GizmoRenderSystem, gizmos::GizmoBuffer},
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
+        RenderApp,
         render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner},
         sync_world::SyncToRenderWorld,
         texture::CachedTexture,
@@ -36,6 +25,8 @@ mod pipelines;
 mod prepare;
 
 #[derive(Component, Reflect)]
+#[require(SyncToRenderWorld, VisibilityClass)]
+#[component(on_add = visibility::add_visibility_class::<PointLight>)]
 pub struct Occluder {
     pub shape: OccluderShape,
 }

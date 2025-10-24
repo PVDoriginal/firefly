@@ -1,10 +1,8 @@
 use bevy::{
     prelude::*,
     render::{
-        Extract, MainWorld, RenderApp,
-        extract_component::ExtractComponent,
-        gpu_component_array_buffer::GpuComponentArrayBufferPlugin,
-        render_resource::{BufferVec, GpuArrayBuffer, ShaderType, StorageBuffer},
+        Extract, RenderApp, extract_component::ExtractComponent,
+        gpu_component_array_buffer::GpuComponentArrayBufferPlugin, render_resource::ShaderType,
         sync_world::RenderEntity,
     },
 };
@@ -24,8 +22,6 @@ pub(crate) struct ExtractedOccluder {
 pub(crate) struct ExtractPlugin;
 impl Plugin for ExtractPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GpuComponentArrayBufferPlugin::<ExtractedPointLight>::default());
-
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };

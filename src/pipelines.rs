@@ -5,10 +5,10 @@ use bevy::{
     prelude::*,
     render::{
         render_resource::{
-            BindGroupLayout, BindGroupLayoutEntries, BufferVec, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            ShaderType, StorageBuffer, TextureFormat, TextureSampleType,
+            BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
+            ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache, RenderPipelineDescriptor,
+            Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, TextureFormat,
+            TextureSampleType,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::RenderDevice,
@@ -18,8 +18,8 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
-    extract::{ExtractedOccluder, ExtractedPointLight},
-    prepare::{Angle, LightingData, OccluderMeta, Vertex},
+    extract::ExtractedPointLight,
+    prepare::{LightingData, OccluderMeta, Vertex},
 };
 
 #[derive(Resource)]
@@ -57,9 +57,8 @@ impl FromWorld for LightmapCreationPipeline {
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<LightingData>(false),
                     uniform_buffer::<ExtractedPointLight>(false),
-                    // GpuArrayBuffer::<OccluderMeta>::binding_layout(render_device),
-                    // GpuArrayBuffer::<Vertex>::binding_layout(render_device),
-                    // GpuArrayBuffer::<Angle>::binding_layout(render_device),
+                    GpuArrayBuffer::<OccluderMeta>::binding_layout(render_device),
+                    GpuArrayBuffer::<Vertex>::binding_layout(render_device),
                 ),
             ),
         );

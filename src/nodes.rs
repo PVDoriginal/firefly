@@ -1,26 +1,24 @@
+use std::ops::Index;
+
 use bevy::{
     ecs::system::lifetimeless::Read,
     prelude::*,
-    reflect::TypeData,
     render::{
         render_graph::{NodeRunError, ViewNode},
-        render_phase::TrackedRenderPass,
         render_resource::{
-            BindGroupEntries, DynamicUniformBuffer, GpuArrayBuffer, Operations, PipelineCache,
-            RenderPassColorAttachment, RenderPassDescriptor, TextureDescriptor, TextureDimension,
-            TextureFormat, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
-            UniformBuffer, binding_types::uniform_buffer,
+            BindGroupEntries, GpuArrayBuffer, PipelineCache, RenderPassColorAttachment,
+            RenderPassDescriptor,
         },
-        renderer::{RenderContext, RenderDevice, RenderQueue, WgpuWrapper},
-        view::{ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
+        renderer::{RenderContext, RenderQueue},
+        view::{ViewTarget, ViewUniformOffset, ViewUniforms},
     },
 };
 
 use crate::{
     EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
-    extract::{self, ExtractedPointLight},
+    extract::ExtractedOccluder,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::{LightingDataBuffer, Lights},
+    prepare::{LightingDataBuffer, Lights, OccluderMeta, OccluderSet},
 };
 
 #[derive(Default)]
@@ -69,9 +67,18 @@ impl ViewNode for CreateLightmapNode {
         };
 
         let lights = world.resource::<Lights>();
+        let occluder_set = world.resource::<OccluderSet>();
 
-        for light in &lights.0 {
+        let Some(occluder_meta) = occluder_set.meta.binding() else {
+            return Ok(());
+        };
+
+        for (i, light) in lights.0.iter().enumerate() {
             {
+                let Some(occluder_vertices) = occluder_set.vertices[i].binding() else {
+                    return Ok(());
+                };
+
                 let bind_group = render_context.render_device().create_bind_group(
                     "create lightmap bind group",
                     &c_pipeline.layout,
@@ -81,6 +88,8 @@ impl ViewNode for CreateLightmapNode {
                         &c_pipeline.sampler,
                         data_binding.clone(),
                         light.binding().unwrap(),
+                        occluder_meta.clone(),
+                        occluder_vertices.clone(),
                     )),
                 );
 
