@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use bevy::{
     prelude::*,
     render::{
@@ -22,29 +24,20 @@ pub(crate) struct LightingData {
     pub n_occluders: u32,
 }
 
-#[derive(Resource)]
-pub(crate) struct OccluderSet {
-    pub meta: GpuArrayBuffer<OccluderMeta>,
-    pub vertices: Vec<GpuArrayBuffer<Vertex>>,
-}
-
-impl FromWorld for OccluderSet {
-    fn from_world(world: &mut World) -> Self {
-        Self {
-            meta: GpuArrayBuffer::<OccluderMeta>::new(world.resource::<RenderDevice>()),
-            vertices: default(),
-        }
-    }
-}
+#[derive(Resource, Default)]
+pub(crate) struct OccluderSet(pub Vec<(GpuArrayBuffer<OccluderMeta>, GpuArrayBuffer<Vertex>)>);
 
 #[derive(Resource, Default)]
 pub(crate) struct LightingDataBuffer(pub UniformBuffer<LightingData>);
 
-#[derive(ShaderType, Clone)]
+#[repr(C, align(16))]
+#[derive(ShaderType, Clone, Default)]
 pub(crate) struct OccluderMeta {
     pub n_vertices: u32,
+    pub offset_angle: f32,
 }
 
+#[repr(C, align(16))]
 #[derive(ShaderType, Clone)]
 pub(crate) struct Vertex {
     pub angle: f32,
@@ -158,40 +151,78 @@ fn prepare_data(
     buffer.0.set(data);
     buffer.0.write_buffer(&render_device, &render_queue);
 
-    *occluder_set = OccluderSet {
-        meta: GpuArrayBuffer::<OccluderMeta>::new(&render_device),
-        vertices: default(),
-    };
+    *occluder_set = default();
 
-    for occluder in occluders {
-        occluder_set.meta.push(OccluderMeta {
-            n_vertices: occluder.vertices.len() as u32,
-        });
+    for light in lights {
+        let mut meta_buffer = GpuArrayBuffer::<OccluderMeta>::new(&render_device);
+        let mut vertices_buffer = GpuArrayBuffer::<Vertex>::new(&render_device);
 
-        for light in lights {
-            let mut vertices_buffer = GpuArrayBuffer::<Vertex>::new(&render_device);
+        for occluder in occluders {
+            let mut meta: OccluderMeta = default();
 
-            let mut vertices: Vec<_> = occluder
+            meta.offset_angle =
+                (occluder.vertices[0].y - light.pos.y).atan2(occluder.vertices[0].x - light.pos.x);
+
+            let vertices: Vec<_> = occluder
                 .vertices
                 .iter()
                 .map(|&pos| Vertex {
-                    angle: light.pos.angle_to(pos),
+                    angle: (pos.y - light.pos.y).atan2(pos.x - light.pos.x),
                     pos,
                 })
                 .collect();
 
-            vertices.sort_by(|a, b| a.angle.total_cmp(&b.angle));
+            vertices
+                .iter()
+                .enumerate()
+                .for_each(|(i, v)| info!("vertex {i}: {}", v.pos));
 
-            vertices.iter().for_each(|v| {
-                vertices_buffer.push(v.clone());
-            });
+            let cmp = |a: &&Vertex, b: &&Vertex| a.angle.total_cmp(&b.angle);
 
-            vertices_buffer.write_buffer(&render_device, &render_queue);
+            let mut min_vertex = vertices
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| cmp(a, b))
+                .map(|(i, _)| i)
+                .unwrap();
 
-            occluder_set.vertices.push(vertices_buffer);
+            info!("min vertex: {}", vertices[min_vertex].pos);
+
+            let max_vertex = vertices
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| cmp(a, b))
+                .map(|(i, _)| i)
+                .unwrap();
+
+            info!("max vertex: {}", vertices[max_vertex].pos);
+            // info!("Looking at vertices!");
+
+            loop {
+                vertices_buffer.push(vertices[min_vertex].clone());
+                meta.n_vertices += 1;
+
+                info!("Adding vertex with angle: {}", vertices[min_vertex].angle);
+
+                if min_vertex == max_vertex {
+                    break;
+                }
+
+                // TODO: increment by 1 instead for non-hollow ocluders
+
+                if min_vertex == 0 {
+                    min_vertex = vertices.len() - 1;
+                } else {
+                    min_vertex -= 1
+                };
+            }
+            info!("n_vertices: {}", meta.n_vertices);
+            meta_buffer.push(meta);
+            // info!("Done!\n\n");
         }
+        meta_buffer.write_buffer(&render_device, &render_queue);
+        vertices_buffer.write_buffer(&render_device, &render_queue);
+
+        occluder_set.0.push((meta_buffer, vertices_buffer));
     }
-    occluder_set
-        .meta
-        .write_buffer(&render_device, &render_queue);
 }

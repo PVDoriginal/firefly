@@ -16,7 +16,7 @@ use crate::{
     extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::PreparePlugin,
+    prepare::{LightingData, OccluderMeta, PreparePlugin, Vertex},
 };
 
 mod extract;

@@ -69,13 +69,11 @@ impl ViewNode for CreateLightmapNode {
         let lights = world.resource::<Lights>();
         let occluder_set = world.resource::<OccluderSet>();
 
-        let Some(occluder_meta) = occluder_set.meta.binding() else {
-            return Ok(());
-        };
-
         for (i, light) in lights.0.iter().enumerate() {
             {
-                let Some(occluder_vertices) = occluder_set.vertices[i].binding() else {
+                let (meta, vertices) = &occluder_set.0[i];
+
+                let (Some(meta), Some(vertices)) = (meta.binding(), vertices.binding()) else {
                     return Ok(());
                 };
 
@@ -88,8 +86,8 @@ impl ViewNode for CreateLightmapNode {
                         &c_pipeline.sampler,
                         data_binding.clone(),
                         light.binding().unwrap(),
-                        occluder_meta.clone(),
-                        occluder_vertices.clone(),
+                        meta.clone(),
+                        vertices.clone(),
                     )),
                 );
 

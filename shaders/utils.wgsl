@@ -27,3 +27,18 @@ fn uv_to_ndc(uv: vec2<f32>) -> vec2<f32> {
 fn ndc_to_uv(ndc: vec2<f32>) -> vec2<f32> {
     return ndc * vec2(0.5, -0.5) + vec2(0.5);
 }
+
+// checks if p and q are on the same side of the [a, b] segment
+fn same_orientation(a: vec2f, b: vec2f, p: vec2f, q: vec2f) -> bool {
+    let ori_p = orientation(a, b, p);
+    let ori_q = orientation(a, b, q);
+
+    return (ori_p == 0. && ori_q == 0.) || ori_p * ori_q > 0.; 
+}
+
+// = 0 - on
+// > 0 - left
+// < 0 - right  
+fn orientation(a: vec2f, b: vec2f, p: vec2f) -> f32 {
+    return (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+} 

@@ -1,9 +1,18 @@
 #define_import_path firefly::types
 
 struct LightingData {
-    n_lights: u32,
+    n_occluders: u32,
 }
 
 struct PointLight {
     pos: vec2f,
+}
+
+struct OccluderMeta {
+    n_vertices: u32,
+}
+
+struct Vertex {
+    angle: f32,
+    pos: vec2f
 }
