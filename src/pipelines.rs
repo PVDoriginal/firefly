@@ -1,15 +1,14 @@
 use std::borrow::Cow;
 
 use bevy::{
-    asset::AssetLoader,
     core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state,
     prelude::*,
     render::{
         render_resource::{
-            BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
-            ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache, RenderPipelineDescriptor,
-            Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, TextureFormat,
-            TextureSampleType,
+            BindGroupLayout, BindGroupLayoutEntries, BufferVec, CachedRenderPipelineId,
+            ColorTargetState, ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            ShaderType, StorageBuffer, TextureFormat, TextureSampleType,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::RenderDevice,
@@ -18,13 +17,15 @@ use bevy::{
 };
 
 use crate::{
-    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, extract::ExtractedPointLight,
-    prepare::LightingData,
+    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
+    extract::{ExtractedOccluder, ExtractedPointLight},
+    prepare::{Angle, LightingData, OccluderMeta, Vertex},
 };
 
 #[derive(Resource)]
 pub(crate) struct LightmapCreationPipeline {
     pub layout: BindGroupLayout,
+    pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
 }
 
@@ -35,7 +36,12 @@ pub(crate) struct LightmapApplicationPipeline {
     pub pipeline_id: CachedRenderPipelineId,
 }
 
-const APPLICATON_SHADER: &str = "apply_lightmap.wgsl";
+#[derive(Resource)]
+pub(crate) struct TransferTexturePipeline {
+    pub layout: BindGroupLayout,
+    pub sampler: Sampler,
+    pub pipeline_id: CachedRenderPipelineId,
+}
 
 impl FromWorld for LightmapCreationPipeline {
     fn from_world(world: &mut World) -> Self {
@@ -47,13 +53,18 @@ impl FromWorld for LightmapCreationPipeline {
                 ShaderStages::FRAGMENT,
                 (
                     uniform_buffer::<ViewUniform>(true),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<LightingData>(false),
-                    GpuArrayBuffer::<ExtractedPointLight>::binding_layout(render_device),
+                    uniform_buffer::<ExtractedPointLight>(false),
+                    // GpuArrayBuffer::<OccluderMeta>::binding_layout(render_device),
+                    // GpuArrayBuffer::<Vertex>::binding_layout(render_device),
+                    // GpuArrayBuffer::<Angle>::binding_layout(render_device),
                 ),
             ),
         );
 
-        //let shader = world.resource::<Shaders>().create_lightmap.clone();
+        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
         let pipeline_id = new_pipeline(
             world,
@@ -66,6 +77,7 @@ impl FromWorld for LightmapCreationPipeline {
 
         Self {
             layout,
+            sampler,
             pipeline_id,
         }
     }
@@ -88,7 +100,6 @@ impl FromWorld for LightmapApplicationPipeline {
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-        // let shader = world.resource::<Shaders>().apply_lightmap.clone();
 
         let pipeline_id = new_pipeline(
             world,
@@ -97,6 +108,40 @@ impl FromWorld for LightmapApplicationPipeline {
             APPLY_LIGHTMAP_SHADER,
             Cow::Borrowed("fragment"),
             TextureFormat::bevy_default(),
+        );
+
+        Self {
+            layout,
+            sampler,
+            pipeline_id,
+        }
+    }
+}
+
+impl FromWorld for TransferTexturePipeline {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+
+        let layout = render_device.create_bind_group_layout(
+            "transfer texture layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                ),
+            ),
+        );
+
+        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+
+        let pipeline_id = new_pipeline(
+            world,
+            Some(Cow::Borrowed("transfer texture pipeline")),
+            layout.clone(),
+            TRANSFER_SHADER,
+            Cow::Borrowed("fragment"),
+            TextureFormat::Rgba16Float,
         );
 
         Self {

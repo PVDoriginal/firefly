@@ -26,7 +26,7 @@ use bevy::{
 use crate::{
     extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
-    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
+    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
     prepare::PreparePlugin,
 };
 
@@ -38,6 +38,22 @@ mod prepare;
 #[derive(Component, Reflect)]
 pub struct Occluder {
     pub shape: OccluderShape,
+}
+
+impl Occluder {
+    pub(crate) fn vertices(&self) -> Vec<Vec2> {
+        match self.shape {
+            OccluderShape::Rectangle { width, height } => {
+                let corner = vec2(width / 2., height / 2.);
+                vec![
+                    vec2(corner.x, corner.y),
+                    vec2(corner.x, -corner.y),
+                    vec2(-corner.x, -corner.y),
+                    vec2(-corner.x, corner.y),
+                ]
+            }
+        }
+    }
 }
 
 #[derive(Reflect)]
@@ -56,7 +72,13 @@ pub enum LightShape {
 }
 
 #[derive(Component)]
-pub(crate) struct LightMapTexture(pub CachedTexture);
+struct LightMapTexture(pub CachedTexture);
+
+#[derive(Component)]
+struct IntermediaryLightMapTexture(pub CachedTexture);
+
+#[derive(Component)]
+struct EmptyLightMapTexture(pub CachedTexture);
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct CreateLightmapLabel;
@@ -66,6 +88,7 @@ struct ApplyLightmapLabel;
 
 const CREATE_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
 const APPLY_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
+const TRANSFER_SHADER: Handle<Shader> = weak_handle!("206fb81e-58e7-4dd0-b4f5-c39892e23fc6");
 const TYPES_SHADER: Handle<Shader> = weak_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
 const UTILS_SHADER: Handle<Shader> = weak_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
 
@@ -85,6 +108,12 @@ impl Plugin for FireflyPlugin {
             app,
             APPLY_LIGHTMAP_SHADER,
             "../shaders/apply_lightmap.wgsl",
+            Shader::from_wgsl
+        );
+        load_internal_asset!(
+            app,
+            TRANSFER_SHADER,
+            "../shaders/transfer.wgsl",
             Shader::from_wgsl
         );
         load_internal_asset!(
@@ -130,6 +159,7 @@ impl Plugin for FireflyPlugin {
 
         render_app.init_resource::<LightmapCreationPipeline>();
         render_app.init_resource::<LightmapApplicationPipeline>();
+        render_app.init_resource::<TransferTexturePipeline>();
     }
 }
 

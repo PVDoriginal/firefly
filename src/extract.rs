@@ -1,17 +1,24 @@
 use bevy::{
     prelude::*,
     render::{
-        Extract, MainWorld, RenderApp, extract_component::ExtractComponent,
-        gpu_component_array_buffer::GpuComponentArrayBufferPlugin, render_resource::ShaderType,
+        Extract, MainWorld, RenderApp,
+        extract_component::ExtractComponent,
+        gpu_component_array_buffer::GpuComponentArrayBufferPlugin,
+        render_resource::{BufferVec, GpuArrayBuffer, ShaderType, StorageBuffer},
         sync_world::RenderEntity,
     },
 };
 
-use bevy::render::view::ViewUniform;
+use crate::Occluder;
 
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
 pub(crate) struct ExtractedPointLight {
     pub pos: Vec2,
+}
+
+#[derive(Component, Default, Clone, ExtractComponent)]
+pub(crate) struct ExtractedOccluder {
+    pub vertices: Vec<Vec2>,
 }
 
 pub(crate) struct ExtractPlugin;
@@ -23,7 +30,7 @@ impl Plugin for ExtractPlugin {
             return;
         };
 
-        render_app.add_systems(ExtractSchedule, extract_point_lights);
+        render_app.add_systems(ExtractSchedule, (extract_point_lights, extract_occluders));
     }
 }
 
@@ -36,6 +43,23 @@ fn extract_point_lights(
             .entity(render_entity.id())
             .insert(ExtractedPointLight {
                 pos: global_transform.translation().truncate(),
+            });
+    }
+}
+
+fn extract_occluders(
+    mut commands: Commands,
+    occluders: Extract<Query<(&RenderEntity, &Occluder, &GlobalTransform)>>,
+) {
+    for (render_entity, occluder, global_transform) in &occluders {
+        commands
+            .entity(render_entity.id())
+            .insert(ExtractedOccluder {
+                vertices: occluder
+                    .vertices()
+                    .iter()
+                    .map(|x| x + global_transform.translation().truncate())
+                    .collect(),
             });
     }
 }
