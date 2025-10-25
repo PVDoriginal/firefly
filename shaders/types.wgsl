@@ -11,6 +11,7 @@ struct PointLight {
 struct OccluderMeta {
     n_vertices: u32,
     seam: f32,
+    concave: u32,
 }
 
 struct Vertex {

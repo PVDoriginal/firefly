@@ -42,3 +42,12 @@ fn same_orientation(a: vec2f, b: vec2f, p: vec2f, q: vec2f) -> bool {
 fn orientation(a: vec2f, b: vec2f, p: vec2f) -> f32 {
     return (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
 } 
+
+fn ccw(a: vec2f, b: vec2f, c: vec2f) -> bool {
+    return (c.y-a.y) * (b.x-a.x) > (b.y-a.y) * (c.x-a.x);
+}
+
+// Return true if line segments AB and CD intersect
+fn intersect(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> bool {
+    return ccw(a, c, d) != ccw(b, c, d) && ccw(a, b, c) != ccw(a, b, d);
+}

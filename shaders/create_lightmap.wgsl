@@ -2,7 +2,7 @@
 #import bevy_render::view::View
 
 #import firefly::types::{PointLight, LightingData, OccluderMeta, Vertex}
-#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation}
+#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect}
 
 @group(0) @binding(0)
 var<uniform> view: View;
@@ -38,16 +38,22 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     if (dist < 100.) {
         let x = dist / 100.;
         res += vec4f(vec3f(1. - x * x), 0);
-
+        
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
-            if (is_occluded(pos, i, start_vertex)) {
+
+            if (occluders[i].concave == 1) {
+                let intersections = concave_check(pos, i, start_vertex);
+                res -= vec4f(vec3f(0.1 * f32(intersections)), 0);
+            }
+            else if (is_occluded(pos, i, start_vertex)) {
                 res = vec4f(0, 0, 0, 1);
                 break;
             }
             start_vertex += occluders[i].n_vertices;
         }
     }
+    res = max(res, vec4f(0, 0, 0, 1));
 
     res += textureSample(lightmap_texture, texture_sampler, in.uv);
     return min(res, vec4f(1, 1, 1, 1));
@@ -93,4 +99,23 @@ fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
     }
 
     return ans;
+}
+
+// returns number of times pixel was blocked by occluder
+fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> i32 {
+    var intersections = 0u;
+
+    for (var i = start_vertex; i < start_vertex + occluders[occluder].n_vertices - 1; i++) {
+        if (intersect(vertices[i].pos, vertices[i+1].pos, pos, light.pos)) {
+            intersections += 1;
+        }
+    }
+    if (intersect(vertices[start_vertex].pos, vertices[start_vertex + occluders[occluder].n_vertices - 1].pos, pos, light.pos)) {
+        intersections += 1;
+    }
+
+    if (intersections % 2 == 0) {
+        return i32(intersections) / 2;
+    }
+    return 0;
 }

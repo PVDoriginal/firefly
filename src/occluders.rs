@@ -18,6 +18,14 @@ pub enum OccluderShape {
     Rectangle { width: f32, height: f32 },
     Polygon { vertices: Vec<Vec2>, concave: bool },
 }
+impl OccluderShape {
+    pub fn concave(&self) -> bool {
+        match self {
+            Self::Polygon { concave, .. } => *concave,
+            _ => false,
+        }
+    }
+}
 
 impl Occluder {
     pub(crate) fn vertices(&self) -> Vec<Vec2> {
@@ -65,10 +73,21 @@ fn normalize_vertices(vertices: &Vec<Vec2>, allow_concave: bool) -> Option<(Vec<
         return Some((vertices.to_vec(), false));
     }
 
-    let orientations: Vec<_> = vertices
+    let mut orientations: Vec<_> = vertices
         .windows(3)
         .map(|line| orientation(line[0], line[1], line[2]))
         .collect();
+
+    orientations.push(orientation(
+        vertices[vertices.len() - 2],
+        vertices[vertices.len() - 1],
+        vertices[0],
+    ));
+    orientations.push(orientation(
+        vertices[vertices.len() - 1],
+        vertices[0],
+        vertices[1],
+    ));
 
     if orientations.contains(&Orientation::Left) && orientations.contains(&Orientation::Right) {
         if allow_concave {

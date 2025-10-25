@@ -36,6 +36,7 @@ pub(crate) struct LightingDataBuffer(pub UniformBuffer<LightingData>);
 pub(crate) struct OccluderMeta {
     pub n_vertices: u32,
     pub seam: f32,
+    pub concave: u32,
 }
 
 #[repr(C, align(16))]
@@ -160,6 +161,19 @@ fn prepare_data(
 
         for occluder in occluders {
             let mut meta: OccluderMeta = default();
+
+            if occluder.concave {
+                meta.concave = 1;
+                meta.n_vertices = occluder.vertices.len() as u32;
+
+                meta_buffer.push(meta);
+
+                occluder.vertices.iter().for_each(|&pos| {
+                    vertices_buffer.push(Vertex { angle: 0., pos });
+                });
+
+                continue;
+            }
 
             let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
 
