@@ -10,27 +10,28 @@ use bevy::{
 #[require(SyncToRenderWorld, VisibilityClass)]
 #[component(on_add = visibility::add_visibility_class::<PointLight>)]
 pub struct Occluder {
-    shape: OccluderShape,
+    pub shape: OccluderShape,
 }
 
 #[derive(Reflect, Clone)]
-pub enum OccluderShape {
+pub struct OccluderShape(OccluderShapeInternal);
+
+#[derive(Reflect, Clone)]
+pub enum OccluderShapeInternal {
     Rectangle { width: f32, height: f32 },
     Polygon { vertices: Vec<Vec2>, concave: bool },
 }
-impl OccluderShape {
+
+impl OccluderShapeInternal {
     pub fn concave(&self) -> bool {
         match self {
             Self::Polygon { concave, .. } => *concave,
             _ => false,
         }
     }
-}
-
-impl Occluder {
     pub(crate) fn vertices(&self) -> Vec<Vec2> {
-        match &self.shape {
-            OccluderShape::Rectangle { width, height } => {
+        match &self {
+            Self::Rectangle { width, height } => {
                 let corner = vec2(width / 2., height / 2.);
                 vec![
                     vec2(corner.x, corner.y),
@@ -39,26 +40,32 @@ impl Occluder {
                     vec2(-corner.x, corner.y),
                 ]
             }
-            OccluderShape::Polygon { vertices, .. } => vertices.clone(),
+            Self::Polygon { vertices, .. } => vertices.clone(),
         }
+    }
+}
+
+impl OccluderShape {
+    pub(crate) fn vertices(&self) -> Vec<Vec2> {
+        self.0.vertices()
+    }
+
+    pub fn is_concave(&self) -> bool {
+        self.0.concave()
     }
 
     pub fn polygon(vertices: Vec<Vec2>, allow_concave: bool) -> Option<Self> {
         normalize_vertices(&vertices, allow_concave).and_then(|(vertices, concave)| {
-            Some(Self {
-                shape: OccluderShape::Polygon { vertices, concave },
-            })
+            Some(Self(OccluderShapeInternal::Polygon { vertices, concave }))
         })
     }
 
     pub fn rectangle(width: f32, height: f32) -> Self {
-        Self {
-            shape: OccluderShape::Rectangle { width, height },
-        }
+        Self(OccluderShapeInternal::Rectangle { width, height })
     }
 
-    pub fn shape(&self) -> OccluderShape {
-        self.shape.clone()
+    pub fn internal(&self) -> OccluderShapeInternal {
+        self.0.clone()
     }
 }
 

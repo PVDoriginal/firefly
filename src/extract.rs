@@ -53,11 +53,12 @@ fn extract_occluders(
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 vertices: occluder
+                    .shape
                     .vertices()
                     .iter()
                     .map(|x| x + global_transform.translation().truncate())
                     .collect(),
-                concave: occluder.shape().concave(),
+                concave: occluder.shape.is_concave(),
             });
     }
 }
