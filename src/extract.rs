@@ -18,6 +18,7 @@ pub(crate) struct ExtractedPointLight {
 pub(crate) struct ExtractedOccluder {
     pub vertices: Vec<Vec2>,
     pub concave: bool,
+    pub closed: bool,
 }
 
 pub(crate) struct ExtractPlugin;
@@ -59,6 +60,7 @@ fn extract_occluders(
                     .map(|x| x + global_transform.translation().truncate())
                     .collect(),
                 concave: occluder.shape.is_concave(),
+                closed: occluder.shape.is_closed(),
             });
     }
 }

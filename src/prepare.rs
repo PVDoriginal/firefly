@@ -37,6 +37,7 @@ pub(crate) struct OccluderMeta {
     pub n_vertices: u32,
     pub seam: f32,
     pub concave: u32,
+    pub closed: u32,
 }
 
 #[repr(C, align(16))]
@@ -161,6 +162,10 @@ fn prepare_data(
 
         for occluder in occluders {
             let mut meta: OccluderMeta = default();
+            meta.closed = match occluder.closed {
+                false => 0,
+                true => 1,
+            };
 
             if occluder.concave {
                 meta.concave = 1;

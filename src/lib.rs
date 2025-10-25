@@ -160,6 +160,11 @@ fn draw_gizmos(
                 }
                 gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
             }
+            OccluderShapeInternal::Polyline { vertices, .. } => {
+                for line in vertices.windows(2) {
+                    gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
+                }
+            }
         }
     }
 }

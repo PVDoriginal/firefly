@@ -20,15 +20,21 @@ pub struct OccluderShape(OccluderShapeInternal);
 pub enum OccluderShapeInternal {
     Rectangle { width: f32, height: f32 },
     Polygon { vertices: Vec<Vec2>, concave: bool },
+    Polyline { vertices: Vec<Vec2>, concave: bool },
 }
 
 impl OccluderShapeInternal {
     pub fn concave(&self) -> bool {
         match self {
             Self::Polygon { concave, .. } => *concave,
+            Self::Polyline { concave, .. } => *concave,
             _ => false,
         }
     }
+    pub fn closed(&self) -> bool {
+        !matches!(self, OccluderShapeInternal::Polyline { .. })
+    }
+
     pub(crate) fn vertices(&self) -> Vec<Vec2> {
         match &self {
             Self::Rectangle { width, height } => {
@@ -41,6 +47,7 @@ impl OccluderShapeInternal {
                 ]
             }
             Self::Polygon { vertices, .. } => vertices.clone(),
+            Self::Polyline { vertices, .. } => vertices.clone(),
         }
     }
 }
@@ -53,18 +60,27 @@ impl OccluderShape {
     pub fn is_concave(&self) -> bool {
         self.0.concave()
     }
+    pub fn is_closed(&self) -> bool {
+        self.0.closed()
+    }
 
     pub fn polygon(vertices: Vec<Vec2>, allow_concave: bool) -> Option<Self> {
-        normalize_vertices(&vertices, allow_concave).and_then(|(vertices, concave)| {
+        normalize_vertices(vertices, allow_concave, true).and_then(|(vertices, concave)| {
             Some(Self(OccluderShapeInternal::Polygon { vertices, concave }))
         })
     }
 
-    pub fn polyline(mut vertices: Vec<Vec2>, allow_concave: bool) -> Option<Self> {
-        for i in (0..vertices.len() - 1).rev() {
-            vertices.push(vertices[i]);
+    pub fn polyline(vertices: Vec<Vec2>, is_concave: bool) -> Option<Self> {
+        if is_concave {
+            return Some(Self(OccluderShapeInternal::Polyline {
+                vertices,
+                concave: true,
+            }));
         }
-        Self::polygon(vertices, allow_concave)
+
+        normalize_vertices(vertices, false, false).and_then(|(vertices, concave)| {
+            Some(Self(OccluderShapeInternal::Polyline { vertices, concave }))
+        })
     }
 
     pub fn rectangle(width: f32, height: f32) -> Self {
@@ -77,7 +93,11 @@ impl OccluderShape {
 }
 
 // rotates vertices to be clockwise
-fn normalize_vertices(vertices: &Vec<Vec2>, allow_concave: bool) -> Option<(Vec<Vec2>, bool)> {
+fn normalize_vertices(
+    mut vertices: Vec<Vec2>,
+    allow_concave: bool,
+    closed: bool,
+) -> Option<(Vec<Vec2>, bool)> {
     if vertices.len() < 1 {
         warn!("Not enough vertices to form shape");
         return None;
@@ -103,14 +123,25 @@ fn normalize_vertices(vertices: &Vec<Vec2>, allow_concave: bool) -> Option<(Vec<
         vertices[1],
     ));
 
+    if !closed {
+        for i in (1..vertices.len() - 1).rev() {
+            vertices.push(vertices[i]);
+        }
+    }
+
     if orientations.contains(&Orientation::Left) && orientations.contains(&Orientation::Right) {
         if allow_concave {
             return Some((vertices.to_vec(), true));
         }
 
-        warn!(
-            "Shape is not convex. Set 'allow_concave' to true if you wish to allow this. However, this might have a considerable impact on performance"
-        );
+        match closed {
+            true => warn!(
+                "Shape is not convex. Set 'allow_concave' to true if you wish to allow this. However, this might have a considerable impact on performance"
+            ),
+            false => warn!(
+                "Line is not convex. Set 'is_convex' to true if you wish to allow this, at the cost of performance"
+            ),
+        }
         return None;
     }
 
