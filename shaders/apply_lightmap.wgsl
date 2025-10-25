@@ -13,6 +13,5 @@ var texture_sampler: sampler;
 fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let light_frag = textureSample(light_map_texture, texture_sampler, vo.uv);
     let scene_frag = textureSample(screen_texture, texture_sampler, vo.uv);
-    return scene_frag * light_frag;
-    //return scene_frag * (floor(light_frag * 4) / 4);
+    return scene_frag * (floor(light_frag * 4) / 4);
 }

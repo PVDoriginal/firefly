@@ -33,7 +33,7 @@ pub struct Occluder {
 
 impl Occluder {
     pub(crate) fn vertices(&self) -> Vec<Vec2> {
-        match self.shape {
+        match &self.shape {
             OccluderShape::Rectangle { width, height } => {
                 let corner = vec2(width / 2., height / 2.);
                 vec![
@@ -43,6 +43,7 @@ impl Occluder {
                     vec2(-corner.x, corner.y),
                 ]
             }
+            OccluderShape::Polygon { points } => points.clone(),
         }
     }
 }
@@ -50,6 +51,7 @@ impl Occluder {
 #[derive(Reflect)]
 pub enum OccluderShape {
     Rectangle { width: f32, height: f32 },
+    Polygon { points: Vec<Vec2> },
 }
 
 #[derive(Component, Reflect)]
@@ -72,10 +74,10 @@ struct IntermediaryLightMapTexture(pub CachedTexture);
 struct EmptyLightMapTexture(pub CachedTexture);
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct CreateLightmapLabel;
+pub struct CreateLightmapLabel;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct ApplyLightmapLabel;
+pub struct ApplyLightmapLabel;
 
 const CREATE_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
 const APPLY_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
@@ -171,6 +173,7 @@ fn draw_gizmos(
             OccluderShape::Rectangle { width, height } => {
                 gizmos.rect_2d(isometry, vec2(width, height), PINK);
             }
+            _ => {}
         }
     }
 }

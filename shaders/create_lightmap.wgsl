@@ -40,39 +40,17 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         res += vec4f(vec3f(1. - x * x), 0);
 
         var start_vertex = 0u;
-        var occluded = false;
-
-        var test = 0;
-        let pi = 3.14159;
-
         for (var i = 0u; i < data.n_occluders; i++) {
-            occluded = is_occluded(pos, i, start_vertex); 
-
-            if (occluded) {
+            if (is_occluded(pos, i, start_vertex)) {
                 res = vec4f(0, 0, 0, 1);
+                break;
             }
-
             start_vertex += occluders[i].n_vertices;
-            
-            // let val = is_occluded_test(pos, i, start_vertex);
-            // res = vec4f(f32(val), 0, 0, 1);
-            // return res;
         }
     }
 
     res += textureSample(lightmap_texture, texture_sampler, in.uv);
     return min(res, vec4f(1, 1, 1, 1));
-}
-
-fn is_occluded_test(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
-    let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
-    let maybe_prev = bs_vertex(angle, start_vertex, occluders[occluder].n_vertices);
-
-    if maybe_prev == -1 || maybe_prev + 1 >= i32(occluders[occluder].n_vertices)  {
-        return 0u;
-    }
-
-    return 1u;
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {

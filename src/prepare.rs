@@ -181,10 +181,10 @@ fn prepare_data(
                 })
                 .collect();
 
-            vertices
-                .iter()
-                .enumerate()
-                .for_each(|(i, v)| info!("vertex {i}: {}", v.pos));
+            // vertices
+            //     .iter()
+            //     .enumerate()
+            //     .for_each(|(i, v)| info!("vertex {i}: {}", v.pos));
 
             let cmp = |a: &&Vertex, b: &&Vertex| a.angle.total_cmp(&b.angle);
 
@@ -195,7 +195,7 @@ fn prepare_data(
                 .map(|(i, _)| i)
                 .unwrap();
 
-            info!("min vertex: {}", vertices[min_vertex].pos);
+            // info!("min vertex: {}", vertices[min_vertex].pos);
 
             let max_vertex = vertices
                 .iter()
@@ -204,14 +204,14 @@ fn prepare_data(
                 .map(|(i, _)| i)
                 .unwrap();
 
-            info!("max vertex: {}", vertices[max_vertex].pos);
+            // info!("max vertex: {}", vertices[max_vertex].pos);
             // info!("Looking at vertices!");
 
             loop {
                 vertices_buffer.push(vertices[min_vertex].clone());
                 meta.n_vertices += 1;
 
-                info!("Adding vertex with angle: {}", vertices[min_vertex].angle);
+                // info!("Adding vertex with angle: {}", vertices[min_vertex].angle);
 
                 if min_vertex == max_vertex {
                     break;
@@ -225,7 +225,7 @@ fn prepare_data(
                     min_vertex -= 1
                 };
             }
-            info!("n_vertices: {}", meta.n_vertices);
+            // info!("n_vertices: {}", meta.n_vertices);
             meta_buffer.push(meta);
             // info!("Done!\n\n");
         }
