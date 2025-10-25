@@ -19,40 +19,18 @@ use crate::{
     prepare::{LightingData, OccluderMeta, PreparePlugin, Vertex},
 };
 
+pub mod occluders;
+
 mod extract;
 mod nodes;
 mod pipelines;
 mod prepare;
 
-#[derive(Component, Reflect)]
-#[require(SyncToRenderWorld, VisibilityClass)]
-#[component(on_add = visibility::add_visibility_class::<PointLight>)]
-pub struct Occluder {
-    pub shape: OccluderShape,
+pub mod prelude {
+    pub use crate::{PointLight, occluders::Occluder};
 }
 
-impl Occluder {
-    pub(crate) fn vertices(&self) -> Vec<Vec2> {
-        match &self.shape {
-            OccluderShape::Rectangle { width, height } => {
-                let corner = vec2(width / 2., height / 2.);
-                vec![
-                    vec2(corner.x, corner.y),
-                    vec2(corner.x, -corner.y),
-                    vec2(-corner.x, -corner.y),
-                    vec2(-corner.x, corner.y),
-                ]
-            }
-            OccluderShape::Polygon { points } => points.clone(),
-        }
-    }
-}
-
-#[derive(Reflect)]
-pub enum OccluderShape {
-    Rectangle { width: f32, height: f32 },
-    Polygon { points: Vec<Vec2> },
-}
+use occluders::{Occluder, OccluderShape};
 
 #[derive(Component, Reflect)]
 #[require(SyncToRenderWorld, VisibilityClass)]
@@ -156,6 +134,8 @@ impl Plugin for FireflyPlugin {
     }
 }
 
+const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
+
 fn draw_gizmos(
     mut gizmos: Gizmos,
     lights: Query<&Transform, With<PointLight>>,
@@ -169,11 +149,16 @@ fn draw_gizmos(
     for (transform, occluder) in &occluders {
         let isometry = Isometry2d::from_translation(transform.translation.truncate());
 
-        match occluder.shape {
+        match occluder.shape() {
             OccluderShape::Rectangle { width, height } => {
-                gizmos.rect_2d(isometry, vec2(width, height), PINK);
+                gizmos.rect_2d(isometry, vec2(width, height), GIZMO_COLOR);
             }
-            _ => {}
+            OccluderShape::Polygon { vertices, .. } => {
+                for line in vertices.windows(2) {
+                    gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
+                }
+                gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
+            }
         }
     }
 }
