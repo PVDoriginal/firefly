@@ -15,10 +15,10 @@ use bevy::{
 };
 
 use crate::{
-    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
+    EmptyLightMapTexture, FireflyConfig, IntermediaryLightMapTexture, LightMapTexture,
     extract::ExtractedOccluder,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::{LightingDataBuffer, Lights, OccluderMeta, OccluderSet},
+    prepare::{BufferedFireflyConfig, LightingDataBuffer, Lights, OccluderMeta, OccluderSet},
 };
 
 #[derive(Default)]
@@ -167,12 +167,16 @@ impl ViewNode for CreateLightmapNode {
 }
 
 impl ViewNode for ApplyLightmapNode {
-    type ViewQuery = (Read<ViewTarget>, Read<LightMapTexture>);
+    type ViewQuery = (
+        Read<BufferedFireflyConfig>,
+        Read<ViewTarget>,
+        Read<LightMapTexture>,
+    );
     fn run<'w>(
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view_target, light_map_texture): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
+        (config, view_target, light_map_texture): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
         world: &'w World,
     ) -> std::result::Result<(), NodeRunError> {
         let pipeline = world.resource::<LightmapApplicationPipeline>();
@@ -183,6 +187,9 @@ impl ViewNode for ApplyLightmapNode {
         };
 
         let post_process = view_target.post_process_write();
+        let Some(config) = config.0.binding() else {
+            return Ok(());
+        };
 
         let bind_group = render_context.render_device().create_bind_group(
             "apply lightmap bind group",
@@ -191,6 +198,7 @@ impl ViewNode for ApplyLightmapNode {
                 post_process.source,
                 &light_map_texture.0.default_view,
                 &pipeline.sampler,
+                config,
             )),
         );
 

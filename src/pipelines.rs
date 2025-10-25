@@ -8,7 +8,7 @@ use bevy::{
             BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
             ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache, RenderPipelineDescriptor,
             Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, TextureFormat,
-            TextureSampleType,
+            TextureSampleType, UniformBuffer,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::RenderDevice,
@@ -19,7 +19,7 @@ use bevy::{
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
     extract::ExtractedPointLight,
-    prepare::{LightingData, OccluderMeta, Vertex},
+    prepare::{LightingData, OccluderMeta, UniformFireflyConfig, Vertex},
 };
 
 #[derive(Resource)]
@@ -94,6 +94,7 @@ impl FromWorld for LightmapApplicationPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<UniformFireflyConfig>(false),
                 ),
             ),
         );

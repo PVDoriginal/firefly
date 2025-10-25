@@ -19,3 +19,13 @@ struct Vertex {
     angle: f32,
     pos: vec2f
 }
+
+struct LightColor {
+    color: vec4f,
+    intensity: f32,
+}
+
+struct FireflyConfig {
+    global_light: LightColor,
+    light_bands: u32,
+}

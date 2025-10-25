@@ -5,21 +5,22 @@ use bevy::{
     prelude::*,
     render::{
         RenderApp,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
         render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner},
-        sync_world::SyncToRenderWorld,
         texture::CachedTexture,
-        view::{VisibilityClass, visibility},
     },
 };
 
 use crate::{
     extract::ExtractPlugin,
+    lights::LightColor,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
     occluders::OccluderShapeInternal,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::{LightingData, OccluderMeta, PreparePlugin, Vertex},
+    prepare::PreparePlugin,
 };
 
+pub mod lights;
 pub mod occluders;
 
 mod extract;
@@ -28,20 +29,12 @@ mod pipelines;
 mod prepare;
 
 pub mod prelude {
-    pub use crate::{PointLight, occluders::Occluder};
+    pub use crate::lights::{LightColor, PointLight};
+    pub use crate::occluders::Occluder;
+    pub use crate::{ApplyLightmapLabel, CreateLightmapLabel, FireflyPlugin};
 }
 
-use occluders::{Occluder, OccluderShape};
-
-#[derive(Component, Reflect)]
-#[require(SyncToRenderWorld, VisibilityClass)]
-#[component(on_add = visibility::add_visibility_class::<PointLight>)]
-pub struct PointLight;
-
-#[derive(Reflect)]
-pub enum LightShape {
-    Point,
-}
+use occluders::Occluder;
 
 #[derive(Component)]
 struct LightMapTexture(pub CachedTexture);
@@ -64,10 +57,19 @@ const TRANSFER_SHADER: Handle<Shader> = weak_handle!("206fb81e-58e7-4dd0-b4f5-c3
 const TYPES_SHADER: Handle<Shader> = weak_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
 const UTILS_SHADER: Handle<Shader> = weak_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
 
+#[derive(Component, ExtractComponent, Clone, Reflect)]
+pub struct FireflyConfig {
+    pub global_light: LightColor,
+    pub light_bands: Option<u32>,
+}
+
 pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<PointLight>();
+        app.register_type::<FireflyConfig>();
+
         app.add_systems(Update, draw_gizmos);
 
         load_internal_asset!(
@@ -102,6 +104,7 @@ impl Plugin for FireflyPlugin {
         );
 
         app.add_plugins((PreparePlugin, ExtractPlugin));
+        app.add_plugins(ExtractComponentPlugin::<FireflyConfig>::default());
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;

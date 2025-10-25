@@ -20,7 +20,6 @@ pub(crate) struct ExtractedOccluder {
     pub concave: bool,
     pub closed: bool,
 }
-
 pub(crate) struct ExtractPlugin;
 impl Plugin for ExtractPlugin {
     fn build(&self, app: &mut App) {
@@ -34,7 +33,9 @@ impl Plugin for ExtractPlugin {
 
 fn extract_point_lights(
     mut commands: Commands,
-    point_lights: Extract<Query<(&RenderEntity, &GlobalTransform), With<crate::PointLight>>>,
+    point_lights: Extract<
+        Query<(&RenderEntity, &GlobalTransform), With<crate::prelude::PointLight>>,
+    >,
 ) {
     for (render_entity, global_transform) in &point_lights {
         commands

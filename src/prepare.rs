@@ -16,7 +16,7 @@ use bevy::{
 };
 
 use crate::{
-    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture, Occluder,
+    EmptyLightMapTexture, FireflyConfig, IntermediaryLightMapTexture, LightMapTexture, Occluder,
     extract::{ExtractedOccluder, ExtractedPointLight},
 };
 
@@ -47,6 +47,23 @@ pub(crate) struct Vertex {
     pub pos: Vec2,
 }
 
+#[derive(Component)]
+pub(crate) struct BufferedFireflyConfig(pub UniformBuffer<UniformFireflyConfig>);
+
+#[repr(C, align(16))]
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformFireflyConfig {
+    global_light: UniformLightColor,
+    light_bands: u32,
+}
+
+#[repr(C, align(16))]
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformLightColor {
+    color: Vec4,
+    intensity: f32,
+}
+
 #[derive(Resource, Default)]
 pub(crate) struct Lights(pub Vec<UniformBuffer<ExtractedPointLight>>);
 
@@ -62,6 +79,7 @@ impl Plugin for PreparePlugin {
         render_app.init_resource::<Lights>();
 
         render_app.add_systems(Render, prepare_data.in_set(RenderSet::Prepare));
+        render_app.add_systems(Render, prepare_config.in_set(RenderSet::Prepare));
         render_app.add_systems(Render, prepare_lightmap.in_set(RenderSet::Prepare));
     }
     fn finish(&self, app: &mut App) {
@@ -72,7 +90,33 @@ impl Plugin for PreparePlugin {
     }
 }
 
-pub fn prepare_lightmap(
+fn prepare_config(
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    configs: Query<(Entity, &FireflyConfig)>,
+    mut commands: Commands,
+) {
+    for (entity, config) in &configs {
+        let mut buffer = UniformBuffer::<UniformFireflyConfig>::default();
+        let uniform = UniformFireflyConfig {
+            global_light: UniformLightColor {
+                color: config.global_light.color.to_linear().to_vec4(),
+                intensity: config.global_light.intensity,
+            },
+            light_bands: match config.light_bands {
+                None => 0,
+                Some(x) => x,
+            },
+        };
+        buffer.set(uniform);
+        buffer.write_buffer(&render_device, &render_queue);
+        commands
+            .entity(entity)
+            .insert(BufferedFireflyConfig(buffer));
+    }
+}
+
+fn prepare_lightmap(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     mut texture_cache: ResMut<TextureCache>,
