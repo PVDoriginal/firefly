@@ -60,6 +60,13 @@ impl OccluderShape {
         })
     }
 
+    pub fn polyline(mut vertices: Vec<Vec2>, allow_concave: bool) -> Option<Self> {
+        for i in (0..vertices.len() - 1).rev() {
+            vertices.push(vertices[i]);
+        }
+        Self::polygon(vertices, allow_concave)
+    }
+
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self(OccluderShapeInternal::Rectangle { width, height })
     }
