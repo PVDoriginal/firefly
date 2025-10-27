@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, f32::consts::PI};
+use std::f32::consts::PI;
 
 use bevy::{
     math::ops::floor,
@@ -6,8 +6,8 @@ use bevy::{
     render::{
         Render, RenderApp, RenderSet,
         render_resource::{
-            GpuArrayBuffer, ShaderType, TextureDescriptor, TextureDimension, TextureFormat,
-            TextureUsages, UniformBuffer,
+            GpuArrayBuffer, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+            UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::TextureCache,
@@ -16,56 +16,17 @@ use bevy::{
 };
 
 use crate::{
-    EmptyLightMapTexture, FireflyConfig, IntermediaryLightMapTexture, LightMapTexture, Occluder,
-    extract::{ExtractedOccluder, ExtractedPointLight},
+    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
+    data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
+    lights::{ExtractedPointLight, LightSet, UniformLightColor},
+    occluders::{ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex},
 };
 
-#[derive(Default, Clone, Copy, ShaderType)]
-pub(crate) struct LightingData {
-    pub n_occluders: u32,
-}
-
 #[derive(Resource, Default)]
-pub(crate) struct OccluderSet(pub Vec<(GpuArrayBuffer<OccluderMeta>, GpuArrayBuffer<Vertex>)>);
-
-#[derive(Resource, Default)]
-pub(crate) struct LightingDataBuffer(pub UniformBuffer<LightingData>);
-
-#[repr(C, align(16))]
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct OccluderMeta {
-    pub n_vertices: u32,
-    pub seam: f32,
-    pub concave: u32,
-    pub closed: u32,
-}
-
-#[repr(C, align(16))]
-#[derive(ShaderType, Clone)]
-pub(crate) struct Vertex {
-    pub angle: f32,
-    pub pos: Vec2,
-}
+pub(crate) struct LightingDataBuffer(pub UniformBuffer<UniformMeta>);
 
 #[derive(Component)]
 pub(crate) struct BufferedFireflyConfig(pub UniformBuffer<UniformFireflyConfig>);
-
-#[repr(C, align(16))]
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformFireflyConfig {
-    global_light: UniformLightColor,
-    light_bands: u32,
-}
-
-#[repr(C, align(16))]
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformLightColor {
-    color: Vec4,
-    intensity: f32,
-}
-
-#[derive(Resource, Default)]
-pub(crate) struct Lights(pub Vec<UniformBuffer<ExtractedPointLight>>);
 
 pub(crate) struct PreparePlugin;
 
@@ -76,7 +37,7 @@ impl Plugin for PreparePlugin {
         };
 
         render_app.init_resource::<LightingDataBuffer>();
-        render_app.init_resource::<Lights>();
+        render_app.init_resource::<LightSet>();
 
         render_app.add_systems(Render, prepare_data.in_set(RenderSet::Prepare));
         render_app.add_systems(Render, prepare_config.in_set(RenderSet::Prepare));
@@ -178,47 +139,48 @@ fn prepare_data(
     render_queue: Res<RenderQueue>,
     lights: Query<&ExtractedPointLight>,
     occluders: Query<&ExtractedOccluder>,
-    mut buffer: ResMut<LightingDataBuffer>,
-    mut lights_res: ResMut<Lights>,
+    mut data_buffer: ResMut<LightingDataBuffer>,
+    mut light_set: ResMut<LightSet>,
     mut occluder_set: ResMut<OccluderSet>,
 ) {
-    let data = LightingData {
+    let data = UniformMeta {
         n_occluders: occluders.iter().len() as u32,
     };
 
-    *lights_res = default();
+    data_buffer.0.set(data);
+    data_buffer.0.write_buffer(&render_device, &render_queue);
+
+    *light_set = default();
     for light in lights {
         let mut buffer = UniformBuffer::<ExtractedPointLight>::default();
         buffer.set(*light);
         buffer.write_buffer(&render_device, &render_queue);
 
-        lights_res.0.push(buffer);
+        light_set.0.push(buffer);
     }
-
-    buffer.0.set(data);
-    buffer.0.write_buffer(&render_device, &render_queue);
-
     *occluder_set = default();
 
     for light in lights {
-        let mut meta_buffer = GpuArrayBuffer::<OccluderMeta>::new(&render_device);
-        let mut vertices_buffer = GpuArrayBuffer::<Vertex>::new(&render_device);
+        let light_pos = light.pos;
+
+        let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
+        let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
 
         for occluder in occluders {
-            let mut meta: OccluderMeta = default();
-            meta.closed = match occluder.closed {
+            let mut meta: UniformOccluder = default();
+            meta.closed = match occluder.shape.is_closed() {
                 false => 0,
                 true => 1,
             };
 
-            if occluder.concave {
+            if occluder.shape.is_concave() {
                 meta.concave = 1;
-                meta.n_vertices = occluder.vertices.len() as u32;
+                meta.n_vertices = occluder.vertices().len() as u32;
 
                 meta_buffer.push(meta);
 
-                occluder.vertices.iter().for_each(|&pos| {
-                    vertices_buffer.push(Vertex { angle: 0., pos });
+                occluder.vertices().iter().for_each(|&pos| {
+                    vertices_buffer.push(UniformVertex { angle: 0., pos });
                 });
 
                 continue;
@@ -226,7 +188,7 @@ fn prepare_data(
 
             let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
 
-            let ref_angle = angle(occluder.vertices[0], light.pos);
+            let ref_angle = angle(occluder.vertices()[0], light_pos);
 
             if ref_angle > 0. {
                 meta.seam = ref_angle - PI;
@@ -235,11 +197,11 @@ fn prepare_data(
             }
 
             let vertices: Vec<_> = occluder
-                .vertices
+                .vertices()
                 .iter()
-                .map(|&pos| Vertex {
-                    angle: (angle(pos, light.pos) - meta.seam)
-                        + 2. * PI * floor((meta.seam - angle(pos, light.pos)) / (2. * PI)),
+                .map(|&pos| UniformVertex {
+                    angle: (angle(pos, light_pos) - meta.seam)
+                        + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI)),
                     pos,
                 })
                 .collect();
@@ -249,7 +211,7 @@ fn prepare_data(
             //     .enumerate()
             //     .for_each(|(i, v)| info!("vertex {i}: {}", v.pos));
 
-            let cmp = |a: &&Vertex, b: &&Vertex| a.angle.total_cmp(&b.angle);
+            let cmp = |a: &&UniformVertex, b: &&UniformVertex| a.angle.total_cmp(&b.angle);
 
             let mut min_vertex = vertices
                 .iter()

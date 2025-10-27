@@ -1,48 +1,39 @@
 use bevy::{
     prelude::*,
     render::{
-        Extract, RenderApp, extract_component::ExtractComponent,
-        gpu_component_array_buffer::GpuComponentArrayBufferPlugin, render_resource::ShaderType,
-        sync_world::RenderEntity,
+        Extract, RenderApp, extract_component::ExtractComponentPlugin, sync_world::RenderEntity,
     },
 };
 
-use crate::Occluder;
+use crate::{
+    data::FireflyConfig,
+    lights::{ExtractedPointLight, PointLight},
+    occluders::ExtractedOccluder,
+    prelude::Occluder,
+};
 
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
-pub(crate) struct ExtractedPointLight {
-    pub pos: Vec2,
-}
-
-#[derive(Component, Default, Clone, ExtractComponent)]
-pub(crate) struct ExtractedOccluder {
-    pub vertices: Vec<Vec2>,
-    pub concave: bool,
-    pub closed: bool,
-}
 pub(crate) struct ExtractPlugin;
 impl Plugin for ExtractPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(ExtractComponentPlugin::<FireflyConfig>::default());
+
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
 
-        render_app.add_systems(ExtractSchedule, (extract_point_lights, extract_occluders));
+        render_app.add_systems(ExtractSchedule, extract_lights);
+        render_app.add_systems(ExtractSchedule, extract_occluders);
     }
 }
 
-fn extract_point_lights(
+fn extract_lights(
     mut commands: Commands,
-    point_lights: Extract<
-        Query<(&RenderEntity, &GlobalTransform), With<crate::prelude::PointLight>>,
-    >,
+    lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight)>>,
 ) {
-    for (render_entity, global_transform) in &point_lights {
-        commands
-            .entity(render_entity.id())
-            .insert(ExtractedPointLight {
-                pos: global_transform.translation().truncate(),
-            });
+    for (entity, transform, _light) in &lights {
+        commands.entity(entity.id()).insert(ExtractedPointLight {
+            pos: transform.translation().truncate(),
+        });
     }
 }
 
@@ -54,14 +45,8 @@ fn extract_occluders(
         commands
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
-                vertices: occluder
-                    .shape
-                    .vertices()
-                    .iter()
-                    .map(|x| x + global_transform.translation().truncate())
-                    .collect(),
-                concave: occluder.shape.is_concave(),
-                closed: occluder.shape.is_closed(),
+                pos: global_transform.translation().truncate(),
+                shape: occluder.shape.clone(),
             });
     }
 }

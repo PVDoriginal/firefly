@@ -8,7 +8,7 @@ use bevy::{
             BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState,
             ColorWrites, FragmentState, GpuArrayBuffer, PipelineCache, RenderPipelineDescriptor,
             Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, TextureFormat,
-            TextureSampleType, UniformBuffer,
+            TextureSampleType,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::RenderDevice,
@@ -18,8 +18,9 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
-    extract::ExtractedPointLight,
-    prepare::{LightingData, OccluderMeta, UniformFireflyConfig, Vertex},
+    data::{UniformFireflyConfig, UniformMeta},
+    lights::ExtractedPointLight,
+    occluders::{UniformOccluder, UniformVertex},
 };
 
 #[derive(Resource)]
@@ -55,10 +56,10 @@ impl FromWorld for LightmapCreationPipeline {
                     uniform_buffer::<ViewUniform>(true),
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
-                    uniform_buffer::<LightingData>(false),
+                    uniform_buffer::<UniformMeta>(false),
                     uniform_buffer::<ExtractedPointLight>(false),
-                    GpuArrayBuffer::<OccluderMeta>::binding_layout(render_device),
-                    GpuArrayBuffer::<Vertex>::binding_layout(render_device),
+                    GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
+                    GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
                 ),
             ),
         );

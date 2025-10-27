@@ -1,17 +1,50 @@
 use bevy::{
     prelude::*,
     render::{
+        render_resource::{GpuArrayBuffer, ShaderType},
         sync_world::SyncToRenderWorld,
-        view::{VisibilityClass, visibility},
     },
 };
 
 #[derive(Component, Reflect)]
-#[require(SyncToRenderWorld, VisibilityClass)]
-#[component(on_add = visibility::add_visibility_class::<PointLight>)]
+#[require(SyncToRenderWorld)]
 pub struct Occluder {
     pub shape: OccluderShape,
 }
+
+#[derive(Component)]
+pub(crate) struct ExtractedOccluder {
+    pub pos: Vec2,
+    pub shape: OccluderShape,
+}
+
+impl ExtractedOccluder {
+    pub fn vertices(&self) -> Vec<Vec2> {
+        self.shape.vertices(self.pos)
+    }
+}
+
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformOccluder {
+    pub n_vertices: u32,
+    pub seam: f32,
+    pub concave: u32,
+    pub closed: u32,
+}
+
+#[derive(ShaderType, Clone)]
+pub(crate) struct UniformVertex {
+    pub angle: f32,
+    pub pos: Vec2,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct OccluderSet(
+    pub  Vec<(
+        GpuArrayBuffer<UniformOccluder>,
+        GpuArrayBuffer<UniformVertex>,
+    )>,
+);
 
 #[derive(Reflect, Clone)]
 pub struct OccluderShape(OccluderShapeInternal);
@@ -35,15 +68,15 @@ impl OccluderShapeInternal {
         !matches!(self, OccluderShapeInternal::Polyline { .. })
     }
 
-    pub(crate) fn vertices(&self) -> Vec<Vec2> {
+    pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
         match &self {
             Self::Rectangle { width, height } => {
                 let corner = vec2(width / 2., height / 2.);
                 vec![
-                    vec2(corner.x, corner.y),
-                    vec2(corner.x, -corner.y),
-                    vec2(-corner.x, -corner.y),
-                    vec2(-corner.x, corner.y),
+                    vec2(corner.x, corner.y) + pos,
+                    vec2(corner.x, -corner.y) + pos,
+                    vec2(-corner.x, -corner.y) + pos,
+                    vec2(-corner.x, corner.y) + pos,
                 ]
             }
             Self::Polygon { vertices, .. } => vertices.clone(),
@@ -53,8 +86,8 @@ impl OccluderShapeInternal {
 }
 
 impl OccluderShape {
-    pub(crate) fn vertices(&self) -> Vec<Vec2> {
-        self.0.vertices()
+    pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
+        self.0.vertices(pos)
     }
 
     pub fn is_concave(&self) -> bool {

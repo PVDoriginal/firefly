@@ -1,24 +1,22 @@
-use std::ops::Index;
-
 use bevy::{
     ecs::system::lifetimeless::Read,
     prelude::*,
     render::{
         render_graph::{NodeRunError, ViewNode},
         render_resource::{
-            BindGroupEntries, GpuArrayBuffer, PipelineCache, RenderPassColorAttachment,
-            RenderPassDescriptor,
+            BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
         },
-        renderer::{RenderContext, RenderQueue},
+        renderer::RenderContext,
         view::{ViewTarget, ViewUniformOffset, ViewUniforms},
     },
 };
 
 use crate::{
-    EmptyLightMapTexture, FireflyConfig, IntermediaryLightMapTexture, LightMapTexture,
-    extract::ExtractedOccluder,
+    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
+    lights::LightSet,
+    occluders::OccluderSet,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::{BufferedFireflyConfig, LightingDataBuffer, Lights, OccluderMeta, OccluderSet},
+    prepare::{BufferedFireflyConfig, LightingDataBuffer},
 };
 
 #[derive(Default)]
@@ -66,7 +64,7 @@ impl ViewNode for CreateLightmapNode {
             return Ok(());
         };
 
-        let lights = world.resource::<Lights>();
+        let lights = world.resource::<LightSet>();
         let occluder_set = world.resource::<OccluderSet>();
 
         for (i, light) in lights.0.iter().enumerate() {
