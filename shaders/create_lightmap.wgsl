@@ -35,8 +35,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let light = light.pos; 
     let dist = distance(pos, light) + 0.01; 
 
-    if (dist < 100.) {
-        let x = dist / 100.;
+    if (dist < 200.) {
+        let x = dist / 200.;
         res += vec4f(vec3f(1. - x * x), 0);
         
         var start_vertex = 0u;
@@ -114,11 +114,11 @@ fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> i32 {
         }
     }
 
-    if (occluders[occluder].closed == 1 && intersect(vertices[start_vertex].pos, vertices[start_vertex + occluders[occluder].n_vertices - 1].pos, pos, light.pos)) {
+    if (occluders[occluder].line == 0 && intersect(vertices[start_vertex].pos, vertices[start_vertex + occluders[occluder].n_vertices - 1].pos, pos, light.pos)) {
         intersections += 1;
     }
 
-    if (occluders[occluder].closed == 0) {
+    if (occluders[occluder].line == 1) {
         return i32(intersections);
     }
 

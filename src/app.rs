@@ -25,6 +25,8 @@ impl Plugin for FireflyPlugin {
         app.register_type::<crate::prelude::PointLight>();
         app.register_type::<FireflyConfig>();
 
+        //app.add_systems(Startup, stress_test);
+
         load_internal_asset!(
             app,
             CREATE_LIGHTMAP_SHADER,
@@ -87,6 +89,12 @@ impl Plugin for FireflyPlugin {
         render_app.init_resource::<LightmapCreationPipeline>();
         render_app.init_resource::<LightmapApplicationPipeline>();
         render_app.init_resource::<TransferTexturePipeline>();
+    }
+}
+
+fn stress_test(mut commands: Commands) {
+    for _ in 0..50 {
+        commands.spawn((Name::new("Point Light"), PointLight, Transform::default()));
     }
 }
 

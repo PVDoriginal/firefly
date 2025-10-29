@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::{EPSILON, consts::PI};
 
 use bevy::{
     math::ops::floor,
@@ -19,7 +19,9 @@ use crate::{
     EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
     lights::{ExtractedPointLight, LightSet, UniformLightColor},
-    occluders::{ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex},
+    occluders::{
+        ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex, point_inside_poly,
+    },
 };
 
 #[derive(Resource, Default)]
@@ -168,14 +170,28 @@ fn prepare_data(
 
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
-            meta.closed = match occluder.shape.is_closed() {
+
+            meta.line = match occluder.shape.is_line() {
+                false => 0,
+                true => 1,
+            };
+
+            meta.concave = match occluder.shape.is_concave() {
                 false => 0,
                 true => 1,
             };
 
             if occluder.shape.is_concave() {
-                meta.concave = 1;
                 meta.n_vertices = occluder.vertices().len() as u32;
+
+                let mut vertices = occluder.vertices().clone();
+
+                // TODO: temp
+                if meta.line == 0 && point_inside_poly(light_pos, occluder.vertices()) {
+                    meta.n_vertices += 1;
+                    vertices.push(*vertices.first().unwrap());
+                    meta.line = 1;
+                }
 
                 meta_buffer.push(meta);
 
@@ -188,6 +204,32 @@ fn prepare_data(
 
             let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
 
+            if point_inside_poly(light_pos, occluder.vertices()) {
+                let ref_angle = angle(*occluder.vertices().last().unwrap(), light_pos) - 0.001;
+                meta.seam = ref_angle;
+
+                meta.n_vertices = occluder.vertices().len() as u32 + 1;
+
+                for &pos in occluder.vertices().iter().rev() {
+                    vertices_buffer.push(UniformVertex {
+                        angle: (angle(pos, light_pos) - meta.seam)
+                            + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI)),
+                        pos,
+                    });
+                }
+
+                let pos = *occluder.vertices().last().unwrap();
+
+                vertices_buffer.push(UniformVertex {
+                    angle: (angle(pos, light_pos) - meta.seam)
+                        + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI))
+                        + 2. * PI,
+                    pos,
+                });
+                meta_buffer.push(meta);
+                continue;
+            }
+
             let ref_angle = angle(occluder.vertices()[0], light_pos);
 
             if ref_angle > 0. {
@@ -196,7 +238,7 @@ fn prepare_data(
                 meta.seam = ref_angle + PI;
             }
 
-            let vertices: Vec<_> = occluder
+            let mut vertices: Vec<_> = occluder
                 .vertices()
                 .iter()
                 .map(|&pos| UniformVertex {
@@ -230,13 +272,16 @@ fn prepare_data(
                 .unwrap();
 
             // info!("max vertex: {}", vertices[max_vertex].pos);
-            // info!("Looking at vertices!");
+            info!("Looking at vertices!");
 
             loop {
                 vertices_buffer.push(vertices[min_vertex].clone());
                 meta.n_vertices += 1;
 
-                // info!("Adding vertex with angle: {}", vertices[min_vertex].angle);
+                info!(
+                    "Adding vertex with angle: {}, pos: {}",
+                    vertices[min_vertex].angle, vertices[min_vertex].pos
+                );
 
                 if min_vertex == max_vertex {
                     break;
@@ -250,6 +295,24 @@ fn prepare_data(
                     min_vertex -= 1
                 };
             }
+
+            // info!(
+            //     "max angle: {}",
+            //     vertices[(max_vertex + 1) % vertices.len()].angle
+            // );
+            // info!("after max angle: {}", vertices[max_vertex].angle);
+
+            // if (vertices[max_vertex].angle - vertices[(max_vertex + 1) % vertices.len()].angle)
+            //     .abs()
+            //     >= PI
+            // {
+            //     warn!("doing something");
+            //     meta.n_vertices += 1;
+            //     let mut rubber = vertices[(max_vertex + 1) % vertices.len()].clone();
+            //     rubber.angle += 2. * PI;
+            //     vertices_buffer.push(rubber);
+            // }
+
             // info!("n_vertices: {}", meta.n_vertices);
             meta_buffer.push(meta);
             // info!("Done!\n\n");

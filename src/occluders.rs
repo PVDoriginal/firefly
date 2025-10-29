@@ -29,7 +29,7 @@ pub(crate) struct UniformOccluder {
     pub n_vertices: u32,
     pub seam: f32,
     pub concave: u32,
-    pub closed: u32,
+    pub line: u32,
 }
 
 #[derive(ShaderType, Clone)]
@@ -45,6 +45,14 @@ pub(crate) struct OccluderSet(
         GpuArrayBuffer<UniformVertex>,
     )>,
 );
+
+pub enum OcluderFlags {
+    Concave = 0,
+    TryConcave = 1,
+    Convex = 2,
+    Hollow = 3,
+    CotainsLight = 4,
+}
 
 #[derive(Reflect, Clone)]
 pub struct OccluderShape(OccluderShapeInternal);
@@ -64,8 +72,8 @@ impl OccluderShapeInternal {
             _ => false,
         }
     }
-    pub fn closed(&self) -> bool {
-        !matches!(self, OccluderShapeInternal::Polyline { .. })
+    pub fn line(&self) -> bool {
+        matches!(self, OccluderShapeInternal::Polyline { .. })
     }
 
     pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
@@ -93,27 +101,24 @@ impl OccluderShape {
     pub fn is_concave(&self) -> bool {
         self.0.concave()
     }
-    pub fn is_closed(&self) -> bool {
-        self.0.closed()
+    pub fn is_line(&self) -> bool {
+        self.0.line()
     }
 
-    pub fn polygon(vertices: Vec<Vec2>, allow_concave: bool) -> Option<Self> {
-        normalize_vertices(vertices, allow_concave, true).and_then(|(vertices, concave)| {
+    pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
+        normalize_vertices(vertices).and_then(|(vertices, concave)| {
             Some(Self(OccluderShapeInternal::Polygon { vertices, concave }))
         })
     }
 
-    pub fn polyline(vertices: Vec<Vec2>, is_concave: bool) -> Option<Self> {
-        if is_concave {
-            return Some(Self(OccluderShapeInternal::Polyline {
-                vertices,
-                concave: true,
-            }));
-        }
-
-        normalize_vertices(vertices, false, false).and_then(|(vertices, concave)| {
-            Some(Self(OccluderShapeInternal::Polyline { vertices, concave }))
-        })
+    pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
+        Some(Self(OccluderShapeInternal::Polyline {
+            vertices,
+            concave: true,
+        }))
+        // normalize_vertices(vertices).and_then(|(vertices, concave)| {
+        //     Some(Self(OccluderShapeInternal::Polyline { vertices, concave }))
+        // })
     }
 
     pub fn rectangle(width: f32, height: f32) -> Self {
@@ -126,11 +131,7 @@ impl OccluderShape {
 }
 
 // rotates vertices to be clockwise
-fn normalize_vertices(
-    mut vertices: Vec<Vec2>,
-    allow_concave: bool,
-    closed: bool,
-) -> Option<(Vec<Vec2>, bool)> {
+fn normalize_vertices(vertices: Vec<Vec2>) -> Option<(Vec<Vec2>, bool)> {
     if vertices.len() < 1 {
         warn!("Not enough vertices to form shape");
         return None;
@@ -156,26 +157,8 @@ fn normalize_vertices(
         vertices[1],
     ));
 
-    if !closed {
-        for i in (1..vertices.len() - 1).rev() {
-            vertices.push(vertices[i]);
-        }
-    }
-
     if orientations.contains(&Orientation::Left) && orientations.contains(&Orientation::Right) {
-        if allow_concave {
-            return Some((vertices.to_vec(), true));
-        }
-
-        match closed {
-            true => warn!(
-                "Shape is not convex. Set 'allow_concave' to true if you wish to allow this. However, this might have a considerable impact on performance"
-            ),
-            false => warn!(
-                "Line is not convex. Set 'is_convex' to true if you wish to allow this, at the cost of performance"
-            ),
-        }
-        return None;
+        return Some((vertices.to_vec(), true));
     }
 
     if orientations.contains(&Orientation::Left) {
@@ -201,4 +184,27 @@ fn orientation(a: Vec2, b: Vec2, p: Vec2) -> Orientation {
         return Orientation::Left;
     }
     Orientation::Touch
+}
+
+pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>) -> bool {
+    // TODO: Bounding Box check
+
+    poly.push(poly[0]);
+
+    let mut inside = false;
+
+    for line in poly.windows(2) {
+        if p.y > line[0].y.min(line[1].y)
+            && p.y <= line[0].y.max(line[1].y)
+            && p.x <= line[0].x.max(line[1].x)
+        {
+            let x_intersection =
+                (p.y - line[0].y) * (line[1].x - line[0].x) / (line[1].y - line[0].y) + line[0].x;
+
+            if line[0].x == line[1].x || p.x <= x_intersection {
+                inside = !inside;
+            }
+        }
+    }
+    inside
 }
