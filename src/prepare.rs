@@ -18,7 +18,7 @@ use bevy::{
 use crate::{
     EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
-    lights::{ExtractedPointLight, LightSet, UniformLightColor},
+    lights::{ExtractedPointLight, LightSet, UniformLightColor, UniformPointLight},
     occluders::{
         ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex, point_inside_poly,
     },
@@ -154,8 +154,15 @@ fn prepare_data(
 
     *light_set = default();
     for light in lights {
-        let mut buffer = UniformBuffer::<ExtractedPointLight>::default();
-        buffer.set(*light);
+        let mut buffer = UniformBuffer::<UniformPointLight>::default();
+        buffer.set(UniformPointLight {
+            pos: light.pos,
+            light: UniformLightColor {
+                color: light.light.color.to_linear().to_vec4(),
+                intensity: light.light.intensity,
+            },
+            range: light.range,
+        });
         buffer.write_buffer(&render_device, &render_queue);
 
         light_set.0.push(buffer);
@@ -181,6 +188,11 @@ fn prepare_data(
                 true => 1,
             };
 
+            meta.hollow = match occluder.hollow {
+                false => 0,
+                true => 1,
+            };
+
             if occluder.shape.is_concave() {
                 meta.n_vertices = occluder.vertices().len() as u32;
 
@@ -195,7 +207,7 @@ fn prepare_data(
 
                 meta_buffer.push(meta);
 
-                occluder.vertices().iter().for_each(|&pos| {
+                vertices.iter().for_each(|&pos| {
                     vertices_buffer.push(UniformVertex { angle: 0., pos });
                 });
 
@@ -272,28 +284,30 @@ fn prepare_data(
                 .unwrap();
 
             // info!("max vertex: {}", vertices[max_vertex].pos);
-            info!("Looking at vertices!");
+            // info!("Looking at vertices!");
 
             loop {
                 vertices_buffer.push(vertices[min_vertex].clone());
                 meta.n_vertices += 1;
 
-                info!(
-                    "Adding vertex with angle: {}, pos: {}",
-                    vertices[min_vertex].angle, vertices[min_vertex].pos
-                );
+                // info!(
+                //     "Adding vertex with angle: {}, pos: {}",
+                //     vertices[min_vertex].angle, vertices[min_vertex].pos
+                // );
 
                 if min_vertex == max_vertex {
                     break;
                 }
 
-                // TODO: increment by 1 instead for non-hollow ocluders
-
-                if min_vertex == 0 {
-                    min_vertex = vertices.len() - 1;
+                if !occluder.hollow {
+                    if min_vertex == 0 {
+                        min_vertex = vertices.len() - 1;
+                    } else {
+                        min_vertex -= 1
+                    };
                 } else {
-                    min_vertex -= 1
-                };
+                    min_vertex = (min_vertex + 1) % vertices.len();
+                }
             }
 
             // info!(

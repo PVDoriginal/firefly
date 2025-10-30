@@ -9,15 +9,36 @@ use bevy::{
 
 #[derive(Component, Clone, Reflect)]
 #[require(SyncToRenderWorld)]
-pub struct PointLight;
+pub struct PointLight {
+    pub light: LightColor,
+    pub range: f32,
+}
 
-#[derive(Component, Default, Clone, Copy, ShaderType)]
+impl Default for PointLight {
+    fn default() -> Self {
+        Self {
+            light: default(),
+            range: 100.,
+        }
+    }
+}
+
+#[derive(Component, Default, Clone)]
 pub(crate) struct ExtractedPointLight {
     pub pos: Vec2,
+    pub light: LightColor,
+    pub range: f32,
+}
+
+#[derive(Component, Default, Clone, ShaderType)]
+pub(crate) struct UniformPointLight {
+    pub pos: Vec2,
+    pub light: UniformLightColor,
+    pub range: f32,
 }
 
 #[derive(Resource, Default)]
-pub(crate) struct LightSet(pub Vec<UniformBuffer<ExtractedPointLight>>);
+pub(crate) struct LightSet(pub Vec<UniformBuffer<UniformPointLight>>);
 
 #[derive(Clone, Reflect)]
 pub struct LightColor {

@@ -30,9 +30,11 @@ fn extract_lights(
     mut commands: Commands,
     lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight)>>,
 ) {
-    for (entity, transform, _light) in &lights {
+    for (entity, transform, light) in &lights {
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: transform.translation().truncate(),
+            light: light.light.clone(),
+            range: light.range,
         });
     }
 }
@@ -47,6 +49,7 @@ fn extract_occluders(
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
                 shape: occluder.shape.clone(),
+                hollow: occluder.hollow,
             });
     }
 }

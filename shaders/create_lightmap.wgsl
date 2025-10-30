@@ -1,7 +1,7 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
-#import firefly::types::{PointLight, LightingData, OccluderMeta, Vertex}
+#import firefly::types::{PointLight, LightingData, UniformOccluder, Vertex}
 #import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect}
 
 @group(0) @binding(0)
@@ -20,7 +20,7 @@ var<uniform> data: LightingData;
 var<uniform> light: PointLight;
 
 @group(0) @binding(5)
-var<storage> occluders: array<OccluderMeta>;
+var<storage> occluders: array<UniformOccluder>;
 
 @group(0) @binding(6)
 var<storage> vertices: array<Vertex>;
@@ -32,12 +32,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     var res = vec4f(0, 0, 0, 1);
 
-    let light = light.pos; 
-    let dist = distance(pos, light) + 0.01; 
+    let dist = distance(pos, light.pos) + 0.01; 
 
-    if (dist < 200.) {
-        let x = dist / 200.;
-        res += vec4f(vec3f(1. - x * x), 0);
+    if (dist < light.range) {
+        let x = dist / light.range;
+        res += vec4f(vec3f(1. - x * x), 0) * light.light.color * light.light.intensity;
         
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
@@ -105,7 +104,7 @@ fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
 }
 
 // returns number of times pixel was blocked by occluder
-fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> i32 {
+fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
     var intersections = 0u;
 
     for (var i = start_vertex; i < start_vertex + occluders[occluder].n_vertices - 1; i++) {
@@ -119,12 +118,12 @@ fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> i32 {
     }
 
     if (occluders[occluder].line == 1) {
-        return i32(intersections);
+        return intersections;
     }
 
-    if (intersections % 2 == 0) {
-        return i32(intersections) / 2;
+    if (occluders[occluder].hollow == 0 && intersections > 0) {
+        intersections -= 1;
     }
     
-    return 0;
+    return intersections;
 }

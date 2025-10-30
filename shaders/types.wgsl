@@ -6,13 +6,16 @@ struct LightingData {
 
 struct PointLight {
     pos: vec2f,
+    light: LightColor,
+    range: f32,
 }
 
-struct OccluderMeta {
+struct UniformOccluder {
     n_vertices: u32,
     seam: f32,
     concave: u32,
     line: u32,
+    hollow: u32,
 }
 
 struct Vertex {

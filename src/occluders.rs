@@ -10,12 +10,14 @@ use bevy::{
 #[require(SyncToRenderWorld)]
 pub struct Occluder {
     pub shape: OccluderShape,
+    pub hollow: bool,
 }
 
 #[derive(Component)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub shape: OccluderShape,
+    pub hollow: bool,
 }
 
 impl ExtractedOccluder {
@@ -30,6 +32,7 @@ pub(crate) struct UniformOccluder {
     pub seam: f32,
     pub concave: u32,
     pub line: u32,
+    pub hollow: u32,
 }
 
 #[derive(ShaderType, Clone)]

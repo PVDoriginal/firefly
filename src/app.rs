@@ -25,7 +25,7 @@ impl Plugin for FireflyPlugin {
         app.register_type::<crate::prelude::PointLight>();
         app.register_type::<FireflyConfig>();
 
-        //app.add_systems(Startup, stress_test);
+        // app.add_systems(Startup, stress_test);
 
         load_internal_asset!(
             app,
@@ -93,8 +93,12 @@ impl Plugin for FireflyPlugin {
 }
 
 fn stress_test(mut commands: Commands) {
-    for _ in 0..50 {
-        commands.spawn((Name::new("Point Light"), PointLight, Transform::default()));
+    for _ in 0..5 {
+        commands.spawn((
+            Name::new("Point Light"),
+            lights::PointLight::default(),
+            Transform::default(),
+        ));
     }
 }
 
