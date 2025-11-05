@@ -14,6 +14,7 @@ use crate::{
     nodes::{ApplyLightmapNode, CreateLightmapNode},
     occluders::OccluderShapeInternal,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
+    sprites::SpritesPlugin,
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
@@ -57,8 +58,15 @@ impl Plugin for FireflyPlugin {
             "../shaders/utils.wgsl",
             Shader::from_wgsl
         );
+        load_internal_asset!(
+            app,
+            SPRITE_SHADER,
+            "../shaders/sprite.wgsl",
+            Shader::from_wgsl
+        );
 
         app.add_plugins((PreparePlugin, ExtractPlugin));
+        app.add_plugins(SpritesPlugin);
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
