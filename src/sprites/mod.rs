@@ -1,11 +1,19 @@
+use std::collections::HashSet;
 use std::ops::Range;
 
-use crate::SPRITE_SHADER;
+use crate::{RenderLabel, SPRITE_SHADER};
 
+use bevy::render::RenderDebugFlags;
+use bevy::render::camera::Viewport;
+
+use bevy::render::mesh::MeshPlugin;
 use bevy::{
     asset::AssetEvents,
     core_pipeline::{
-        core_2d::{AlphaMask2d, CORE_2D_DEPTH_FORMAT, Opaque2d, Transparent2d},
+        core_2d::{
+            AlphaMask2d, CORE_2D_DEPTH_FORMAT, Opaque2d,
+            graph::{Core2d, Node2d},
+        },
         tonemapping::{
             DebandDither, Tonemapping, TonemappingLuts, get_lut_bind_group_layout_entries,
             get_lut_bindings,
@@ -13,7 +21,7 @@ use bevy::{
     },
     ecs::{
         prelude::*,
-        query::ROQueryItem,
+        query::{QueryItem, ROQueryItem},
         system::{SystemParamItem, SystemState, lifetimeless::*},
     },
     image::{ImageSampler, TextureFormatPixelInfo as _},
@@ -23,17 +31,22 @@ use bevy::{
     render::{
         Extract, Render, RenderApp, RenderSet,
         batching::sort_binned_render_phase,
+        camera::ExtractedCamera,
         mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
         render_asset::RenderAssets,
+        render_graph::{
+            NodeRunError, RenderGraphApp, RenderGraphContext, ViewNode, ViewNodeRunner,
+        },
         render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
-            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
+            RenderCommandResult, SetItemPipeline, SortedRenderPhasePlugin, TrackedRenderPass,
+            ViewSortedRenderPhases, sort_phase_system,
         },
         render_resource::{
             binding_types::{sampler, texture_2d, uniform_buffer},
             *,
         },
-        renderer::{RenderDevice, RenderQueue},
+        renderer::{RenderContext, RenderDevice, RenderQueue},
         sync_world::RenderEntity,
         texture::{DefaultImageSampler, FallbackImage, GpuImage},
         view::{
@@ -43,18 +56,24 @@ use bevy::{
     },
 };
 
-use bevy::sprite::{SpriteSystem, queue_material2d_meshes};
+use bevy::sprite::{Mesh2dPipeline, SpriteSystem, queue_material2d_meshes};
 
 use bytemuck::{Pod, Zeroable};
 use fixedbitset::FixedBitSet;
 
+mod phase;
 mod texture_slice;
 
+use phase::*;
 use texture_slice::*;
 
 pub(crate) struct SpritesPlugin;
 impl Plugin for SpritesPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(SortedRenderPhasePlugin::<Stencil2d, Mesh2dPipeline>::new(
+            RenderDebugFlags::default(),
+        ));
+
         app.add_systems(
             PostUpdate,
             ((
@@ -68,11 +87,14 @@ impl Plugin for SpritesPlugin {
             render_app
                 .init_resource::<ImageBindGroups>()
                 .init_resource::<SpecializedRenderPipelines<SpritePipeline>>()
+                .init_resource::<DrawFunctions<Stencil2d>>()
                 .init_resource::<SpriteMeta>()
                 .init_resource::<ExtractedSprites>()
                 .init_resource::<ExtractedSlices>()
                 .init_resource::<SpriteAssetEvents>()
-                .add_render_command::<Transparent2d, DrawSprite>()
+                .add_render_command::<Stencil2d, DrawSprite>()
+                .init_resource::<ViewSortedRenderPhases<Stencil2d>>()
+                .add_systems(ExtractSchedule, extract_camera_phases)
                 .add_systems(
                     ExtractSchedule,
                     (
@@ -83,6 +105,7 @@ impl Plugin for SpritesPlugin {
                 .add_systems(
                     Render,
                     (
+                        sort_phase_system::<Stencil2d>.in_set(RenderSet::PhaseSort),
                         queue_sprites
                             .in_set(RenderSet::Queue)
                             .ambiguous_with(queue_material2d_meshes::<ColorMaterial>),
@@ -92,6 +115,14 @@ impl Plugin for SpritesPlugin {
                         sort_binned_render_phase::<AlphaMask2d>.in_set(RenderSet::PhaseSort),
                     ),
                 );
+
+            render_app
+                .add_render_graph_node::<ViewNodeRunner<CustomDrawNode>>(
+                    Core2d,
+                    CustomDrawPassLabel,
+                )
+                // Tell the node to run after the main pass
+                .add_render_graph_edges(Core2d, (Node2d::MainTransparentPass, CustomDrawPassLabel));
         };
     }
 
@@ -101,6 +132,87 @@ impl Plugin for SpritesPlugin {
                 .init_resource::<SpriteBatches>()
                 .init_resource::<SpritePipeline>();
         }
+    }
+}
+
+fn extract_camera_phases(
+    mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
+    cameras: Extract<Query<(Entity, &Camera), With<Camera2d>>>,
+    mut live_entities: Local<HashSet<RetainedViewEntity>>,
+) {
+    live_entities.clear();
+    for (main_entity, camera) in &cameras {
+        if !camera.is_active {
+            continue;
+        }
+        // This is the main camera, so we use the first subview index (0)
+        let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
+
+        stencil_phases.insert_or_clear(retained_view_entity);
+        live_entities.insert(retained_view_entity);
+    }
+
+    // Clear out all dead views.
+    stencil_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+}
+
+// Render label used to order our render graph node that will render our phase
+#[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
+struct CustomDrawPassLabel;
+
+#[derive(Default)]
+struct CustomDrawNode;
+impl ViewNode for CustomDrawNode {
+    type ViewQuery = (
+        &'static ExtractedCamera,
+        &'static ExtractedView,
+        &'static ViewTarget,
+    );
+
+    fn run<'w>(
+        &self,
+        graph: &mut RenderGraphContext,
+        render_context: &mut RenderContext<'w>,
+        (camera, view, target): QueryItem<'w, Self::ViewQuery>,
+        world: &'w World,
+    ) -> Result<(), NodeRunError> {
+        // First, we need to get our phases resource
+        let Some(stencil_phases) = world.get_resource::<ViewSortedRenderPhases<Stencil2d>>() else {
+            return Ok(());
+        };
+
+        // Get the view entity from the graph
+        let view_entity = graph.view_entity();
+
+        // Get the phase for the current view running our node
+        let Some(stencil_phase) = stencil_phases.get(&view.retained_view_entity) else {
+            return Ok(());
+        };
+
+        // Render pass setup
+        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("stencil pass"),
+            // For the purpose of the example, we will write directly to the view target. A real
+            // stencil pass would write to a custom texture and that texture would be used in later
+            // passes to render custom effects using it.
+            color_attachments: &[Some(target.get_color_attachment())],
+            // We don't bind any depth buffer for this pass
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        if let Some(viewport) = camera.viewport.as_ref() {
+            render_pass.set_camera_viewport(viewport);
+        }
+
+        // Render the phase
+        // This will execute each draw functions of each phase items queued in this phase
+        if let Err(err) = stencil_phase.render(&mut render_pass, world, view_entity) {
+            error!("Error encountered while rendering the stencil phase {err:?}");
+        }
+
+        Ok(())
     }
 }
 
@@ -356,22 +468,23 @@ impl SpecializedRenderPipeline for SpritePipeline {
             // Sprites are always alpha blended so they never need to write to depth.
             // They just need to read it in case an opaque mesh2d
             // that wrote to depth is present.
-            depth_stencil: Some(DepthStencilState {
-                format: CORE_2D_DEPTH_FORMAT,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::GreaterEqual,
-                stencil: StencilState {
-                    front: StencilFaceState::IGNORE,
-                    back: StencilFaceState::IGNORE,
-                    read_mask: 0,
-                    write_mask: 0,
-                },
-                bias: DepthBiasState {
-                    constant: 0,
-                    slope_scale: 0.0,
-                    clamp: 0.0,
-                },
-            }),
+            // depth_stencil: Some(DepthStencilState {
+            //     format: CORE_2D_DEPTH_FORMAT,
+            //     depth_write_enabled: false,
+            //     depth_compare: CompareFunction::GreaterEqual,
+            //     stencil: StencilState {
+            //         front: StencilFaceState::IGNORE,
+            //         back: StencilFaceState::IGNORE,
+            //         read_mask: 0,
+            //         write_mask: 0,
+            //     },
+            //     bias: DepthBiasState {
+            //         constant: 0,
+            //         slope_scale: 0.0,
+            //         clamp: 0.0,
+            //     },
+            // }),
+            depth_stencil: None,
             multisample: MultisampleState {
                 count: key.msaa_samples(),
                 mask: !0,
@@ -585,12 +698,12 @@ pub struct ImageBindGroups {
 
 pub fn queue_sprites(
     mut view_entities: Local<FixedBitSet>,
-    draw_functions: Res<DrawFunctions<Transparent2d>>,
+    draw_functions: Res<DrawFunctions<Stencil2d>>,
     sprite_pipeline: Res<SpritePipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<SpritePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     extracted_sprites: Res<ExtractedSprites>,
-    mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent2d>>,
+    mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
     mut views: Query<(
         &RenderVisibleEntities,
         &ExtractedView,
@@ -657,7 +770,7 @@ pub fn queue_sprites(
             let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
 
             // Add the item to the render phase
-            transparent_phase.add(Transparent2d {
+            transparent_phase.add(Stencil2d {
                 draw_function: draw_sprite_function,
                 pipeline,
                 entity: (
@@ -717,7 +830,7 @@ pub fn prepare_sprite_image_bind_groups(
     gpu_images: Res<RenderAssets<GpuImage>>,
     extracted_sprites: Res<ExtractedSprites>,
     extracted_slices: Res<ExtractedSlices>,
-    mut phases: ResMut<ViewSortedRenderPhases<Transparent2d>>,
+    mut phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
     events: Res<SpriteAssetEvents>,
     mut batches: ResMut<SpriteBatches>,
 ) {
