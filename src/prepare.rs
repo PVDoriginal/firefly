@@ -175,6 +175,11 @@ fn prepare_data(
         let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
         let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
 
+        if occluders.is_empty() {
+            meta_buffer.push(default());
+            vertices_buffer.push(default());
+        }
+
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
 

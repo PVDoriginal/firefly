@@ -5,8 +5,10 @@ use bevy::{
         render_graph::{NodeRunError, ViewNode},
         render_resource::{
             BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
+            RenderPipeline, TextureView,
         },
         renderer::RenderContext,
+        texture::CachedTexture,
         view::{ViewTarget, ViewUniformOffset, ViewUniforms},
     },
 };
@@ -67,6 +69,18 @@ impl ViewNode for CreateLightmapNode {
         let lights = world.resource::<LightSet>();
         let occluder_set = world.resource::<OccluderSet>();
 
+        // if there are no lights, clear the lightmap and return
+        if lights.0.is_empty() {
+            transfer_texture(
+                &empty_lightmap.0,
+                &lightmap.0,
+                render_context,
+                t_pipeline,
+                t_render_pipeline,
+            );
+            return Ok(());
+        }
+
         for (i, light) in lights.0.iter().enumerate() {
             {
                 let (meta, vertices) = &occluder_set.0[i];
@@ -107,61 +121,55 @@ impl ViewNode for CreateLightmapNode {
                 render_pass.draw(0..3, 0..1);
             }
 
-            {
-                let bind_group = render_context.render_device().create_bind_group(
-                    "transfer texture bind group",
-                    &t_pipeline.layout,
-                    &BindGroupEntries::sequential((&lightmap.0.default_view, &t_pipeline.sampler)),
-                );
-
-                let mut render_pass =
-                    render_context.begin_tracked_render_pass(RenderPassDescriptor {
-                        label: Some("transfer texture pass"),
-                        color_attachments: &[Some(RenderPassColorAttachment {
-                            view: &inter_lightmap.0.default_view,
-                            resolve_target: None,
-                            ops: default(),
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
-
-                render_pass.set_render_pipeline(t_render_pipeline);
-                render_pass.set_bind_group(0, &bind_group, &[]);
-                render_pass.draw(0..3, 0..1);
-            }
-        }
-
-        {
-            let bind_group = render_context.render_device().create_bind_group(
-                "transfer texture bind group",
-                &t_pipeline.layout,
-                &BindGroupEntries::sequential((
-                    &empty_lightmap.0.default_view,
-                    &t_pipeline.sampler,
-                )),
+            transfer_texture(
+                &lightmap.0,
+                &inter_lightmap.0,
+                render_context,
+                t_pipeline,
+                t_render_pipeline,
             );
-
-            let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-                label: Some("transfer texture pass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &inter_lightmap.0.default_view,
-                    resolve_target: None,
-                    ops: default(),
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            render_pass.set_render_pipeline(t_render_pipeline);
-            render_pass.set_bind_group(0, &bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
         }
+
+        transfer_texture(
+            &empty_lightmap.0,
+            &inter_lightmap.0,
+            render_context,
+            t_pipeline,
+            t_render_pipeline,
+        );
 
         Ok(())
     }
+}
+
+fn transfer_texture(
+    src: &CachedTexture,
+    dst: &CachedTexture,
+    render_context: &mut RenderContext,
+    t_pipeline: &TransferTexturePipeline,
+    t_render_pipeline: &RenderPipeline,
+) {
+    let bind_group = render_context.render_device().create_bind_group(
+        "transfer texture bind group",
+        &t_pipeline.layout,
+        &BindGroupEntries::sequential((&src.default_view, &t_pipeline.sampler)),
+    );
+
+    let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+        label: Some("transfer texture pass"),
+        color_attachments: &[Some(RenderPassColorAttachment {
+            view: &dst.default_view,
+            resolve_target: None,
+            ops: default(),
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+    });
+
+    render_pass.set_render_pipeline(t_render_pipeline);
+    render_pass.set_bind_group(0, &bind_group, &[]);
+    render_pass.draw(0..3, 0..1);
 }
 
 impl ViewNode for ApplyLightmapNode {

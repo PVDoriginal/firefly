@@ -122,7 +122,7 @@ impl Plugin for SpritesPlugin {
                     CustomDrawPassLabel,
                 )
                 // Tell the node to run after the main pass
-                .add_render_graph_edges(Core2d, (Node2d::MainTransparentPass, CustomDrawPassLabel));
+                ; //.add_render_graph_edges(Core2d, (Node2d::MainTransparentPass, CustomDrawPassLabel));
         };
     }
 

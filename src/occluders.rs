@@ -35,7 +35,7 @@ pub(crate) struct UniformOccluder {
     pub hollow: u32,
 }
 
-#[derive(ShaderType, Clone)]
+#[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformVertex {
     pub angle: f32,
     pub pos: Vec2,
