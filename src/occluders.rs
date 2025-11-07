@@ -6,7 +6,7 @@ use bevy::{
     },
 };
 
-#[derive(Component, Reflect)]
+#[derive(Component, Clone, Default, Reflect)]
 #[require(SyncToRenderWorld)]
 pub struct Occluder {
     pub shape: OccluderShape,
@@ -57,7 +57,7 @@ pub enum OcluderFlags {
     CotainsLight = 4,
 }
 
-#[derive(Reflect, Clone)]
+#[derive(Reflect, Clone, Default)]
 pub struct OccluderShape(OccluderShapeInternal);
 
 #[derive(Reflect, Clone)]
@@ -65,6 +65,15 @@ pub enum OccluderShapeInternal {
     Rectangle { width: f32, height: f32 },
     Polygon { vertices: Vec<Vec2>, concave: bool },
     Polyline { vertices: Vec<Vec2>, concave: bool },
+}
+
+impl Default for OccluderShapeInternal {
+    fn default() -> Self {
+        Self::Rectangle {
+            width: 10.,
+            height: 10.,
+        }
+    }
 }
 
 impl OccluderShapeInternal {

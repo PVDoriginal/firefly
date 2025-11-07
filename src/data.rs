@@ -3,8 +3,6 @@ use bevy::{
     render::{extract_component::ExtractComponent, render_resource::ShaderType},
 };
 
-use crate::lights::{LightColor, UniformLightColor};
-
 #[derive(Default, Clone, Copy, ShaderType)]
 pub(crate) struct UniformMeta {
     pub n_occluders: u32,
@@ -12,12 +10,14 @@ pub(crate) struct UniformMeta {
 
 #[derive(Component, ExtractComponent, Clone, Reflect)]
 pub struct FireflyConfig {
-    pub global_light: LightColor,
+    pub ambient_color: Color,
+    pub ambient_brightness: f32,
     pub light_bands: Option<u32>,
 }
 
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformFireflyConfig {
-    pub global_light: UniformLightColor,
+    pub ambient_color: Vec3,
+    pub ambient_brightness: f32,
     pub light_bands: u32,
 }

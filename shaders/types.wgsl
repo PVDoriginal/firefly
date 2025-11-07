@@ -6,7 +6,8 @@ struct LightingData {
 
 struct PointLight {
     pos: vec2f,
-    light: LightColor,
+    color: vec3f, 
+    intensity: f32,
     range: f32,
 }
 
@@ -23,12 +24,8 @@ struct Vertex {
     pos: vec2f
 }
 
-struct LightColor {
-    color: vec4f,
-    intensity: f32,
-}
-
 struct FireflyConfig {
-    global_light: LightColor,
+    ambient_color: vec3f,
+    ambient_brightness: f32, 
     light_bands: u32,
 }

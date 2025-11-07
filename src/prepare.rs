@@ -18,7 +18,7 @@ use bevy::{
 use crate::{
     EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
-    lights::{ExtractedPointLight, LightSet, UniformLightColor, UniformPointLight},
+    lights::{ExtractedPointLight, LightSet, UniformPointLight},
     occluders::{
         ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex, point_inside_poly,
     },
@@ -62,10 +62,8 @@ fn prepare_config(
     for (entity, config) in &configs {
         let mut buffer = UniformBuffer::<UniformFireflyConfig>::default();
         let uniform = UniformFireflyConfig {
-            global_light: UniformLightColor {
-                color: config.global_light.color.to_linear().to_vec4(),
-                intensity: config.global_light.intensity,
-            },
+            ambient_color: config.ambient_color.to_linear().to_vec3(),
+            ambient_brightness: config.ambient_brightness,
             light_bands: match config.light_bands {
                 None => 0,
                 Some(x) => x,
@@ -157,10 +155,8 @@ fn prepare_data(
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
         buffer.set(UniformPointLight {
             pos: light.pos,
-            light: UniformLightColor {
-                color: light.light.color.to_linear().to_vec4(),
-                intensity: light.light.intensity,
-            },
+            color: light.color.to_linear().to_vec3(),
+            intensity: light.intensity,
             range: light.range,
         });
         buffer.write_buffer(&render_device, &render_queue);

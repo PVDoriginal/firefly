@@ -2,7 +2,7 @@
 #import bevy_render::view::View
 
 #import firefly::types::{PointLight, LightingData, UniformOccluder, Vertex}
-#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect}
+#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend}
 
 @group(0) @binding(0)
 var<uniform> view: View;
@@ -30,13 +30,13 @@ const PI2: f32 = 6.28318530718;
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
-    var res = vec4f(0, 0, 0, 1);
+    var res = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
 
-    let dist = distance(pos, light.pos) + 0.01; 
+    let dist = distance(pos, light.pos);
 
     if (dist < light.range) {
         let x = dist / light.range;
-        res += vec4f(vec3f(1. - x * x), 0) * light.light.color * light.light.intensity;
+        res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
         
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
@@ -55,10 +55,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             start_vertex += occluders[i].n_vertices;
         }
     }
-    res = max(res, vec4f(0, 0, 0, 1));
-
-    res += textureSample(lightmap_texture, texture_sampler, in.uv);
-    return min(res, vec4f(1, 1, 1, 1));
+    return res;
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {

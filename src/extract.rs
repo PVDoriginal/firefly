@@ -33,7 +33,8 @@ fn extract_lights(
     for (entity, transform, light) in &lights {
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: transform.translation().truncate(),
-            light: light.light.clone(),
+            color: light.color,
+            intensity: light.intensity,
             range: light.range,
         });
     }

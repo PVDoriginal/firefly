@@ -51,3 +51,7 @@ fn ccw(a: vec2f, b: vec2f, c: vec2f) -> bool {
 fn intersect(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> bool {
     return ccw(a, c, d) != ccw(b, c, d) && ccw(a, b, c) != ccw(a, b, d);
 }
+
+fn blend(bg: vec4f, fg: vec4f, intensity: f32) -> vec4f {
+    return max(fg * intensity, bg);
+}
