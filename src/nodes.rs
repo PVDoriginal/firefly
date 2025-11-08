@@ -19,6 +19,7 @@ use crate::{
     occluders::OccluderSet,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
     prepare::{BufferedFireflyConfig, LightingDataBuffer},
+    sprites::SpriteStencilTexture,
 };
 
 #[derive(Default)]
@@ -34,13 +35,14 @@ impl ViewNode for CreateLightmapNode {
         Read<IntermediaryLightMapTexture>,
         Read<EmptyLightMapTexture>,
         Read<ViewTarget>,
+        Read<SpriteStencilTexture>,
     );
 
     fn run<'w>(
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut bevy::render::renderer::RenderContext<'w>,
-        (view_offset, lightmap, inter_lightmap, empty_lightmap, _): bevy::ecs::query::QueryItem<
+        (view_offset, lightmap, inter_lightmap, empty_lightmap, _, sprite_stencil_texture): bevy::ecs::query::QueryItem<
             'w,
             Self::ViewQuery,
         >,
@@ -100,6 +102,7 @@ impl ViewNode for CreateLightmapNode {
                         light.binding().unwrap(),
                         meta.clone(),
                         vertices.clone(),
+                        &sprite_stencil_texture.0.default_view,
                     )),
                 );
 

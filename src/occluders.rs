@@ -49,14 +49,6 @@ pub(crate) struct OccluderSet(
     )>,
 );
 
-pub enum OcluderFlags {
-    Concave = 0,
-    TryConcave = 1,
-    Convex = 2,
-    Hollow = 3,
-    CotainsLight = 4,
-}
-
 #[derive(Reflect, Clone, Default)]
 pub struct OccluderShape(OccluderShapeInternal);
 

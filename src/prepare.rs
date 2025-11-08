@@ -135,7 +135,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::R16Uint,
+                format: TextureFormat::Rgb10a2Unorm,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },

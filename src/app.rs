@@ -14,7 +14,7 @@ use crate::{
     nodes::{ApplyLightmapNode, CreateLightmapNode},
     occluders::OccluderShapeInternal,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    sprites::SpritesPlugin,
+    sprites::{SpriteStencilLabel, SpritesPlugin},
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
@@ -79,9 +79,12 @@ impl Plugin for FireflyPlugin {
             )
             .add_render_graph_node::<ViewNodeRunner<ApplyLightmapNode>>(Core2d, ApplyLightmapLabel);
 
+        // render_app.add_render_graph_edges(Core2d, (, CreateLightmapLabel));
+
         render_app.add_render_graph_edges(
             Core2d,
             (
+                SpriteStencilLabel,
                 Node2d::Tonemapping,
                 CreateLightmapLabel,
                 ApplyLightmapLabel,

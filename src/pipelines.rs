@@ -19,7 +19,7 @@ use bevy::{
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
     data::{UniformFireflyConfig, UniformMeta},
-    lights::{ExtractedPointLight, UniformPointLight},
+    lights::UniformPointLight,
     occluders::{UniformOccluder, UniformVertex},
 };
 
@@ -53,13 +53,22 @@ impl FromWorld for LightmapCreationPipeline {
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
                 (
+                    // view uniform
                     uniform_buffer::<ViewUniform>(true),
+                    // previous lightmap
                     texture_2d(TextureSampleType::Float { filterable: true }),
+                    // sampler
                     sampler(SamplerBindingType::Filtering),
+                    // occluder meta
                     uniform_buffer::<UniformMeta>(false),
+                    // point light
                     uniform_buffer::<UniformPointLight>(false),
+                    // occluder
                     GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
+                    // vertices
                     GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
+                    // sprite stencil
+                    texture_2d(TextureSampleType::Float { filterable: false }),
                 ),
             ),
         );

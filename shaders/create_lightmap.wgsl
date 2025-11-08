@@ -25,6 +25,9 @@ var<storage> occluders: array<UniformOccluder>;
 @group(0) @binding(6)
 var<storage> vertices: array<Vertex>;
 
+@group(0) @binding(7)
+var sprite_stencil: texture_2d<f32>;
+
 const PI2: f32 = 6.28318530718;
 
 @fragment
@@ -34,28 +37,40 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
     let dist = distance(pos, light.pos);
 
-    if (dist < light.range) {
-        let x = dist / light.range;
-        res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
-        
-        var start_vertex = 0u;
-        for (var i = 0u; i < data.n_occluders; i++) {
+    let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
 
-            if (occluders[i].concave == 1) {
-                let intersections = concave_check(pos, i, start_vertex);
-                if (intersections > 0) {
-                    res = vec4f(0, 0, 0, 1);
-                    break;
-                }
-            }
-            else if (is_occluded(pos, i, start_vertex)) {
-                res = vec4f(0, 0, 0, 1);
-                break;
-            }
-            start_vertex += occluders[i].n_vertices;
-        }
+    if (stencil.r == 1) {
+        return vec4f(1);
     }
-    return res;
+
+    return vec4f(0, 0, 0, 1);
+
+    // if (stencil.r == 10) {
+    //     return vec4f(1);
+    // }
+
+    // if (dist < light.range) {
+    //     let x = dist / light.range;
+    //     res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
+        
+    //     var start_vertex = 0u;
+    //     for (var i = 0u; i < data.n_occluders; i++) {
+
+    //         if (occluders[i].concave == 1) {
+    //             let intersections = concave_check(pos, i, start_vertex);
+    //             if (intersections > 0) {
+    //                 res = vec4f(0, 0, 0, 1);
+    //                 break;
+    //             }
+    //         }
+    //         else if (is_occluded(pos, i, start_vertex)) {
+    //             res = vec4f(0, 0, 0, 1);
+    //             break;
+    //         }
+    //         start_vertex += occluders[i].n_vertices;
+    //     }
+    // }
+    // return res;
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {

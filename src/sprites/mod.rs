@@ -1,5 +1,5 @@
-use crate::RenderLabel;
-use crate::sprites::pipeline::SpritesPipelinePlugin;
+use crate::sprites::pipeline::{SpritePipeline, SpritesPipelinePlugin};
+use crate::{CreateLightmapLabel, RenderLabel};
 
 use bevy::{
     core_pipeline::core_2d::graph::{Core2d, Node2d},
@@ -49,7 +49,7 @@ impl Plugin for SpritesPlugin {
 }
 
 #[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
-struct SpriteStencilLabel;
+pub struct SpriteStencilLabel;
 
 #[derive(Default)]
 struct SpriteStencilNode;
@@ -109,6 +109,7 @@ impl ViewNode for SpriteStencilNode {
             error!("Error encountered while rendering the stencil phase {err:?}");
         }
 
+        // render_pass.draw(0..3, 0..1);
         Ok(())
     }
 }

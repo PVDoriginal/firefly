@@ -55,11 +55,13 @@ fn vertex(in: VertexInput) -> VertexOutput {
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     var color = in.color * textureSample(sprite_texture, sprite_sampler, in.uv);
 
-#ifdef TONEMAP_IN_SHADER
-    color = tonemapping::tone_mapping(color, view.color_grading);
-#endif
+// #ifdef TONEMAP_IN_SHADER
+//     color = tonemapping::tone_mapping(color, view.color_grading);
+// #endif
 
     // return 1;
-    return vec4f(1, 0, 0, 0);
+
+    return vec4f(1, 0, 0, color.a);
+    
     // return color;
 }
