@@ -1,6 +1,11 @@
-use crate::sprites::*;
+use std::ops::Range;
+
+use crate::sprites::CachedRenderPipelineId;
+use bevy::math::FloatOrd;
 use bevy::prelude::*;
-use bevy::render::render_phase::{CachedRenderPipelinePhaseItem, DrawFunctionId, SortedPhaseItem};
+use bevy::render::render_phase::{
+    CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem, PhaseItemExtraIndex, SortedPhaseItem,
+};
 use bevy::render::sync_world::MainEntity;
 
 pub struct Stencil2d {

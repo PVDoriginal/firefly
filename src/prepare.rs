@@ -22,6 +22,7 @@ use crate::{
     occluders::{
         ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex, point_inside_poly,
     },
+    sprites::SpriteStencilTexture,
 };
 
 #[derive(Resource, Default)]
@@ -126,10 +127,25 @@ fn prepare_lightmap(
             },
         );
 
+        let sprite_stencil_texture = texture_cache.get(
+            &render_device,
+            TextureDescriptor {
+                label: Some("sprite stencil"),
+                size: view_target.main_texture().size(),
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::R16Uint,
+                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+        );
+
         commands.entity(entity).insert((
             LightMapTexture(light_map_texture),
             IntermediaryLightMapTexture(inter_light_map_texture),
             EmptyLightMapTexture(empty_light_map_texture),
+            SpriteStencilTexture(sprite_stencil_texture),
         ));
     }
 }

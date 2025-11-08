@@ -59,6 +59,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     color = tonemapping::tone_mapping(color, view.color_grading);
 #endif
 
-    return vec4f(1, 0, 0, color.a);
+    // return 1;
+    return vec4f(1, 0, 0, 0);
     // return color;
 }

@@ -1,6 +1,6 @@
 use bevy::{platform::collections::HashSet, prelude::*};
 
-use crate::sprites::ExtractedSlice;
+use crate::sprites::pipeline::ExtractedSlice;
 /// Component storing texture slices for tiled or sliced sprite entities
 ///
 /// This component is automatically inserted and updated
