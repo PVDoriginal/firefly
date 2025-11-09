@@ -19,6 +19,7 @@ pub(crate) struct ExtractedOccluder {
     pub shape: OccluderShape,
     pub hollow: bool,
     pub sprite_id: f32,
+    pub z: f32,
 }
 
 impl ExtractedOccluder {
@@ -35,6 +36,7 @@ pub(crate) struct UniformOccluder {
     pub line: u32,
     pub hollow: u32,
     pub sprite_id: f32,
+    pub z: f32,
 }
 
 #[derive(ShaderType, Clone, Default)]

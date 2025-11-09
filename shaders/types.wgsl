@@ -18,6 +18,7 @@ struct UniformOccluder {
     line: u32,
     hollow: u32,
     sprite_id: f32,
+    z: f32,
 }
 
 struct Vertex {

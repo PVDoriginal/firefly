@@ -60,6 +60,7 @@ fn extract_occluders(
                 shape: occluder.shape.clone(),
                 hollow: occluder.hollow,
                 sprite_id: sprite_id.map_or(-1., |s| s.float()),
+                z: global_transform.translation().z,
             });
     }
 }

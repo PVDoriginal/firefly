@@ -21,12 +21,14 @@ struct VertexInput {
     @location(2) i_model_transpose_col2: vec4<f32>,
     @location(3) id: f32,
     @location(4) i_uv_offset_scale: vec4<f32>,
+    @location(5) z: f32,
 }
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) id: f32,
+    @location(2) z: f32,
 };
 
 @vertex
@@ -46,6 +48,7 @@ fn vertex(in: VertexInput) -> VertexOutput {
     )) * vec4<f32>(vertex_position, 1.0);
     out.uv = vec2<f32>(vertex_position.xy) * in.i_uv_offset_scale.zw + in.i_uv_offset_scale.xy;
     out.id = in.id;
+    out.z = in.z;
 
     return out;
 }
@@ -70,7 +73,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // else if (sprite_id.id == 17) {
         //     return vec4f(0, 0, 1, 1);
         // } 
-        return vec4f(in.id, 0, 0, 1);
+        return vec4f(in.id, in.z, 0, 1);
     }
     else {
         return vec4f(0, 0, 0, 0);

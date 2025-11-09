@@ -346,7 +346,7 @@ impl SpecializedRenderPipeline for SpritePipeline {
                     offset: 32,
                     shader_location: 2,
                 },
-                // @location(3) i_id: f32,
+                // @location(3) id: f32,
                 VertexAttribute {
                     format: VertexFormat::Float32,
                     offset: 48,
@@ -357,6 +357,12 @@ impl SpecializedRenderPipeline for SpritePipeline {
                     format: VertexFormat::Float32x4,
                     offset: 52,
                     shader_location: 4,
+                },
+                // @location(5) z: f32,
+                VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: 68,
+                    shader_location: 5,
                 },
             ],
         };
@@ -577,12 +583,19 @@ struct SpriteInstance {
     pub i_model_transpose: [Vec4; 3],
     pub id: f32,
     pub i_uv_offset_scale: [f32; 4],
-    pub _padding: [f32; 3],
+    pub z: f32,
+    pub _padding: [f32; 2],
 }
 
 impl SpriteInstance {
     #[inline]
-    fn from(transform: &Affine3A, color: &LinearRgba, uv_offset_scale: &Vec4, id: f32) -> Self {
+    fn from(
+        transform: &Affine3A,
+        color: &LinearRgba,
+        uv_offset_scale: &Vec4,
+        id: f32,
+        z: f32,
+    ) -> Self {
         let transpose_model_3x3 = transform.matrix3.transpose();
         Self {
             i_model_transpose: [
@@ -591,8 +604,9 @@ impl SpriteInstance {
                 transpose_model_3x3.z_axis.extend(transform.translation.z),
             ],
             id,
+            z,
             i_uv_offset_scale: uv_offset_scale.to_array(),
-            _padding: [0., 0., 0.],
+            _padding: [0., 0.],
         }
     }
 }
@@ -637,6 +651,7 @@ pub fn queue_sprites(
     sprite_pipeline: Res<SpritePipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<SpritePipeline>>,
     pipeline_cache: Res<PipelineCache>,
+
     extracted_sprites: Res<ExtractedSprites>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
     mut views: Query<(
@@ -925,6 +940,7 @@ pub fn prepare_sprite_image_bind_groups(
                             &extracted_sprite.color,
                             &uv_offset_scale,
                             extracted_sprite.id.float(),
+                            extracted_sprite.transform.translation().z,
                         ));
 
                     current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -971,6 +987,7 @@ pub fn prepare_sprite_image_bind_groups(
                                 &extracted_sprite.color,
                                 &uv_offset_scale,
                                 extracted_sprite.id.float(),
+                                extracted_sprite.transform.translation().z,
                             ));
 
                         current_batch.as_mut().unwrap().get_mut().range.end += 1;

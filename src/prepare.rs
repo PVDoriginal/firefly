@@ -195,6 +195,7 @@ fn prepare_data(
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
             meta.sprite_id = occluder.sprite_id;
+            meta.z = occluder.z;
 
             // warn!("setting occluder sprite id: {}", meta.sprite_id);
 
