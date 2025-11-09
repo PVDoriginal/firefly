@@ -135,7 +135,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgb10a2Unorm,
+                format: TextureFormat::Rgba32Float,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
@@ -194,6 +194,9 @@ fn prepare_data(
 
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
+            meta.sprite_id = occluder.sprite_id;
+
+            // warn!("setting occluder sprite id: {}", meta.sprite_id);
 
             meta.line = match occluder.shape.is_line() {
                 false => 0,

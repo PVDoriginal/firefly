@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use crate::SPRITE_SHADER;
+use crate::sprites::{SpriteId, UniformSpriteId};
 
+use bevy::core_pipeline::core_2d::CORE_2D_DEPTH_FORMAT;
 use bevy::render::RenderDebugFlags;
 use bevy::{
     asset::AssetEvents,
@@ -178,6 +180,7 @@ impl FromWorld for SpritePipeline {
                 (
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<UniformSpriteId>(false),
                 ),
             ),
         );
@@ -370,7 +373,7 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::Rgb10a2Unorm, //format,
+                    format: TextureFormat::Rgba32Float, //format,
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -380,6 +383,7 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
                 unclipped_depth: false,
+
                 polygon_mode: PolygonMode::Fill,
                 conservative: false,
                 topology: PrimitiveTopology::TriangleList,
@@ -406,7 +410,7 @@ impl SpecializedRenderPipeline for SpritePipeline {
             // }),
             depth_stencil: None,
             multisample: default(),
-            // MultisampleState {
+            // multisample: MultisampleState {
             //     count: key.msaa_samples(),
             //     mask: !0,
             //     alpha_to_coverage_enabled: false,
@@ -436,6 +440,8 @@ pub struct ExtractedSprite {
     pub flip_x: bool,
     pub flip_y: bool,
     pub kind: ExtractedSpriteKind,
+    pub id: SpriteId,
+    pub name: String,
 }
 
 pub enum ExtractedSpriteKind {
@@ -490,13 +496,15 @@ pub fn extract_sprites(
             &ViewVisibility,
             &Sprite,
             &GlobalTransform,
+            &SpriteId,
             Option<&super::texture_slice::ComputedTextureSlices>,
+            &Name,
         )>,
     >,
 ) {
     extracted_sprites.sprites.clear();
     extracted_slices.slices.clear();
-    for (main_entity, render_entity, view_visibility, sprite, transform, slices) in
+    for (main_entity, render_entity, view_visibility, sprite, transform, id, slices, name) in
         sprite_query.iter()
     {
         if !view_visibility.get() {
@@ -520,6 +528,8 @@ pub fn extract_sprites(
                 kind: ExtractedSpriteKind::Slices {
                     indices: start..end,
                 },
+                id: *id,
+                name: name.to_string(),
             });
         } else {
             let atlas_rect = sprite
@@ -553,6 +563,8 @@ pub fn extract_sprites(
                     // Pass the custom size
                     custom_size: sprite.custom_size,
                 },
+                id: *id,
+                name: name.to_string(),
             });
         }
     }
@@ -806,21 +818,51 @@ pub fn prepare_sprite_image_bind_groups(
                     continue;
                 };
 
+                let mut id_buffer =
+                    UniformBuffer::<UniformSpriteId>::from(extracted_sprite.id.uniform());
+
+                id_buffer.write_buffer(&render_device, &render_queue);
+                // info!(
+                //     "putting id {} in the buffer for {}",
+                //     extracted_sprite.id.0, extracted_sprite.name
+                // );
+
+                let bind_group = render_device.create_bind_group(
+                    "sprite_material_bind_group",
+                    &sprite_pipeline.material_layout,
+                    &BindGroupEntries::sequential((
+                        &gpu_image.texture_view,
+                        &gpu_image.sampler,
+                        id_buffer.binding().unwrap(),
+                    )),
+                );
                 batch_image_size = gpu_image.size_2d().as_vec2();
                 batch_image_handle = extracted_sprite.image_handle_id;
+
+                // TODO: maybe optimize this
+
+                // it used to not add the new bind group if the sprite was already loaded previous
+                // e.g. when vase if loaded for the first time, it gets id 10, the second time it just re-uses it
+                image_bind_groups.values.remove(&batch_image_handle);
+
                 image_bind_groups
                     .values
-                    .entry(batch_image_handle)
-                    .or_insert_with(|| {
-                        render_device.create_bind_group(
-                            "sprite_material_bind_group",
-                            &sprite_pipeline.material_layout,
-                            &BindGroupEntries::sequential((
-                                &gpu_image.texture_view,
-                                &gpu_image.sampler,
-                            )),
-                        )
-                    });
+                    .insert(batch_image_handle, bind_group);
+
+                // image_bind_groups
+                //     .values
+                //     .entry(batch_image_handle)
+                //     .or_insert_with(|| {
+                //         render_device.create_bind_group(
+                //             "sprite_material_bind_group",
+                //             &sprite_pipeline.material_layout,
+                //             &BindGroupEntries::sequential((
+                //                 &gpu_image.texture_view,
+                //                 &gpu_image.sampler,
+                //                 id_buffer.binding().unwrap(),
+                //             )),
+                //         )
+                //     });
 
                 batch_item_index = item_index;
                 current_batch = Some(batches.entry((*retained_view, item.entity())).insert(

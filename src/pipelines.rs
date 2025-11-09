@@ -27,6 +27,7 @@ use crate::{
 pub(crate) struct LightmapCreationPipeline {
     pub layout: BindGroupLayout,
     pub sampler: Sampler,
+    pub stencil_sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
 }
 
@@ -69,11 +70,14 @@ impl FromWorld for LightmapCreationPipeline {
                     GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
                     // sprite stencil
                     texture_2d(TextureSampleType::Float { filterable: false }),
+                    // stencil sampler
+                    sampler(SamplerBindingType::NonFiltering),
                 ),
             ),
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let stencil_sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
         let pipeline_id = new_pipeline(
             world,
@@ -87,6 +91,7 @@ impl FromWorld for LightmapCreationPipeline {
         Self {
             layout,
             sampler,
+            stencil_sampler,
             pipeline_id,
         }
     }

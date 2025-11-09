@@ -85,6 +85,7 @@ impl ViewNode for CreateLightmapNode {
 
         for (i, light) in lights.0.iter().enumerate() {
             {
+                // info!("rendering light #{i}");
                 let (meta, vertices) = &occluder_set.0[i];
 
                 let (Some(meta), Some(vertices)) = (meta.binding(), vertices.binding()) else {
@@ -103,6 +104,7 @@ impl ViewNode for CreateLightmapNode {
                         meta.clone(),
                         vertices.clone(),
                         &sprite_stencil_texture.0.default_view,
+                        &c_pipeline.stencil_sampler,
                     )),
                 );
 

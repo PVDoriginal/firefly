@@ -17,6 +17,7 @@ struct UniformOccluder {
     concave: u32,
     line: u32,
     hollow: u32,
+    sprite_id: f32,
 }
 
 struct Vertex {
@@ -28,4 +29,8 @@ struct FireflyConfig {
     ambient_color: vec3f,
     ambient_brightness: f32, 
     light_bands: u32,
+}
+
+struct SpriteId {
+    id: f32
 }

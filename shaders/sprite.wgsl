@@ -7,6 +7,8 @@
     view::View,
 }
 
+#import firefly::types::SpriteId
+
 #import bevy_sprite::sprite_view_bindings::view
 
 struct VertexInput {
@@ -50,6 +52,7 @@ fn vertex(in: VertexInput) -> VertexOutput {
 
 @group(1) @binding(0) var sprite_texture: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
+@group(1) @binding(2) var<uniform> sprite_id: SpriteId;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -61,7 +64,18 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // return 1;
 
-    return vec4f(1, 0, 0, color.a);
-    
+    if color.a > 0.5 {
+        // if (sprite_id.id == 16) {
+        //     return vec4f(0, 1, 0, 1);
+        // } 
+        // else if (sprite_id.id == 17) {
+        //     return vec4f(0, 0, 1, 1);
+        // } 
+        return vec4f(sprite_id.id, 0, 0, 1);
+    }
+    else {
+        return vec4f(0, 0, 0, 0);
+    }
+
     // return color;
 }

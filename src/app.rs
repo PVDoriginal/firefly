@@ -84,6 +84,7 @@ impl Plugin for FireflyPlugin {
         render_app.add_render_graph_edges(
             Core2d,
             (
+                Node2d::MainTransparentPass,
                 SpriteStencilLabel,
                 Node2d::Tonemapping,
                 CreateLightmapLabel,

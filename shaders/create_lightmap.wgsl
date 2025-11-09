@@ -28,6 +28,9 @@ var<storage> vertices: array<Vertex>;
 @group(0) @binding(7)
 var sprite_stencil: texture_2d<f32>;
 
+@group(0) @binding(8)
+var stencil_sampler: sampler;
+
 const PI2: f32 = 6.28318530718;
 
 @fragment
@@ -37,40 +40,42 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
     let dist = distance(pos, light.pos);
 
+    // let stencil = textureSample(sprite_stencil, stencil_sampler, in.uv);
+    // let stencil = textureGather(0, sprite_stencil, stencil_sampler, in.uv);//;
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
 
-    if (stencil.r == 1) {
-        return vec4f(1);
-    }
-
-    return vec4f(0, 0, 0, 1);
-
-    // if (stencil.r == 10) {
-    //     return vec4f(1);
-    // }
-
-    // if (dist < light.range) {
-    //     let x = dist / light.range;
-    //     res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
+    if (dist < light.range) {
+        let x = dist / light.range;
+        res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
         
-    //     var start_vertex = 0u;
-    //     for (var i = 0u; i < data.n_occluders; i++) {
+        var start_vertex = 0u;
+        for (var i = 0u; i < data.n_occluders; i++) {
 
-    //         if (occluders[i].concave == 1) {
-    //             let intersections = concave_check(pos, i, start_vertex);
-    //             if (intersections > 0) {
-    //                 res = vec4f(0, 0, 0, 1);
-    //                 break;
-    //             }
-    //         }
-    //         else if (is_occluded(pos, i, start_vertex)) {
-    //             res = vec4f(0, 0, 0, 1);
-    //             break;
-    //         }
-    //         start_vertex += occluders[i].n_vertices;
-    //     }
-    // }
-    // return res;
+            // if (distance(pos, vertices[start_vertex].pos) < 15) { 
+            //     if (stencil.r != 0) {
+            //         return vec4f(f32(stencil.r) / 10, 0, 0, 1);
+            //     }
+            // }
+            // return vec4f(f32(stencil.r) / 10, 0, 0, 1);
+
+            if (abs(stencil.r - occluders[i].sprite_id) < 0.4) {
+                start_vertex += occluders[i].n_vertices;
+                continue;
+            }
+
+            if (occluders[i].concave == 1) {
+                let intersections = concave_check(pos, i, start_vertex);
+                if (intersections > 0) {
+                    res = vec4f(0, 0, 0, 1);
+                }
+            }
+            else if (is_occluded(pos, i, start_vertex)) {
+                res = vec4f(0, 0, 0, 1);
+            }
+            start_vertex += occluders[i].n_vertices;
+        }
+    }
+    return res;
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {
