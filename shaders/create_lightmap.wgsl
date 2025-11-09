@@ -58,7 +58,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             // }
             // return vec4f(f32(stencil.r) / 10, 0, 0, 1);
 
-            if (abs(stencil.r - occluders[i].sprite_id) < 0.4) {
+            if (stencil.r == occluders[i].sprite_id) {
                 start_vertex += occluders[i].n_vertices;
                 continue;
             }

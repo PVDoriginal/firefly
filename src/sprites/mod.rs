@@ -56,7 +56,7 @@ struct SpriteIdCounter(f32);
 
 impl SpriteIdCounter {
     fn next(&mut self) -> f32 {
-        self.0 += 1.;
+        self.0 += f32::EPSILON;
         return self.0;
     }
 }

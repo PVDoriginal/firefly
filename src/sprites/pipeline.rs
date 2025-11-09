@@ -346,16 +346,16 @@ impl SpecializedRenderPipeline for SpritePipeline {
                     offset: 32,
                     shader_location: 2,
                 },
-                // @location(3) i_color: vec4<f32>,
+                // @location(3) i_id: f32,
                 VertexAttribute {
-                    format: VertexFormat::Float32x4,
+                    format: VertexFormat::Float32,
                     offset: 48,
                     shader_location: 3,
                 },
                 // @location(4) i_uv_offset_scale: vec4<f32>,
                 VertexAttribute {
                     format: VertexFormat::Float32x4,
-                    offset: 64,
+                    offset: 52,
                     shader_location: 4,
                 },
             ],
@@ -575,13 +575,14 @@ pub fn extract_sprites(
 struct SpriteInstance {
     // Affine 4x3 transposed to 3x4
     pub i_model_transpose: [Vec4; 3],
-    pub i_color: [f32; 4],
+    pub id: f32,
     pub i_uv_offset_scale: [f32; 4],
+    pub _padding: [f32; 3],
 }
 
 impl SpriteInstance {
     #[inline]
-    fn from(transform: &Affine3A, color: &LinearRgba, uv_offset_scale: &Vec4) -> Self {
+    fn from(transform: &Affine3A, color: &LinearRgba, uv_offset_scale: &Vec4, id: f32) -> Self {
         let transpose_model_3x3 = transform.matrix3.transpose();
         Self {
             i_model_transpose: [
@@ -589,8 +590,9 @@ impl SpriteInstance {
                 transpose_model_3x3.y_axis.extend(transform.translation.y),
                 transpose_model_3x3.z_axis.extend(transform.translation.z),
             ],
-            i_color: color.to_f32_array(),
+            id,
             i_uv_offset_scale: uv_offset_scale.to_array(),
+            _padding: [0., 0., 0.],
         }
     }
 }
@@ -826,43 +828,23 @@ pub fn prepare_sprite_image_bind_groups(
                 //     "putting id {} in the buffer for {}",
                 //     extracted_sprite.id.0, extracted_sprite.name
                 // );
-
-                let bind_group = render_device.create_bind_group(
-                    "sprite_material_bind_group",
-                    &sprite_pipeline.material_layout,
-                    &BindGroupEntries::sequential((
-                        &gpu_image.texture_view,
-                        &gpu_image.sampler,
-                        id_buffer.binding().unwrap(),
-                    )),
-                );
                 batch_image_size = gpu_image.size_2d().as_vec2();
                 batch_image_handle = extracted_sprite.image_handle_id;
 
-                // TODO: maybe optimize this
-
-                // it used to not add the new bind group if the sprite was already loaded previous
-                // e.g. when vase if loaded for the first time, it gets id 10, the second time it just re-uses it
-                image_bind_groups.values.remove(&batch_image_handle);
-
                 image_bind_groups
                     .values
-                    .insert(batch_image_handle, bind_group);
-
-                // image_bind_groups
-                //     .values
-                //     .entry(batch_image_handle)
-                //     .or_insert_with(|| {
-                //         render_device.create_bind_group(
-                //             "sprite_material_bind_group",
-                //             &sprite_pipeline.material_layout,
-                //             &BindGroupEntries::sequential((
-                //                 &gpu_image.texture_view,
-                //                 &gpu_image.sampler,
-                //                 id_buffer.binding().unwrap(),
-                //             )),
-                //         )
-                //     });
+                    .entry(batch_image_handle)
+                    .or_insert_with(|| {
+                        render_device.create_bind_group(
+                            "sprite_material_bind_group",
+                            &sprite_pipeline.material_layout,
+                            &BindGroupEntries::sequential((
+                                &gpu_image.texture_view,
+                                &gpu_image.sampler,
+                                id_buffer.binding().unwrap(),
+                            )),
+                        )
+                    });
 
                 batch_item_index = item_index;
                 current_batch = Some(batches.entry((*retained_view, item.entity())).insert(
@@ -942,6 +924,7 @@ pub fn prepare_sprite_image_bind_groups(
                             &transform,
                             &extracted_sprite.color,
                             &uv_offset_scale,
+                            extracted_sprite.id.float(),
                         ));
 
                     current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -987,6 +970,7 @@ pub fn prepare_sprite_image_bind_groups(
                                 &transform,
                                 &extracted_sprite.color,
                                 &uv_offset_scale,
+                                extracted_sprite.id.float(),
                             ));
 
                         current_batch.as_mut().unwrap().get_mut().range.end += 1;

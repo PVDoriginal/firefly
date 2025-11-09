@@ -19,14 +19,14 @@ struct VertexInput {
     @location(0) i_model_transpose_col0: vec4<f32>,
     @location(1) i_model_transpose_col1: vec4<f32>,
     @location(2) i_model_transpose_col2: vec4<f32>,
-    @location(3) i_color: vec4<f32>,
+    @location(3) id: f32,
     @location(4) i_uv_offset_scale: vec4<f32>,
 }
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
-    @location(1) @interpolate(flat) color: vec4<f32>,
+    @location(1) id: f32,
 };
 
 @vertex
@@ -45,18 +45,17 @@ fn vertex(in: VertexInput) -> VertexOutput {
         in.i_model_transpose_col2,
     )) * vec4<f32>(vertex_position, 1.0);
     out.uv = vec2<f32>(vertex_position.xy) * in.i_uv_offset_scale.zw + in.i_uv_offset_scale.xy;
-    out.color = in.i_color;
+    out.id = in.id;
 
     return out;
 }
 
 @group(1) @binding(0) var sprite_texture: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
-@group(1) @binding(2) var<uniform> sprite_id: SpriteId;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color = in.color * textureSample(sprite_texture, sprite_sampler, in.uv);
+    var color = textureSample(sprite_texture, sprite_sampler, in.uv);
 
 // #ifdef TONEMAP_IN_SHADER
 //     color = tonemapping::tone_mapping(color, view.color_grading);
@@ -71,7 +70,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // else if (sprite_id.id == 17) {
         //     return vec4f(0, 0, 1, 1);
         // } 
-        return vec4f(sprite_id.id, 0, 0, 1);
+        return vec4f(in.id, 0, 0, 1);
     }
     else {
         return vec4f(0, 0, 0, 0);
