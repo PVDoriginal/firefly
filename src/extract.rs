@@ -57,7 +57,7 @@ fn extract_occluders(
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
-                shape: occluder.shape.clone(),
+                shape: occluder.shape().clone(),
                 sprite_id: sprite_id.map_or(-1., |s| s.float()),
                 z: global_transform.translation().z,
             });

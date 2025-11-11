@@ -9,10 +9,40 @@ use bevy::{
 #[derive(Component, Clone, Default, Reflect)]
 #[require(SyncToRenderWorld)]
 pub struct Occluder {
-    pub shape: OccluderShape,
+    shape: OccluderShape,
 }
 
-#[derive(Component)]
+impl Occluder {
+    pub fn shape(&self) -> &OccluderShape {
+        &self.shape
+    }
+
+    pub fn from_shape(shape: OccluderShape) -> Self {
+        Self { shape }
+    }
+
+    pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
+        normalize_vertices(vertices).and_then(|(vertices, concave)| {
+            Some(Self::from_shape(OccluderShape::Polygon {
+                vertices,
+                concave,
+            }))
+        })
+    }
+
+    pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
+        Some(Self::from_shape(OccluderShape::Polyline {
+            vertices,
+            concave: true,
+        }))
+    }
+
+    pub fn rectangle(width: f32, height: f32) -> Self {
+        Self::from_shape(OccluderShape::Rectangle { width, height })
+    }
+}
+
+#[derive(Component, Debug)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub shape: OccluderShape,
@@ -50,17 +80,14 @@ pub(crate) struct OccluderSet(
     )>,
 );
 
-#[derive(Reflect, Clone, Default)]
-pub struct OccluderShape(OccluderShapeInternal);
-
-#[derive(Reflect, Clone)]
-pub enum OccluderShapeInternal {
+#[derive(Reflect, Clone, Debug)]
+pub enum OccluderShape {
     Rectangle { width: f32, height: f32 },
     Polygon { vertices: Vec<Vec2>, concave: bool },
     Polyline { vertices: Vec<Vec2>, concave: bool },
 }
 
-impl Default for OccluderShapeInternal {
+impl Default for OccluderShape {
     fn default() -> Self {
         Self::Rectangle {
             width: 10.,
@@ -69,16 +96,16 @@ impl Default for OccluderShapeInternal {
     }
 }
 
-impl OccluderShapeInternal {
-    pub fn concave(&self) -> bool {
+impl OccluderShape {
+    pub fn is_concave(&self) -> bool {
         match self {
             Self::Polygon { concave, .. } => *concave,
             Self::Polyline { concave, .. } => *concave,
             _ => false,
         }
     }
-    pub fn line(&self) -> bool {
-        matches!(self, OccluderShapeInternal::Polyline { .. })
+    pub fn is_line(&self) -> bool {
+        matches!(self, OccluderShape::Polyline { .. })
     }
 
     pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
@@ -95,43 +122,6 @@ impl OccluderShapeInternal {
             Self::Polygon { vertices, .. } => vertices.clone(),
             Self::Polyline { vertices, .. } => vertices.clone(),
         }
-    }
-}
-
-impl OccluderShape {
-    pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
-        self.0.vertices(pos)
-    }
-
-    pub fn is_concave(&self) -> bool {
-        self.0.concave()
-    }
-    pub fn is_line(&self) -> bool {
-        self.0.line()
-    }
-
-    pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
-        normalize_vertices(vertices).and_then(|(vertices, concave)| {
-            Some(Self(OccluderShapeInternal::Polygon { vertices, concave }))
-        })
-    }
-
-    pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
-        Some(Self(OccluderShapeInternal::Polyline {
-            vertices,
-            concave: true,
-        }))
-        // normalize_vertices(vertices).and_then(|(vertices, concave)| {
-        //     Some(Self(OccluderShapeInternal::Polyline { vertices, concave }))
-        // })
-    }
-
-    pub fn rectangle(width: f32, height: f32) -> Self {
-        Self(OccluderShapeInternal::Rectangle { width, height })
-    }
-
-    pub fn internal(&self) -> OccluderShapeInternal {
-        self.0.clone()
     }
 }
 

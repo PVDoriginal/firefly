@@ -197,8 +197,6 @@ fn prepare_data(
             meta.sprite_id = occluder.sprite_id;
             meta.z = occluder.z;
 
-            // warn!("setting occluder sprite id: {}", meta.sprite_id);
-
             meta.line = match occluder.shape.is_line() {
                 false => 0,
                 true => 1,

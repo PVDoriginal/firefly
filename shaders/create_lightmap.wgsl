@@ -37,13 +37,9 @@ const PI2: f32 = 6.28318530718;
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     var res = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
-
-    let dist = distance(pos, light.pos);
-
-    // let stencil = textureSample(sprite_stencil, stencil_sampler, in.uv);
-    // let stencil = textureGather(0, sprite_stencil, stencil_sampler, in.uv);//;
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
-
+    
+    let dist = distance(pos, light.pos);
     if (dist < light.range) {
         let x = dist / light.range;
         res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
@@ -51,21 +47,16 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
 
-            // if (distance(pos, vertices[start_vertex].pos) < 15) { 
-            //     if (stencil.r != 0) {
-            //         return vec4f(f32(stencil.r) / 10, 0, 0, 1);
-            //     }
-            // }
-            // return vec4f(f32(stencil.r) / 10, 0, 0, 1);
+            if (stencil.a > 0.1) {
+                if (stencil.g >= occluders[i].z) {
+                    start_vertex += occluders[i].n_vertices;
+                    continue;
+                }
 
-            if (stencil.g >= occluders[i].z) {
-                start_vertex += occluders[i].n_vertices;
-                continue;
-            }
-
-            if (stencil.r == occluders[i].sprite_id) {
-                start_vertex += occluders[i].n_vertices;
-                continue;
+                if (stencil.r == occluders[i].sprite_id) {
+                    start_vertex += occluders[i].n_vertices;
+                    continue;
+                }
             }
 
             if (occluders[i].concave == 1) {
