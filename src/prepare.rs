@@ -20,7 +20,8 @@ use crate::{
     data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
     lights::{ExtractedPointLight, LightSet, UniformPointLight},
     occluders::{
-        ExtractedOccluder, OccluderSet, UniformOccluder, UniformVertex, point_inside_poly,
+        ExtractedOccluder, OccluderSet, OccluderShape, UniformOccluder, UniformRoundOccluder,
+        UniformVertex, point_inside_poly,
     },
     sprites::SpriteStencilTexture,
 };
@@ -186,11 +187,7 @@ fn prepare_data(
 
         let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
         let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
-
-        if occluders.is_empty() {
-            meta_buffer.push(default());
-            vertices_buffer.push(default());
-        }
+        let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
 
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
@@ -206,6 +203,27 @@ fn prepare_data(
                 false => 0,
                 true => 1,
             };
+
+            meta.round = match occluder.shape.is_round() {
+                false => 0,
+                true => 1,
+            };
+
+            if let OccluderShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } = occluder.shape
+            {
+                round_buffer.push(UniformRoundOccluder {
+                    pos: occluder.pos,
+                    width,
+                    height,
+                    radius,
+                });
+                meta_buffer.push(meta);
+                continue;
+            }
 
             if occluder.shape.is_concave() {
                 meta.n_vertices = occluder.vertices().len() as u32;
@@ -302,9 +320,16 @@ fn prepare_data(
 
             meta_buffer.push(meta);
         }
+        meta_buffer.push(default());
+        vertices_buffer.push(default());
+        round_buffer.push(default());
+
         meta_buffer.write_buffer(&render_device, &render_queue);
         vertices_buffer.write_buffer(&render_device, &render_queue);
+        round_buffer.write_buffer(&render_device, &render_queue);
 
-        occluder_set.0.push((meta_buffer, vertices_buffer));
+        occluder_set
+            .0
+            .push((meta_buffer, vertices_buffer, round_buffer));
     }
 }

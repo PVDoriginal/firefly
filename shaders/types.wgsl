@@ -11,13 +11,21 @@ struct PointLight {
     range: f32,
 }
 
-struct UniformOccluder {
+struct Occluder {
     n_vertices: u32,
     seam: f32,
     concave: u32,
     line: u32,
+    round: u32,
     sprite_id: f32,
     z: f32,
+}
+
+struct RoundOccluder {
+    pos: vec2f,
+    width: f32,
+    height: f32, 
+    radius: f32,
 }
 
 struct Vertex {

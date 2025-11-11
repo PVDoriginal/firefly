@@ -40,6 +40,14 @@ impl Occluder {
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self::from_shape(OccluderShape::Rectangle { width, height })
     }
+
+    pub fn round_rectangle(width: f32, height: f32, radius: f32) -> Self {
+        Self::from_shape(OccluderShape::RoundRectangle {
+            width,
+            height,
+            radius,
+        })
+    }
 }
 
 #[derive(Component, Debug)]
@@ -62,8 +70,17 @@ pub(crate) struct UniformOccluder {
     pub seam: f32,
     pub concave: u32,
     pub line: u32,
+    pub round: u32,
     pub sprite_id: f32,
     pub z: f32,
+}
+
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformRoundOccluder {
+    pub pos: Vec2,
+    pub width: f32,
+    pub height: f32,
+    pub radius: f32,
 }
 
 #[derive(ShaderType, Clone, Default)]
@@ -77,14 +94,29 @@ pub(crate) struct OccluderSet(
     pub  Vec<(
         GpuArrayBuffer<UniformOccluder>,
         GpuArrayBuffer<UniformVertex>,
+        GpuArrayBuffer<UniformRoundOccluder>,
     )>,
 );
 
 #[derive(Reflect, Clone, Debug)]
 pub enum OccluderShape {
-    Rectangle { width: f32, height: f32 },
-    Polygon { vertices: Vec<Vec2>, concave: bool },
-    Polyline { vertices: Vec<Vec2>, concave: bool },
+    Rectangle {
+        width: f32,
+        height: f32,
+    },
+    Polygon {
+        vertices: Vec<Vec2>,
+        concave: bool,
+    },
+    Polyline {
+        vertices: Vec<Vec2>,
+        concave: bool,
+    },
+    RoundRectangle {
+        width: f32,
+        height: f32,
+        radius: f32,
+    },
 }
 
 impl Default for OccluderShape {
@@ -97,6 +129,10 @@ impl Default for OccluderShape {
 }
 
 impl OccluderShape {
+    pub fn is_round(&self) -> bool {
+        matches!(self, OccluderShape::RoundRectangle { .. })
+    }
+
     pub fn is_concave(&self) -> bool {
         match self {
             Self::Polygon { concave, .. } => *concave,
@@ -121,6 +157,7 @@ impl OccluderShape {
             }
             Self::Polygon { vertices, .. } => vertices.clone(),
             Self::Polyline { vertices, .. } => vertices.clone(),
+            Self::RoundRectangle { .. } => default(),
         }
     }
 }

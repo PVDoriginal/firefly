@@ -1,3 +1,5 @@
+use std::f32::consts::{FRAC_2_PI, FRAC_PI_2};
+
 use bevy::{
     asset::load_internal_asset,
     color::palettes::css::{BLUE, PINK},
@@ -150,6 +152,87 @@ fn draw_gizmos(
                 for line in vertices.windows(2) {
                     gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
                 }
+            }
+            OccluderShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } => {
+                let center = transform.translation.truncate();
+                let width = width / 2.;
+                let height = height / 2.;
+
+                // top line
+                gizmos.line_2d(
+                    center + vec2(-width, height + radius),
+                    center + vec2(width, height + radius),
+                    GIZMO_COLOR,
+                );
+
+                // right line
+                gizmos.line_2d(
+                    center + vec2(width + radius, height),
+                    center + vec2(width + radius, -height),
+                    GIZMO_COLOR,
+                );
+
+                // bottom line
+                gizmos.line_2d(
+                    center + vec2(-width, -height - radius),
+                    center + vec2(width, -height - radius),
+                    GIZMO_COLOR,
+                );
+
+                // left line
+                gizmos.line_2d(
+                    center + vec2(-width - radius, height),
+                    center + vec2(-width - radius, -height),
+                    GIZMO_COLOR,
+                );
+
+                // top-left arc
+                gizmos.arc_2d(
+                    Isometry2d {
+                        translation: center + vec2(-width, height),
+                        rotation: Rot2 { cos: 1., sin: 0. },
+                    },
+                    FRAC_PI_2,
+                    radius,
+                    GIZMO_COLOR,
+                );
+
+                // top-right arc
+                gizmos.arc_2d(
+                    Isometry2d {
+                        translation: center + vec2(width, height),
+                        rotation: Rot2 { cos: 0., sin: -1. },
+                    },
+                    FRAC_PI_2,
+                    radius,
+                    GIZMO_COLOR,
+                );
+
+                // bottom-right arc
+                gizmos.arc_2d(
+                    Isometry2d {
+                        translation: center + vec2(width, -height),
+                        rotation: Rot2 { cos: -1., sin: 0. },
+                    },
+                    FRAC_PI_2,
+                    radius,
+                    GIZMO_COLOR,
+                );
+
+                // bottom-left arc
+                gizmos.arc_2d(
+                    Isometry2d {
+                        translation: center + vec2(-width, -height),
+                        rotation: Rot2 { cos: 0., sin: 1. },
+                    },
+                    FRAC_PI_2,
+                    radius,
+                    GIZMO_COLOR,
+                );
             }
         }
     }

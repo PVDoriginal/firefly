@@ -55,3 +55,59 @@ fn intersect(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> bool {
 fn blend(bg: vec4f, fg: vec4f, intensity: f32) -> vec4f {
     return max(fg * intensity, bg);
 }
+
+// check if the [a, b] segment intersects the circle (c, r) between the 2 angles 
+fn intersects_arc(a: vec2f, b: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> bool {
+    let a2 = a - c;
+    let b2 = b - c;
+
+    let dx = b2.x - a2.x; 
+    let dy = b2.y - a2.y; 
+    let dr_sqr = dx * dx + dy * dy;
+
+    let det = a2.x * b2.y - a2.y * b2.x;
+    let delta = r * r * dr_sqr - det * det;
+
+    if (delta < 0) {
+        return false;
+    }
+
+    let new_delta = sqrt(delta);
+
+    let x1 = (det * dy + sgn(dy) * dx * new_delta) / dr_sqr;
+    let y1 = (-det * dx + abs(dy) * new_delta) / dr_sqr;
+
+    let dt1 = dot(b2 - a2, vec2f(x1, y1) - a2);
+    if dt1 >= 0 && dt1 < dr_sqr { 
+        let angle = atan2(y1, x1);
+        if (angle > start_angle) && (angle < end_angle) {
+            return true;
+        }
+    }  
+
+    if (delta == 0) {
+        return false;
+    }
+
+    let x2 = (det * dy - sgn(dy) * dx * new_delta) / dr_sqr;
+    let y2 = (-det * dx - abs(dy) * new_delta) / dr_sqr;
+
+
+    let dt2 = dot(b2 - a2, vec2f(x2, y2) - a2);
+    if dt2 >= 0 && dt2 < dr_sqr { 
+        let angle = atan2(y2, x2);
+        if (angle > start_angle) && (angle < end_angle) {
+            return true;
+        }  
+    }
+    
+    return false;
+}
+
+// sign of float
+fn sgn(x: f32) -> f32 {
+    if (x < 0) {
+        return -1.0;
+    } 
+    return 1.0;
+}

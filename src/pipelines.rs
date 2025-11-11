@@ -20,7 +20,7 @@ use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
     data::{UniformFireflyConfig, UniformMeta},
     lights::UniformPointLight,
-    occluders::{UniformOccluder, UniformVertex},
+    occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
 };
 
 #[derive(Resource)]
@@ -60,18 +60,18 @@ impl FromWorld for LightmapCreationPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     // sampler
                     sampler(SamplerBindingType::Filtering),
-                    // occluder meta
+                    // meta
                     uniform_buffer::<UniformMeta>(false),
                     // point light
                     uniform_buffer::<UniformPointLight>(false),
-                    // occluder
+                    // occluders
                     GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
                     // vertices
                     GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
+                    // round occluders
+                    GpuArrayBuffer::<UniformRoundOccluder>::binding_layout(render_device),
                     // sprite stencil
                     texture_2d(TextureSampleType::Float { filterable: false }),
-                    // stencil sampler
-                    sampler(SamplerBindingType::NonFiltering),
                 ),
             ),
         );

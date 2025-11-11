@@ -1,8 +1,8 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
-#import firefly::types::{PointLight, LightingData, UniformOccluder, Vertex}
-#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend}
+#import firefly::types::{PointLight, LightingData, Occluder, Vertex, RoundOccluder}
+#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, intersects_arc}
 
 @group(0) @binding(0)
 var<uniform> view: View;
@@ -20,18 +20,20 @@ var<uniform> data: LightingData;
 var<uniform> light: PointLight;
 
 @group(0) @binding(5)
-var<storage> occluders: array<UniformOccluder>;
+var<storage> occluders: array<Occluder>;
 
 @group(0) @binding(6)
 var<storage> vertices: array<Vertex>;
 
 @group(0) @binding(7)
-var sprite_stencil: texture_2d<f32>;
+var<storage> round_occluders: array<RoundOccluder>;
 
 @group(0) @binding(8)
-var stencil_sampler: sampler;
+var sprite_stencil: texture_2d<f32>;
 
 const PI2: f32 = 6.28318530718;
+const PI: f32 = 3.14159265359;
+const PIDIV2: f32 = 1.57079632679; 
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
@@ -43,7 +45,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     if (dist < light.range) {
         let x = dist / light.range;
         res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
-        
+
+        var round_index = 0u;
+
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
 
@@ -57,6 +61,14 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     start_vertex += occluders[i].n_vertices;
                     continue;
                 }
+            }
+
+            if (occluders[i].round == 1) {
+                if (round_check(pos, round_index)) {
+                    res = vec4f(0, 0, 0, 1);
+                }
+                round_index += 1;
+                continue;
             }
 
             if (occluders[i].concave == 1) {
@@ -135,4 +147,54 @@ fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
     }
     
     return (intersections + 1) / 2;
+}
+
+// checks if pixel is blocked by round occluder
+fn round_check(pos: vec2f, occluder: u32) -> bool {
+    let center = round_occluders[occluder].pos;
+    let width = round_occluders[occluder].width / 2; 
+    let height = round_occluders[occluder].height / 2; 
+    let radius = round_occluders[occluder].radius;
+
+    // top edge
+    if (intersect(center + vec2f(-width, height + radius), center + vec2f(width, height + radius), pos, light.pos)) {
+        return true;
+    }
+
+    // right edge
+    if (intersect(center + vec2f(width + radius, height), center + vec2f(width + radius, -height), pos, light.pos)) {
+        return true;
+    }
+    
+    // bottom edge
+    if (intersect(center + vec2f(-width, -height - radius), center + vec2f(width, -height - radius), pos, light.pos)) {
+        return true;
+    }
+    
+    // left edge
+    if (intersect(center + vec2f(-width - radius, height), center + vec2f(-width - radius, -height), pos, light.pos)) {
+        return true;
+    }
+
+    // top-left arc
+    if (intersects_arc(pos, light.pos, center + vec2f(-width, height), radius, PIDIV2, PI)) {
+        return true;
+    }
+    
+    // top-right arc
+    if (intersects_arc(pos, light.pos, center + vec2f(width, height), radius, 0, PIDIV2)) {
+        return true;
+    }
+    
+    // bottom-right arc
+    if (intersects_arc(pos, light.pos, center + vec2f(width, -height), radius, -PIDIV2, 0)) {
+        return true;
+    }
+    
+    // bottom-left arc
+    if (intersects_arc(pos, light.pos, center + vec2f(-width, -height), radius, -PI, -PIDIV2)) {
+        return true;
+    }
+
+    return false;
 }
