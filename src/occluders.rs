@@ -17,7 +17,7 @@ impl Occluder {
         &self.shape
     }
 
-    pub fn from_shape(shape: OccluderShape) -> Self {
+    fn from_shape(shape: OccluderShape) -> Self {
         Self { shape }
     }
 
@@ -38,7 +38,7 @@ impl Occluder {
     }
 
     pub fn rectangle(width: f32, height: f32) -> Self {
-        Self::from_shape(OccluderShape::Rectangle { width, height })
+        Self::round_rectangle(width, height, 0.)
     }
 
     pub fn round_rectangle(width: f32, height: f32, radius: f32) -> Self {
@@ -47,6 +47,22 @@ impl Occluder {
             height,
             radius,
         })
+    }
+
+    pub fn circle(radius: f32) -> Self {
+        Self::round_rectangle(0., 0., radius)
+    }
+
+    pub fn vertical_capsule(length: f32, radius: f32) -> Self {
+        Self::round_rectangle(0., length, radius)
+    }
+
+    pub fn horizontal_capsule(length: f32, radius: f32) -> Self {
+        Self::round_rectangle(length, 0., radius)
+    }
+
+    pub fn capsule(length: f32, radius: f32) -> Self {
+        Self::vertical_capsule(length, radius)
     }
 }
 
@@ -100,10 +116,6 @@ pub(crate) struct OccluderSet(
 
 #[derive(Reflect, Clone, Debug)]
 pub enum OccluderShape {
-    Rectangle {
-        width: f32,
-        height: f32,
-    },
     Polygon {
         vertices: Vec<Vec2>,
         concave: bool,
@@ -121,9 +133,10 @@ pub enum OccluderShape {
 
 impl Default for OccluderShape {
     fn default() -> Self {
-        Self::Rectangle {
+        Self::RoundRectangle {
             width: 10.,
             height: 10.,
+            radius: 0.,
         }
     }
 }
@@ -146,15 +159,6 @@ impl OccluderShape {
 
     pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
         match &self {
-            Self::Rectangle { width, height } => {
-                let corner = vec2(width / 2., height / 2.);
-                vec![
-                    vec2(corner.x, corner.y) + pos,
-                    vec2(corner.x, -corner.y) + pos,
-                    vec2(-corner.x, -corner.y) + pos,
-                    vec2(-corner.x, corner.y) + pos,
-                ]
-            }
             Self::Polygon { vertices, .. } => vertices.clone(),
             Self::Polyline { vertices, .. } => vertices.clone(),
             Self::RoundRectangle { .. } => default(),

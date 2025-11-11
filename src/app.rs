@@ -136,12 +136,7 @@ fn draw_gizmos(
     }
 
     for (transform, occluder) in &occluders {
-        let isometry = Isometry2d::from_translation(transform.translation.truncate());
-
         match occluder.shape().clone() {
-            OccluderShape::Rectangle { width, height } => {
-                gizmos.rect_2d(isometry, vec2(width, height), GIZMO_COLOR);
-            }
             OccluderShape::Polygon { vertices, .. } => {
                 for line in vertices.windows(2) {
                     gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
