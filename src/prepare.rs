@@ -209,11 +209,6 @@ fn prepare_data(
                 true => 1,
             };
 
-            meta.hollow = match occluder.hollow {
-                false => 0,
-                true => 1,
-            };
-
             if occluder.shape.is_concave() {
                 meta.n_vertices = occluder.vertices().len() as u32;
 
@@ -281,11 +276,6 @@ fn prepare_data(
                 })
                 .collect();
 
-            // vertices
-            //     .iter()
-            //     .enumerate()
-            //     .for_each(|(i, v)| info!("vertex {i}: {}", v.pos));
-
             let cmp = |a: &&UniformVertex, b: &&UniformVertex| a.angle.total_cmp(&b.angle);
 
             let mut min_vertex = vertices
@@ -295,8 +285,6 @@ fn prepare_data(
                 .map(|(i, _)| i)
                 .unwrap();
 
-            // info!("min vertex: {}", vertices[min_vertex].pos);
-
             let max_vertex = vertices
                 .iter()
                 .enumerate()
@@ -304,53 +292,17 @@ fn prepare_data(
                 .map(|(i, _)| i)
                 .unwrap();
 
-            // info!("max vertex: {}", vertices[max_vertex].pos);
-            // info!("Looking at vertices!");
-
             loop {
                 vertices_buffer.push(vertices[min_vertex].clone());
                 meta.n_vertices += 1;
 
-                // info!(
-                //     "Adding vertex with angle: {}, pos: {}",
-                //     vertices[min_vertex].angle, vertices[min_vertex].pos
-                // );
-
                 if min_vertex == max_vertex {
                     break;
                 }
-
-                if !occluder.hollow {
-                    if min_vertex == 0 {
-                        min_vertex = vertices.len() - 1;
-                    } else {
-                        min_vertex -= 1
-                    };
-                } else {
-                    min_vertex = (min_vertex + 1) % vertices.len();
-                }
+                min_vertex = (min_vertex + 1) % vertices.len();
             }
 
-            // info!(
-            //     "max angle: {}",
-            //     vertices[(max_vertex + 1) % vertices.len()].angle
-            // );
-            // info!("after max angle: {}", vertices[max_vertex].angle);
-
-            // if (vertices[max_vertex].angle - vertices[(max_vertex + 1) % vertices.len()].angle)
-            //     .abs()
-            //     >= PI
-            // {
-            //     warn!("doing something");
-            //     meta.n_vertices += 1;
-            //     let mut rubber = vertices[(max_vertex + 1) % vertices.len()].clone();
-            //     rubber.angle += 2. * PI;
-            //     vertices_buffer.push(rubber);
-            // }
-
-            // info!("n_vertices: {}", meta.n_vertices);
             meta_buffer.push(meta);
-            // info!("Done!\n\n");
         }
         meta_buffer.write_buffer(&render_device, &render_queue);
         vertices_buffer.write_buffer(&render_device, &render_queue);

@@ -16,7 +16,6 @@ struct UniformOccluder {
     seam: f32,
     concave: u32,
     line: u32,
-    hollow: u32,
     sprite_id: f32,
     z: f32,
 }

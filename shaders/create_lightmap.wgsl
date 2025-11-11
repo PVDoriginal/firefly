@@ -142,10 +142,6 @@ fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
     if (occluders[occluder].line == 1) {
         return intersections;
     }
-
-    if (occluders[occluder].hollow == 0 && intersections > 0) {
-        intersections -= 1;
-    }
     
-    return intersections;
+    return (intersections + 1) / 2;
 }
