@@ -1,12 +1,7 @@
 use bevy::{
     asset::weak_handle,
     prelude::*,
-    render::{
-        render_graph::RenderLabel,
-        render_resource::{BindingResource, Buffer, BufferDescriptor, BufferUsages},
-        renderer::RenderDevice,
-        texture::CachedTexture,
-    },
+    render::{render_graph::RenderLabel, texture::CachedTexture},
 };
 
 pub mod app;

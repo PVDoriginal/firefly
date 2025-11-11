@@ -1,4 +1,4 @@
-use std::f32::consts::{FRAC_2_PI, FRAC_PI_2};
+use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
     asset::load_internal_asset,
@@ -106,7 +106,7 @@ impl Plugin for FireflyPlugin {
     }
 }
 
-fn stress_test(mut commands: Commands) {
+fn _stress_test(mut commands: Commands) {
     for _ in 0..5 {
         commands.spawn((
             Name::new("Point Light"),

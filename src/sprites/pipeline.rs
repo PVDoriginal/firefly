@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use crate::SPRITE_SHADER;
-use crate::sprites::{SpriteId, UniformSpriteId};
+use crate::sprites::SpriteId;
 
 use bevy::core_pipeline::core_2d::CORE_2D_DEPTH_FORMAT;
 use bevy::render::RenderDebugFlags;
@@ -180,7 +180,6 @@ impl FromWorld for SpritePipeline {
                 (
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
-                    uniform_buffer::<UniformSpriteId>(false),
                 ),
             ),
         );
@@ -834,15 +833,6 @@ pub fn prepare_sprite_image_bind_groups(
                 let Some(gpu_image) = gpu_images.get(extracted_sprite.image_handle_id) else {
                     continue;
                 };
-
-                let mut id_buffer =
-                    UniformBuffer::<UniformSpriteId>::from(extracted_sprite.id.uniform());
-
-                id_buffer.write_buffer(&render_device, &render_queue);
-                // info!(
-                //     "putting id {} in the buffer for {}",
-                //     extracted_sprite.id.0, extracted_sprite.name
-                // );
                 batch_image_size = gpu_image.size_2d().as_vec2();
                 batch_image_handle = extracted_sprite.image_handle_id;
 
@@ -856,7 +846,6 @@ pub fn prepare_sprite_image_bind_groups(
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &gpu_image.sampler,
-                                id_buffer.binding().unwrap(),
                             )),
                         )
                     });

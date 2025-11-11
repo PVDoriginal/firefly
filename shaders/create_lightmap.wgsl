@@ -50,37 +50,36 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         var start_vertex = 0u;
         for (var i = 0u; i < data.n_occluders; i++) {
+            var shadow = vec4f(0, 0, 0, 0); 
 
+            if (occluders[i].round == 1) {
+                if (round_check(pos, round_index)) {
+                    shadow = vec4f(1, 1, 1, 0);
+                }
+                round_index += 1;
+            }
+            else if (occluders[i].concave == 1) {
+                let intersections = concave_check(pos, i, start_vertex);
+                if (intersections > 0) {
+                    shadow = vec4f(1, 1, 1, 0);
+                }
+            }
+            else if (is_occluded(pos, i, start_vertex)) {
+                shadow = vec4f(1, 1, 1, 0);
+            }
+            start_vertex += occluders[i].n_vertices;
+            
             if (stencil.a > 0.1) {
                 if (stencil.g >= occluders[i].z) {
-                    start_vertex += occluders[i].n_vertices;
                     continue;
                 }
 
                 if (stencil.r == occluders[i].sprite_id) {
-                    start_vertex += occluders[i].n_vertices;
                     continue;
                 }
             }
 
-            if (occluders[i].round == 1) {
-                if (round_check(pos, round_index)) {
-                    res = vec4f(0, 0, 0, 1);
-                }
-                round_index += 1;
-                continue;
-            }
-
-            if (occluders[i].concave == 1) {
-                let intersections = concave_check(pos, i, start_vertex);
-                if (intersections > 0) {
-                    res = vec4f(0, 0, 0, 1);
-                }
-            }
-            else if (is_occluded(pos, i, start_vertex)) {
-                res = vec4f(0, 0, 0, 1);
-            }
-            start_vertex += occluders[i].n_vertices;
+            res -= shadow;
         }
     }
     return res;

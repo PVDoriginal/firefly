@@ -1,15 +1,11 @@
-use crate::sprites::pipeline::{SpritePipeline, SpritesPipelinePlugin};
-use crate::{CreateLightmapLabel, RenderLabel};
+use crate::RenderLabel;
+use crate::sprites::pipeline::SpritesPipelinePlugin;
 
 use bevy::render::extract_component::ExtractComponent;
 use bevy::render::render_resource::ShaderType;
 use bevy::{
-    core_pipeline::core_2d::graph::{Core2d, Node2d},
-    ecs::{
-        prelude::*,
-        query::QueryItem,
-        system::lifetimeless::{Read, Write},
-    },
+    core_pipeline::core_2d::graph::Core2d,
+    ecs::{prelude::*, query::QueryItem, system::lifetimeless::Read},
     prelude::*,
     render::{
         RenderApp,
@@ -36,18 +32,9 @@ use phase::*;
 #[require(SyncToRenderWorld)]
 pub(crate) struct SpriteId(pub f32);
 
-#[derive(Component, Clone, Copy, ShaderType)]
-pub(crate) struct UniformSpriteId {
-    id: f32,
-}
-
 impl SpriteId {
     pub(crate) fn float(&self) -> f32 {
         self.0
-    }
-
-    pub(crate) fn uniform(&self) -> UniformSpriteId {
-        UniformSpriteId { id: self.float() }
     }
 }
 
