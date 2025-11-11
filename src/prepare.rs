@@ -175,6 +175,7 @@ fn prepare_data(
             color: light.color.to_linear().to_vec3(),
             intensity: light.intensity,
             range: light.range,
+            z: light.z,
         });
         buffer.write_buffer(&render_device, &render_queue);
 

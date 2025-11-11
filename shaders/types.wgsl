@@ -9,6 +9,7 @@ struct PointLight {
     color: vec3f, 
     intensity: f32,
     range: f32,
+    z: f32,
 }
 
 struct Occluder {

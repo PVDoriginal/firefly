@@ -31,6 +31,7 @@ pub(crate) struct ExtractedPointLight {
     pub color: Color,
     pub intensity: f32,
     pub range: f32,
+    pub z: f32,
 }
 
 #[derive(Component, Default, Clone, ShaderType)]
@@ -39,6 +40,7 @@ pub(crate) struct UniformPointLight {
     pub color: Vec3,
     pub intensity: f32,
     pub range: f32,
+    pub z: f32,
 }
 
 #[derive(Resource, Default)]

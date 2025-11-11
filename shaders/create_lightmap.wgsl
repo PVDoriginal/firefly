@@ -70,7 +70,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             start_vertex += occluders[i].n_vertices;
             
             if (stencil.a > 0.1) {
-                if (stencil.g >= occluders[i].z) {
+                if ((light.z >= occluders[i].z && stencil.g >= occluders[i].z) ||
+                    (light.z <  occluders[i].z && stencil.g <= occluders[i].z)) {
                     continue;
                 }
 

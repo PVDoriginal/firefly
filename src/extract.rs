@@ -37,6 +37,7 @@ fn extract_lights(
             color: light.color,
             intensity: light.intensity,
             range: light.range,
+            z: transform.translation().z,
         });
     }
 }
