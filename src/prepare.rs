@@ -1,6 +1,9 @@
 use std::f32::{EPSILON, consts::PI};
 
-use crate::sprites::{ExtractedSprite, ExtractedSprites};
+use crate::{
+    data::ExtractedWorldData,
+    sprites::{ExtractedSprite, ExtractedSprites},
+};
 
 use bevy::{
     math::ops::floor,
@@ -19,7 +22,7 @@ use bevy::{
 
 use crate::{
     EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
-    data::{FireflyConfig, UniformFireflyConfig, UniformMeta},
+    data::{FireflyConfig, UniformFireflyConfig},
     lights::{ExtractedPointLight, LightSet, UniformPointLight},
     occluders::{
         ExtractedOccluder, OccluderSet, OccluderShape, UniformOccluder, UniformRoundOccluder,
@@ -27,9 +30,6 @@ use crate::{
     },
     sprites::SpriteStencilTexture,
 };
-
-#[derive(Resource, Default)]
-pub(crate) struct LightingDataBuffer(pub UniformBuffer<UniformMeta>);
 
 #[derive(Component)]
 pub(crate) struct BufferedFireflyConfig(pub UniformBuffer<UniformFireflyConfig>);
@@ -42,7 +42,6 @@ impl Plugin for PreparePlugin {
             return;
         };
 
-        render_app.init_resource::<LightingDataBuffer>();
         render_app.init_resource::<LightSet>();
 
         render_app.add_systems(Render, prepare_data.in_set(RenderSet::Prepare));
@@ -159,19 +158,31 @@ fn prepare_data(
     lights: Query<&ExtractedPointLight>,
     occluders: Query<&ExtractedOccluder>,
     sprites: Res<ExtractedSprites>,
-    mut data_buffer: ResMut<LightingDataBuffer>,
+    camera: Single<(&ExtractedWorldData, &Projection)>,
     mut light_set: ResMut<LightSet>,
     mut occluder_set: ResMut<OccluderSet>,
 ) {
-    let data = UniformMeta {
-        n_occluders: occluders.iter().len() as u32,
+    let Projection::Orthographic(projection) = camera.1 else {
+        return;
     };
 
-    data_buffer.0.set(data);
-    data_buffer.0.write_buffer(&render_device, &render_queue);
+    let camera_rect = Rect {
+        min: projection.area.min + camera.0.camera_pos,
+        max: projection.area.max + camera.0.camera_pos,
+    };
 
     *light_set = default();
-    for light in lights {
+
+    let lights = lights.iter().filter(|light| {
+        !Rect {
+            min: light.pos - light.range,
+            max: light.pos + light.range,
+        }
+        .intersect(camera_rect)
+        .is_empty()
+    });
+
+    for light in lights.clone() {
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
         buffer.set(UniformPointLight {
             pos: light.pos,
@@ -188,6 +199,10 @@ fn prepare_data(
 
     for light in lights {
         let light_pos = light.pos;
+        let light_rect = Rect {
+            min: light.pos - light.range,
+            max: light.pos + light.range,
+        };
 
         let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
         let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
@@ -195,6 +210,10 @@ fn prepare_data(
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
         for occluder in occluders {
+            if occluder.rect().intersect(light_rect).is_empty() {
+                continue;
+            }
+
             let mut meta: UniformOccluder = default();
 
             let ids: Vec<_> = sprites

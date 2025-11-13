@@ -18,7 +18,7 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, TRANSFER_SHADER,
-    data::{UniformFireflyConfig, UniformMeta},
+    data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
 };
@@ -60,8 +60,6 @@ impl FromWorld for LightmapCreationPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     // sampler
                     sampler(SamplerBindingType::Filtering),
-                    // meta
-                    uniform_buffer::<UniformMeta>(false),
                     // point light
                     uniform_buffer::<UniformPointLight>(false),
                     // occluders

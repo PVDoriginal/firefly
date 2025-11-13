@@ -2,10 +2,9 @@ use bevy::{
     prelude::*,
     render::{extract_component::ExtractComponent, render_resource::ShaderType},
 };
-
-#[derive(Default, Clone, Copy, ShaderType)]
-pub(crate) struct UniformMeta {
-    pub n_occluders: u32,
+#[derive(Component, Default, Clone, ExtractComponent, Reflect)]
+pub(crate) struct ExtractedWorldData {
+    pub camera_pos: Vec2,
 }
 
 #[derive(Component, ExtractComponent, Clone, Reflect)]

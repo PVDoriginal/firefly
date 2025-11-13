@@ -18,7 +18,7 @@ use crate::{
     lights::LightSet,
     occluders::OccluderSet,
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
-    prepare::{BufferedFireflyConfig, LightingDataBuffer},
+    prepare::BufferedFireflyConfig,
     sprites::SpriteStencilTexture,
 };
 
@@ -64,10 +64,6 @@ impl ViewNode for CreateLightmapNode {
 
         let view_buffer = world.resource::<ViewUniforms>();
 
-        let Some(data_binding) = world.resource::<LightingDataBuffer>().0.binding() else {
-            return Ok(());
-        };
-
         let lights = world.resource::<LightSet>();
         let occluder_set = world.resource::<OccluderSet>();
 
@@ -104,7 +100,6 @@ impl ViewNode for CreateLightmapNode {
                         view_buffer.uniforms.binding().unwrap(),
                         &inter_lightmap.0.default_view,
                         &c_pipeline.sampler,
-                        data_binding.clone(),
                         light.binding().unwrap(),
                         occluders.clone(),
                         vertices.clone(),

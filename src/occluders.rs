@@ -1,3 +1,5 @@
+use core::f32;
+
 use bevy::{
     prelude::*,
     render::{
@@ -80,6 +82,34 @@ impl ExtractedOccluder {
     pub fn vertices(&self) -> Vec<Vec2> {
         self.shape.vertices(self.pos, Rot2::radians(self.rot))
     }
+    pub fn rect(&self) -> Rect {
+        match self.shape {
+            OccluderShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } => Rect {
+                min: Vec2::splat(-width.max(height) - radius * 2.) + self.pos,
+                max: Vec2::splat(width.max(height) + radius * 2.) + self.pos,
+            },
+            _ => vertices_rect(self.vertices()),
+        }
+    }
+}
+
+fn vertices_rect(vertices: Vec<Vec2>) -> Rect {
+    let mut rect = Rect {
+        min: Vec2::splat(f32::MAX),
+        max: Vec2::splat(f32::MIN),
+    };
+
+    for vertex in vertices {
+        rect.min.x = rect.min.x.min(vertex.x);
+        rect.max.x = rect.max.x.max(vertex.x);
+        rect.min.y = rect.min.y.min(vertex.y);
+        rect.max.y = rect.max.y.max(vertex.y);
+    }
+    rect
 }
 
 #[derive(ShaderType, Clone, Default)]

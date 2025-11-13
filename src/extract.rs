@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::{
-    data::FireflyConfig,
+    data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, PointLight},
     occluders::ExtractedOccluder,
     prelude::Occluder,
@@ -23,6 +23,18 @@ impl Plugin for ExtractPlugin {
 
         render_app.add_systems(ExtractSchedule, extract_lights);
         render_app.add_systems(ExtractSchedule, extract_occluders);
+        render_app.add_systems(ExtractSchedule, extract_world_data);
+    }
+}
+
+fn extract_world_data(
+    mut commands: Commands,
+    camera: Extract<Query<(&RenderEntity, &GlobalTransform, &FireflyConfig, &Camera2d)>>,
+) {
+    for (entity, transform, _, _) in &camera {
+        commands.entity(entity.id()).insert(ExtractedWorldData {
+            camera_pos: transform.translation().truncate(),
+        });
     }
 }
 

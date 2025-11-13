@@ -13,25 +13,22 @@ var lightmap_texture: texture_2d<f32>;
 @group(0) @binding(2)
 var texture_sampler: sampler;
 
-@group(0) @binding(3) 
-var<uniform> data: LightingData;
-
-@group(0) @binding(4)
+@group(0) @binding(3)
 var<uniform> light: PointLight;
 
-@group(0) @binding(5)
+@group(0) @binding(4)
 var<storage> occluders: array<Occluder>;
 
-@group(0) @binding(6)
+@group(0) @binding(5)
 var<storage> vertices: array<Vertex>;
 
-@group(0) @binding(7)
+@group(0) @binding(6)
 var<storage> round_occluders: array<RoundOccluder>;
 
-@group(0) @binding(8)
+@group(0) @binding(7)
 var sprite_stencil: texture_2d<f32>;
 
-@group(0) @binding(9)
+@group(0) @binding(8)
 var<storage> ids: array<f32>;
 
 const PI2: f32 = 6.28318530718;
@@ -53,7 +50,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var start_vertex = 0u;
         var id_index = 0u;
 
-        for (var i = 0u; i < data.n_occluders; i++) {
+        for (var i = 0u; i < arrayLength(&occluders); i++) {
             var shadow = vec4f(0, 0, 0, 0); 
 
             if (occluders[i].round == 1) {
