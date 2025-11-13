@@ -80,7 +80,7 @@ fn intersects_arc(a: vec2f, b: vec2f, c: vec2f, r: f32, start_angle: f32, end_an
     let dt1 = dot(b2 - a2, vec2f(x1, y1) - a2);
     if dt1 >= 0 && dt1 < dr_sqr { 
         let angle = atan2(y1, x1);
-        if (angle > start_angle) && (angle < end_angle) {
+        if (between_arctan(angle, start_angle, end_angle)) {
             return true;
         }
     }  
@@ -96,7 +96,7 @@ fn intersects_arc(a: vec2f, b: vec2f, c: vec2f, r: f32, start_angle: f32, end_an
     let dt2 = dot(b2 - a2, vec2f(x2, y2) - a2);
     if dt2 >= 0 && dt2 < dr_sqr { 
         let angle = atan2(y2, x2);
-        if (angle > start_angle) && (angle < end_angle) {
+        if (between_arctan(angle, start_angle, end_angle)) {
             return true;
         }  
     }
@@ -110,4 +110,29 @@ fn sgn(x: f32) -> f32 {
         return -1.0;
     } 
     return 1.0;
+}
+
+fn rotate(p: vec2f, r: vec2f) -> vec2f {
+    return vec2f(p.x * r.x - p.y * r.y, p.x * r.y + p.y * r.x);
+}
+
+const PI2: f32 = 6.28318530718;
+const PI: f32 = 3.14159265359;
+const PIDIV2: f32 = 1.57079632679; 
+
+// checks if x is between a and b, all being arctan angles 
+fn between_arctan(x: f32, a: f32, b: f32) -> bool {
+    return (x > a && x < b) || (x > PIDIV2 && b < -PIDIV2 && x > a && x - PI2 < b) || (x < -PIDIV2 && a > PIDIV2 && x + PI2 > a && x < b);
+}
+
+// rotate an arctan angle 
+fn rotate_arctan(x: f32, r: f32) -> f32 {
+    var res = x + r; 
+    if (res > PI) {
+        return res - PI2; 
+    }
+    if (res < -PI) {
+        return res + PI2; 
+    }
+    return res;
 }

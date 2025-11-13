@@ -24,6 +24,7 @@ struct Occluder {
 
 struct RoundOccluder {
     pos: vec2f,
+    rot: f32,
     width: f32,
     height: f32, 
     radius: f32,

@@ -234,6 +234,7 @@ fn prepare_data(
             {
                 round_buffer.push(UniformRoundOccluder {
                     pos: occluder.pos,
+                    rot: occluder.rot,
                     width,
                     height,
                     radius,

@@ -2,7 +2,7 @@
 #import bevy_render::view::View
 
 #import firefly::types::{PointLight, LightingData, Occluder, Vertex, RoundOccluder}
-#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, intersects_arc}
+#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, intersects_arc, rotate, rotate_arctan}
 
 @group(0) @binding(0)
 var<uniform> view: View;
@@ -169,44 +169,59 @@ fn round_check(pos: vec2f, occluder: u32) -> bool {
     let height = round_occluders[occluder].height / 2; 
     let radius = round_occluders[occluder].radius;
 
-    // top edge
-    if (intersect(center + vec2f(-width, height + radius), center + vec2f(width, height + radius), pos, light.pos)) {
-        return true;
+    var rot = round_occluders[occluder].rot;
+    
+    if (rot > PI2) {
+        rot = rot - PI2 * floor(rot / PI2);
+    }
+    
+
+    let cos_sin = vec2f(cos(rot), sin(rot));
+
+    if (width > 0) {
+        // top edge
+        if (intersect(center + rotate(vec2f(-width, height + radius), cos_sin), center + rotate(vec2f(width, height + radius), cos_sin), pos, light.pos)) {
+            return true;
+        }
+
+        // bottom edge
+        if (intersect(center + rotate(vec2f(-width, -height - radius), cos_sin), center + rotate(vec2f(width, -height - radius), cos_sin), pos, light.pos)) {
+            return true;
+        }
     }
 
-    // right edge
-    if (intersect(center + vec2f(width + radius, height), center + vec2f(width + radius, -height), pos, light.pos)) {
-        return true;
-    }
-    
-    // bottom edge
-    if (intersect(center + vec2f(-width, -height - radius), center + vec2f(width, -height - radius), pos, light.pos)) {
-        return true;
-    }
-    
-    // left edge
-    if (intersect(center + vec2f(-width - radius, height), center + vec2f(-width - radius, -height), pos, light.pos)) {
-        return true;
+    if (height > 0) {
+        // right edge
+        if (intersect(center + rotate(vec2f(width + radius, height), cos_sin), center + rotate(vec2f(width + radius, -height), cos_sin), pos, light.pos)) {
+            return true;
+        }
+        
+        // left edge
+        if (intersect(center + rotate(vec2f(-width - radius, height), cos_sin), center + rotate(vec2f(-width - radius, -height), cos_sin), pos, light.pos)) {
+            return true;
+        }
     }
 
-    // top-left arc
-    if (intersects_arc(pos, light.pos, center + vec2f(-width, height), radius, PIDIV2, PI)) {
-        return true;
-    }
-    
-    // top-right arc
-    if (intersects_arc(pos, light.pos, center + vec2f(width, height), radius, 0, PIDIV2)) {
-        return true;
-    }
-    
-    // bottom-right arc
-    if (intersects_arc(pos, light.pos, center + vec2f(width, -height), radius, -PIDIV2, 0)) {
-        return true;
-    }
-    
-    // bottom-left arc
-    if (intersects_arc(pos, light.pos, center + vec2f(-width, -height), radius, -PI, -PIDIV2)) {
-        return true;
+    if (radius > 0) {
+        // top-left arc
+        if (intersects_arc(pos, light.pos, center + rotate(vec2f(-width, height), cos_sin), radius, rotate_arctan(PIDIV2, rot), rotate_arctan(PI, rot))) {
+            return true;
+        }
+        
+        // top-right arc
+        if (intersects_arc(pos, light.pos, center + rotate(vec2f(width, height), cos_sin), radius, rotate_arctan(0, rot), rotate_arctan(PIDIV2, rot))) {
+            return true;
+        }
+        
+        // bottom-right arc
+        if (intersects_arc(pos, light.pos, center + rotate(vec2f(width, -height), cos_sin), radius, rotate_arctan(-PIDIV2, rot), rotate_arctan(0, rot))) {
+            return true;
+        }
+        
+        // bottom-left arc
+        if (intersects_arc(pos, light.pos, center + rotate(vec2f(-width, -height), cos_sin), radius, rotate_arctan(-PI, rot), rotate_arctan(-PIDIV2, rot))) {
+            return true;
+        }
     }
 
     return false;

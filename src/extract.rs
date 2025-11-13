@@ -50,6 +50,7 @@ fn extract_occluders(
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
+                rot: global_transform.rotation().to_axis_angle().1,
                 shape: occluder.shape().clone(),
                 z: global_transform.translation().z,
                 ignored_sprites: occluder.ignored_sprites.clone(),

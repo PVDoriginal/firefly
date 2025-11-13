@@ -70,6 +70,7 @@ impl Occluder {
 #[derive(Component, Debug)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
+    pub rot: f32,
     pub shape: OccluderShape,
     pub z: f32,
     pub ignored_sprites: Vec<Entity>,
@@ -77,7 +78,7 @@ pub(crate) struct ExtractedOccluder {
 
 impl ExtractedOccluder {
     pub fn vertices(&self) -> Vec<Vec2> {
-        self.shape.vertices(self.pos)
+        self.shape.vertices(self.pos, Rot2::radians(self.rot))
     }
 }
 
@@ -95,6 +96,7 @@ pub(crate) struct UniformOccluder {
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformRoundOccluder {
     pub pos: Vec2,
+    pub rot: f32,
     pub width: f32,
     pub height: f32,
     pub radius: f32,
@@ -159,13 +161,27 @@ impl OccluderShape {
         matches!(self, OccluderShape::Polyline { .. })
     }
 
-    pub(crate) fn vertices(&self, pos: Vec2) -> Vec<Vec2> {
+    pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
-            Self::Polygon { vertices, .. } => vertices.clone(),
-            Self::Polyline { vertices, .. } => vertices.clone(),
+            Self::Polygon { vertices, .. } => rotate_vertices(vertices.to_vec(), pos, rot),
+            Self::Polyline { vertices, .. } => rotate_vertices(vertices.to_vec(), pos, rot),
             Self::RoundRectangle { .. } => default(),
         }
     }
+}
+
+pub(crate) fn rotate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
+    vertices
+        .iter()
+        .map(|v| {
+            let dir = *v - pos;
+            let new_dir = vec2(
+                dir.x * rot.cos - dir.y * rot.sin,
+                dir.x * rot.sin + dir.y * rot.cos,
+            );
+            new_dir + pos
+        })
+        .collect()
 }
 
 // rotates vertices to be clockwise

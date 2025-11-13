@@ -1,4 +1,4 @@
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_2_PI, FRAC_PI_2, PI};
 
 use bevy::{
     asset::load_internal_asset,
@@ -14,7 +14,7 @@ use bevy::{
 use crate::{
     extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
-    occluders::OccluderShape,
+    occluders::{OccluderShape, rotate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
     sprites::{SpriteStencilLabel, SpritesPlugin},
     *,
@@ -128,7 +128,7 @@ const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
 fn draw_gizmos(
     mut gizmos: Gizmos,
     lights: Query<&Transform, With<crate::prelude::PointLight>>,
-    occluders: Query<(&Transform, &Occluder)>,
+    occluders: Query<(&GlobalTransform, &Occluder)>,
 ) {
     for transform in &lights {
         let isometry = Isometry2d::from_translation(transform.translation.truncate());
@@ -138,12 +138,24 @@ fn draw_gizmos(
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
             OccluderShape::Polygon { vertices, .. } => {
+                let vertices = rotate_vertices(
+                    vertices,
+                    transform.translation().truncate(),
+                    Rot2::degrees(transform.rotation().z),
+                );
+
                 for line in vertices.windows(2) {
                     gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
                 }
                 gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
             }
             OccluderShape::Polyline { vertices, .. } => {
+                let vertices = rotate_vertices(
+                    vertices,
+                    transform.translation().truncate(),
+                    Rot2::radians(transform.rotation().z),
+                );
+
                 for line in vertices.windows(2) {
                     gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
                 }
@@ -153,43 +165,47 @@ fn draw_gizmos(
                 height,
                 radius,
             } => {
-                let center = transform.translation.truncate();
+                let center = transform.translation().truncate();
                 let width = width / 2.;
                 let height = height / 2.;
 
+                let rot = Rot2::radians(transform.rotation().to_axis_angle().1);
+                let rotate =
+                    |v: Vec2| vec2(v.x * rot.cos - v.y * rot.sin, v.x * rot.sin + v.y * rot.cos);
+
                 // top line
                 gizmos.line_2d(
-                    center + vec2(-width, height + radius),
-                    center + vec2(width, height + radius),
+                    center + rotate(vec2(-width, height + radius)),
+                    center + rotate(vec2(width, height + radius)),
                     GIZMO_COLOR,
                 );
 
                 // right line
                 gizmos.line_2d(
-                    center + vec2(width + radius, height),
-                    center + vec2(width + radius, -height),
+                    center + rotate(vec2(width + radius, height)),
+                    center + rotate(vec2(width + radius, -height)),
                     GIZMO_COLOR,
                 );
 
                 // bottom line
                 gizmos.line_2d(
-                    center + vec2(-width, -height - radius),
-                    center + vec2(width, -height - radius),
+                    center + rotate(vec2(-width, -height - radius)),
+                    center + rotate(vec2(width, -height - radius)),
                     GIZMO_COLOR,
                 );
 
                 // left line
                 gizmos.line_2d(
-                    center + vec2(-width - radius, height),
-                    center + vec2(-width - radius, -height),
+                    center + rotate(vec2(-width - radius, height)),
+                    center + rotate(vec2(-width - radius, -height)),
                     GIZMO_COLOR,
                 );
 
                 // top-left arc
                 gizmos.arc_2d(
                     Isometry2d {
-                        translation: center + vec2(-width, height),
-                        rotation: Rot2 { cos: 1., sin: 0. },
+                        translation: center + rotate(vec2(-width, height)),
+                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1),
                     },
                     FRAC_PI_2,
                     radius,
@@ -199,8 +215,8 @@ fn draw_gizmos(
                 // top-right arc
                 gizmos.arc_2d(
                     Isometry2d {
-                        translation: center + vec2(width, height),
-                        rotation: Rot2 { cos: 0., sin: -1. },
+                        translation: center + rotate(vec2(width, height)),
+                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 - FRAC_PI_2),
                     },
                     FRAC_PI_2,
                     radius,
@@ -210,8 +226,8 @@ fn draw_gizmos(
                 // bottom-right arc
                 gizmos.arc_2d(
                     Isometry2d {
-                        translation: center + vec2(width, -height),
-                        rotation: Rot2 { cos: -1., sin: 0. },
+                        translation: center + rotate(vec2(width, -height)),
+                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 + PI),
                     },
                     FRAC_PI_2,
                     radius,
@@ -221,8 +237,8 @@ fn draw_gizmos(
                 // bottom-left arc
                 gizmos.arc_2d(
                     Isometry2d {
-                        translation: center + vec2(-width, -height),
-                        rotation: Rot2 { cos: 0., sin: 1. },
+                        translation: center + rotate(vec2(-width, -height)),
+                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 + FRAC_PI_2),
                     },
                     FRAC_PI_2,
                     radius,
