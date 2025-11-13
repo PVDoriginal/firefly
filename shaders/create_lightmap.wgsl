@@ -31,6 +31,9 @@ var<storage> round_occluders: array<RoundOccluder>;
 @group(0) @binding(8)
 var sprite_stencil: texture_2d<f32>;
 
+@group(0) @binding(9)
+var<storage> ids: array<f32>;
+
 const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
 const PIDIV2: f32 = 1.57079632679; 
@@ -47,8 +50,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
 
         var round_index = 0u;
-
         var start_vertex = 0u;
+        var id_index = 0u;
+
         for (var i = 0u; i < data.n_occluders; i++) {
             var shadow = vec4f(0, 0, 0, 0); 
 
@@ -68,14 +72,14 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 shadow = vec4f(1, 1, 1, 0);
             }
             start_vertex += occluders[i].n_vertices;
+            id_index += occluders[i].n_sprites;
             
             if (stencil.a > 0.1) {
-                if ((light.z >= occluders[i].z && stencil.g >= occluders[i].z) ||
-                    (light.z <  occluders[i].z && stencil.g <= occluders[i].z)) {
+                if (stencil.g >= occluders[i].z) {
                     continue;
                 }
 
-                if (stencil.r == occluders[i].sprite_id) {
+                if (is_excluded(i, id_index - occluders[i].n_sprites, stencil.r)) {
                     continue;
                 }
             }
@@ -84,6 +88,15 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         }
     }
     return res;
+}
+
+fn is_excluded(occluder: u32, start_id: u32, id: f32) -> bool {
+    for (var i = start_id; i < start_id + occluders[occluder].n_sprites; i++) {
+        if (ids[i] == id) {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {

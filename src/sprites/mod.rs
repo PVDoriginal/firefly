@@ -28,25 +28,7 @@ mod texture_slice;
 
 use phase::*;
 
-#[derive(Component, Clone, Copy, ExtractComponent)]
-#[require(SyncToRenderWorld)]
-pub(crate) struct SpriteId(pub f32);
-
-impl SpriteId {
-    pub(crate) fn float(&self) -> f32 {
-        self.0
-    }
-}
-
-#[derive(Resource, Clone, Default)]
-struct SpriteIdCounter(f32);
-
-impl SpriteIdCounter {
-    fn next(&mut self) -> f32 {
-        self.0 += f32::EPSILON;
-        return self.0;
-    }
-}
+pub(crate) use pipeline::{ExtractedSprite, ExtractedSprites};
 
 #[derive(Component)]
 pub(crate) struct SpriteStencilTexture(pub CachedTexture);
@@ -55,9 +37,6 @@ pub(crate) struct SpritesPlugin;
 impl Plugin for SpritesPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(SpritesPipelinePlugin);
-        app.init_resource::<SpriteIdCounter>();
-
-        app.add_systems(Update, increment_sprites);
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.add_render_graph_node::<ViewNodeRunner<SpriteStencilNode>>(
@@ -66,19 +45,6 @@ impl Plugin for SpritesPlugin {
             );
             // .add_render_graph_edges(Core2d, (Node2d::MainTransparentPass, SpriteStencilLabel));
         }
-    }
-}
-
-// TODO: FIX THIS!
-fn increment_sprites(
-    sprites: Query<(Entity, &Name), (With<Sprite>, Without<SpriteId>)>,
-    mut counter: ResMut<SpriteIdCounter>,
-    mut commands: Commands,
-) {
-    for (sprite, name) in &sprites {
-        let id = counter.next();
-        info!("giving id {id} to {name}");
-        commands.entity(sprite).insert(SpriteId(id));
     }
 }
 

@@ -10,6 +10,7 @@ use bevy::{
 #[require(SyncToRenderWorld)]
 pub struct Occluder {
     shape: OccluderShape,
+    pub ignored_sprites: Vec<Entity>,
 }
 
 impl Occluder {
@@ -18,7 +19,7 @@ impl Occluder {
     }
 
     fn from_shape(shape: OccluderShape) -> Self {
-        Self { shape }
+        Self { shape, ..default() }
     }
 
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
@@ -70,8 +71,8 @@ impl Occluder {
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub shape: OccluderShape,
-    pub sprite_id: f32,
     pub z: f32,
+    pub ignored_sprites: Vec<Entity>,
 }
 
 impl ExtractedOccluder {
@@ -87,7 +88,7 @@ pub(crate) struct UniformOccluder {
     pub concave: u32,
     pub line: u32,
     pub round: u32,
-    pub sprite_id: f32,
+    pub n_sprites: u32,
     pub z: f32,
 }
 
@@ -111,6 +112,7 @@ pub(crate) struct OccluderSet(
         GpuArrayBuffer<UniformOccluder>,
         GpuArrayBuffer<UniformVertex>,
         GpuArrayBuffer<UniformRoundOccluder>,
+        GpuArrayBuffer<f32>,
     )>,
 );
 

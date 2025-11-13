@@ -72,6 +72,8 @@ impl FromWorld for LightmapCreationPipeline {
                     GpuArrayBuffer::<UniformRoundOccluder>::binding_layout(render_device),
                     // sprite stencil
                     texture_2d(TextureSampleType::Float { filterable: false }),
+                    // sprite ids
+                    GpuArrayBuffer::<f32>::binding_layout(render_device),
                 ),
             ),
         );

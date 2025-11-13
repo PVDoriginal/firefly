@@ -3,8 +3,6 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use crate::SPRITE_SHADER;
-use crate::sprites::SpriteId;
-
 use bevy::core_pipeline::core_2d::CORE_2D_DEPTH_FORMAT;
 use bevy::render::RenderDebugFlags;
 use bevy::{
@@ -445,7 +443,7 @@ pub struct ExtractedSprite {
     pub flip_x: bool,
     pub flip_y: bool,
     pub kind: ExtractedSpriteKind,
-    pub id: SpriteId,
+    pub id: f32,
     pub name: String,
 }
 
@@ -501,20 +499,22 @@ pub fn extract_sprites(
             &ViewVisibility,
             &Sprite,
             &GlobalTransform,
-            &SpriteId,
             Option<&super::texture_slice::ComputedTextureSlices>,
             &Name,
         )>,
     >,
 ) {
+    let mut id_counter = 0.;
     extracted_sprites.sprites.clear();
     extracted_slices.slices.clear();
-    for (main_entity, render_entity, view_visibility, sprite, transform, id, slices, name) in
+    for (main_entity, render_entity, view_visibility, sprite, transform, slices, name) in
         sprite_query.iter()
     {
         if !view_visibility.get() {
             continue;
         }
+
+        id_counter += f32::EPSILON;
 
         if let Some(slices) = slices {
             let start = extracted_slices.slices.len();
@@ -525,6 +525,7 @@ pub fn extract_sprites(
             extracted_sprites.sprites.push(ExtractedSprite {
                 main_entity,
                 render_entity,
+
                 color: sprite.color.into(),
                 transform: *transform,
                 flip_x: sprite.flip_x,
@@ -533,7 +534,7 @@ pub fn extract_sprites(
                 kind: ExtractedSpriteKind::Slices {
                     indices: start..end,
                 },
-                id: *id,
+                id: id_counter,
                 name: name.to_string(),
             });
         } else {
@@ -568,7 +569,7 @@ pub fn extract_sprites(
                     // Pass the custom size
                     custom_size: sprite.custom_size,
                 },
-                id: *id,
+                id: id_counter,
                 name: name.to_string(),
             });
         }
@@ -928,7 +929,7 @@ pub fn prepare_sprite_image_bind_groups(
                             &transform,
                             &extracted_sprite.color,
                             &uv_offset_scale,
-                            extracted_sprite.id.float(),
+                            extracted_sprite.id,
                             extracted_sprite.transform.translation().z,
                         ));
 
@@ -975,7 +976,7 @@ pub fn prepare_sprite_image_bind_groups(
                                 &transform,
                                 &extracted_sprite.color,
                                 &uv_offset_scale,
-                                extracted_sprite.id.float(),
+                                extracted_sprite.id,
                                 extracted_sprite.transform.translation().z,
                             ));
 

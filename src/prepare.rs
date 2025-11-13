@@ -1,5 +1,7 @@
 use std::f32::{EPSILON, consts::PI};
 
+use crate::sprites::{ExtractedSprite, ExtractedSprites};
+
 use bevy::{
     math::ops::floor,
     prelude::*,
@@ -156,6 +158,7 @@ fn prepare_data(
     render_queue: Res<RenderQueue>,
     lights: Query<&ExtractedPointLight>,
     occluders: Query<&ExtractedOccluder>,
+    sprites: Res<ExtractedSprites>,
     mut data_buffer: ResMut<LightingDataBuffer>,
     mut light_set: ResMut<LightSet>,
     mut occluder_set: ResMut<OccluderSet>,
@@ -189,10 +192,23 @@ fn prepare_data(
         let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
         let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
         let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
+        let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
         for occluder in occluders {
             let mut meta: UniformOccluder = default();
-            meta.sprite_id = occluder.sprite_id;
+
+            let ids: Vec<_> = sprites
+                .sprites
+                .iter()
+                .filter(|x| occluder.ignored_sprites.contains(&x.main_entity))
+                .collect();
+
+            meta.n_sprites = ids.len() as u32;
+
+            for id in ids {
+                id_buffer.push(id.id);
+            }
+
             meta.z = occluder.z;
 
             meta.line = match occluder.shape.is_line() {
@@ -324,13 +340,15 @@ fn prepare_data(
         meta_buffer.push(default());
         vertices_buffer.push(default());
         round_buffer.push(default());
+        id_buffer.push(default());
 
         meta_buffer.write_buffer(&render_device, &render_queue);
         vertices_buffer.write_buffer(&render_device, &render_queue);
         round_buffer.write_buffer(&render_device, &render_queue);
+        id_buffer.write_buffer(&render_device, &render_queue);
 
         occluder_set
             .0
-            .push((meta_buffer, vertices_buffer, round_buffer));
+            .push((meta_buffer, vertices_buffer, round_buffer, id_buffer));
     }
 }

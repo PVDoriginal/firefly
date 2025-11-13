@@ -10,7 +10,6 @@ use crate::{
     lights::{ExtractedPointLight, PointLight},
     occluders::ExtractedOccluder,
     prelude::Occluder,
-    sprites::SpriteId,
 };
 
 pub(crate) struct ExtractPlugin;
@@ -44,23 +43,16 @@ fn extract_lights(
 
 fn extract_occluders(
     mut commands: Commands,
-    occluders: Extract<
-        Query<(
-            &RenderEntity,
-            &Occluder,
-            &GlobalTransform,
-            Option<&SpriteId>,
-        )>,
-    >,
+    occluders: Extract<Query<(&RenderEntity, &Occluder, &GlobalTransform)>>,
 ) {
-    for (render_entity, occluder, global_transform, sprite_id) in &occluders {
+    for (render_entity, occluder, global_transform) in &occluders {
         commands
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
                 shape: occluder.shape().clone(),
-                sprite_id: sprite_id.map_or(-1., |s| s.float()),
                 z: global_transform.translation().z,
+                ignored_sprites: occluder.ignored_sprites.clone(),
             });
     }
 }

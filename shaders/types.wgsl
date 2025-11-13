@@ -18,7 +18,7 @@ struct Occluder {
     concave: u32,
     line: u32,
     round: u32,
-    sprite_id: f32,
+    n_sprites: u32,
     z: f32,
 }
 
