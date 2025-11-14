@@ -26,6 +26,7 @@ pub struct FireflyPlugin;
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<crate::prelude::PointLight>();
+        app.register_type::<crate::prelude::Occluder>();
         app.register_type::<FireflyConfig>();
 
         // app.add_systems(Startup, stress_test);

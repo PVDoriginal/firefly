@@ -245,6 +245,9 @@ fn prepare_data(
                 true => 1,
             };
 
+            meta.color = occluder.color.to_linear().to_vec3();
+            meta.opacity = occluder.opacity;
+
             if let OccluderShape::RoundRectangle {
                 width,
                 height,

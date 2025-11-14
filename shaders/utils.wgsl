@@ -56,6 +56,11 @@ fn blend(bg: vec4f, fg: vec4f, intensity: f32) -> vec4f {
     return max(fg * intensity, bg);
 }
 
+
+fn shadow_blend(bg: vec3f, fg: vec3f, opacity: f32) -> vec3f {
+    return bg * min(vec3f(1), (vec3f(2) - (vec3f(1) - fg)) * (1 - opacity));
+}
+
 // check if the [a, b] segment intersects the circle (c, r) between the 2 angles 
 fn intersects_arc(a: vec2f, b: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> bool {
     let a2 = a - c;

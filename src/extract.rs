@@ -65,6 +65,8 @@ fn extract_occluders(
                 rot: global_transform.rotation().to_axis_angle().1,
                 shape: occluder.shape().clone(),
                 z: global_transform.translation().z,
+                color: occluder.color,
+                opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),
             });
     }

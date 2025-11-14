@@ -16,6 +16,8 @@ struct Occluder {
     round: u32,
     n_sprites: u32,
     z: f32,
+    color: vec3f, 
+    opacity: f32,
 }
 
 struct RoundOccluder {

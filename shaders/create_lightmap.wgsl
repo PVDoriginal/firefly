@@ -2,7 +2,7 @@
 #import bevy_render::view::View
 
 #import firefly::types::{PointLight, LightingData, Occluder, Vertex, RoundOccluder}
-#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, intersects_arc, rotate, rotate_arctan}
+#import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, shadow_blend, intersects_arc, rotate, rotate_arctan}
 
 @group(0) @binding(0)
 var<uniform> view: View;
@@ -38,53 +38,66 @@ const PIDIV2: f32 = 1.57079632679;
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
-    var res = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
+    var prev = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
-    
+
     let dist = distance(pos, light.pos);
     if (dist < light.range) {
         let x = dist / light.range;
-        res = blend(res, vec4f(light.color, 0), light.intensity * (1. - x * x));
+        var res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x));
 
         var round_index = 0u;
         var start_vertex = 0u;
         var id_index = 0u;
 
-        for (var i = 0u; i < arrayLength(&occluders); i++) {
-            var shadow = vec4f(0, 0, 0, 0); 
+        var shadow = vec3f(1); 
+        var i = 0u; 
 
-            if (occluders[i].round == 1) {
-                if (round_check(pos, round_index)) {
-                    shadow = vec4f(1, 1, 1, 0);
-                }
-                round_index += 1;
+        loop {
+            if (i >= arrayLength(&occluders)) {
+                break;
             }
-            else if (occluders[i].concave == 1) {
-                let intersections = concave_check(pos, i, start_vertex);
-                if (intersections > 0) {
-                    shadow = vec4f(1, 1, 1, 0);
-                }
-            }
-            else if (is_occluded(pos, i, start_vertex)) {
-                shadow = vec4f(1, 1, 1, 0);
-            }
-            start_vertex += occluders[i].n_vertices;
-            id_index += occluders[i].n_sprites;
             
             if (stencil.a > 0.1) {
                 if (stencil.g >= occluders[i].z) {
                     continue;
                 }
 
-                if (is_excluded(i, id_index - occluders[i].n_sprites, stencil.r)) {
+                if (is_excluded(i, id_index, stencil.r)) {
                     continue;
                 }
             }
 
-            res -= shadow;
+            
+            if (occluders[i].round == 1) {
+                if (!round_check(pos, round_index)){
+                    continue;
+                }
+            }
+            else if (occluders[i].concave == 1) {
+                if (concave_check(pos, i, start_vertex) == 0) {
+                    continue;
+                }
+            }
+            else if (!is_occluded(pos, i, start_vertex)) {
+                continue;
+            }
+
+            shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
+            continuing {
+                start_vertex += occluders[i].n_vertices;
+                id_index += occluders[i].n_sprites;
+                
+                if (occluders[i].round == 1) {
+                    round_index += 1;
+                }
+                i += 1;
+            }
         }
+        res *= vec4f(shadow, 1);
+        prev = max(prev, res);
     }
-    return res;
+    return prev;
 }
 
 fn is_excluded(occluder: u32, start_id: u32, id: f32) -> bool {

@@ -1,6 +1,7 @@
 use core::f32;
 
 use bevy::{
+    color::palettes::css::{BLACK, WHITE},
     prelude::*,
     render::{
         render_resource::{GpuArrayBuffer, ShaderType},
@@ -12,6 +13,8 @@ use bevy::{
 #[require(SyncToRenderWorld)]
 pub struct Occluder {
     shape: OccluderShape,
+    pub color: Color,
+    pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
 }
 
@@ -21,7 +24,24 @@ impl Occluder {
     }
 
     fn from_shape(shape: OccluderShape) -> Self {
-        Self { shape, ..default() }
+        Self {
+            shape,
+            opacity: 1.,
+            color: bevy::prelude::Color::Srgba(WHITE),
+            ..default()
+        }
+    }
+
+    pub fn with_color(&self, color: Color) -> Self {
+        let mut res = self.clone();
+        res.color = color;
+        res
+    }
+
+    pub fn with_opacity(&self, opacity: f32) -> Self {
+        let mut res = self.clone();
+        res.opacity = opacity;
+        res
     }
 
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
@@ -75,6 +95,8 @@ pub(crate) struct ExtractedOccluder {
     pub rot: f32,
     pub shape: OccluderShape,
     pub z: f32,
+    pub color: Color,
+    pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
 }
 
@@ -121,6 +143,8 @@ pub(crate) struct UniformOccluder {
     pub round: u32,
     pub n_sprites: u32,
     pub z: f32,
+    pub color: Vec3,
+    pub opacity: f32,
 }
 
 #[derive(ShaderType, Clone, Default)]
