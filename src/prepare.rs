@@ -214,7 +214,9 @@ fn prepare_data(
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
         for occluder in occluders {
-            if occluder.rect().intersect(light_rect).is_empty() {
+            let occluder_rect = occluder.rect();
+
+            if occluder_rect.intersect(light_rect).is_empty() {
                 continue;
             }
 
@@ -269,7 +271,7 @@ fn prepare_data(
                 })
                 .collect();
 
-            if point_inside_poly(light_pos, occluder.vertices()) {
+            if point_inside_poly(light_pos, occluder.vertices(), occluder_rect) {
                 vertices.reverse();
             }
 

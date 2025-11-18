@@ -300,8 +300,10 @@ fn orientation(a: Vec2, b: Vec2, p: Vec2) -> Orientation {
     Orientation::Touch
 }
 
-pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>) -> bool {
-    // TODO: Bounding Box check
+pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> bool {
+    if !rect.contains(p) {
+        return false;
+    }
 
     poly.push(poly[0]);
 
