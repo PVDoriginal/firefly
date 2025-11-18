@@ -1,4 +1,7 @@
-use std::f32::{EPSILON, consts::PI};
+use std::f32::{
+    EPSILON,
+    consts::{FRAC_2_PI, FRAC_PI_2, PI},
+};
 
 use crate::{
     data::ExtractedWorldData,
@@ -205,6 +208,7 @@ fn prepare_data(
         };
 
         let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
+        let mut sequence_buffer = GpuArrayBuffer::<u32>::new(&render_device);
         let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
         let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
@@ -223,27 +227,16 @@ fn prepare_data(
                 .collect();
 
             meta.n_sprites = ids.len() as u32;
-
-            for id in ids {
-                id_buffer.push(id.id);
-            }
-
             meta.z = occluder.z;
-
-            meta.line = match occluder.shape.is_line() {
-                false => 0,
-                true => 1,
-            };
-
-            meta.concave = match occluder.shape.is_concave() {
-                false => 0,
-                true => 1,
-            };
 
             meta.round = match occluder.shape.is_round() {
                 false => 0,
                 true => 1,
             };
+
+            for id in &ids {
+                id_buffer.push(id.id);
+            }
 
             meta.color = occluder.color.to_linear().to_vec3();
             meta.opacity = occluder.opacity;
@@ -265,113 +258,92 @@ fn prepare_data(
                 continue;
             }
 
-            if occluder.shape.is_concave() {
-                meta.n_vertices = occluder.vertices().len() as u32;
-
-                let mut vertices = occluder.vertices().clone();
-
-                // TODO: temp
-                if meta.line == 0 && point_inside_poly(light_pos, occluder.vertices()) {
-                    meta.n_vertices += 1;
-                    vertices.push(*vertices.first().unwrap());
-                    meta.line = 1;
-                }
-
-                meta_buffer.push(meta);
-
-                vertices.iter().for_each(|&pos| {
-                    vertices_buffer.push(UniformVertex { angle: 0., pos });
-                });
-
-                continue;
-            }
-
             let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
-
-            if point_inside_poly(light_pos, occluder.vertices()) {
-                let ref_angle = angle(*occluder.vertices().last().unwrap(), light_pos) - 0.001;
-                meta.seam = ref_angle;
-
-                meta.n_vertices = occluder.vertices().len() as u32 + 1;
-
-                for &pos in occluder.vertices().iter().rev() {
-                    vertices_buffer.push(UniformVertex {
-                        angle: (angle(pos, light_pos) - meta.seam)
-                            + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI)),
-                        pos,
-                    });
-                }
-
-                let pos = *occluder.vertices().last().unwrap();
-
-                vertices_buffer.push(UniformVertex {
-                    angle: (angle(pos, light_pos) - meta.seam)
-                        + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI))
-                        + 2. * PI,
-                    pos,
-                });
-                meta_buffer.push(meta);
-                continue;
-            }
-
-            let ref_angle = angle(occluder.vertices()[0], light_pos);
-
-            if ref_angle > 0. {
-                meta.seam = ref_angle - PI;
-            } else {
-                meta.seam = ref_angle + PI;
-            }
 
             let mut vertices: Vec<_> = occluder
                 .vertices()
                 .iter()
                 .map(|&pos| UniformVertex {
-                    angle: (angle(pos, light_pos) - meta.seam)
-                        + 2. * PI * floor((meta.seam - angle(pos, light_pos)) / (2. * PI)),
+                    angle: angle(pos, light_pos),
                     pos,
                 })
                 .collect();
 
-            let cmp = |a: &&UniformVertex, b: &&UniformVertex| a.angle.total_cmp(&b.angle);
+            if point_inside_poly(light_pos, occluder.vertices()) {
+                vertices.reverse();
+            }
 
-            let mut min_vertex = vertices
-                .iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| cmp(a, b))
-                .map(|(i, _)| i)
-                .unwrap();
+            vertices.push(vertices[0].clone());
 
-            let max_vertex = vertices
-                .iter()
-                .enumerate()
-                .max_by(|(_, a), (_, b)| cmp(a, b))
-                .map(|(i, _)| i)
-                .unwrap();
+            let mut slice: Vec<UniformVertex> = default();
 
-            loop {
-                vertices_buffer.push(vertices[min_vertex].clone());
-                meta.n_vertices += 1;
+            let mut push_slice = |slice: &Vec<UniformVertex>| {
+                sequence_buffer.push(slice.len() as u32);
 
-                if min_vertex == max_vertex {
-                    break;
+                for v in slice {
+                    vertices_buffer.push(v.clone());
                 }
-                min_vertex = (min_vertex + 1) % vertices.len();
+
+                meta.n_sequences += 1;
+            };
+
+            for vertex in &vertices {
+                if let Some(last) = slice.last() {
+                    let loops = (vertex.angle - last.angle).abs() > PI;
+
+                    // if the next vertex is decreasing
+                    if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle)
+                    {
+                        if slice.len() > 1 {
+                            push_slice(&slice);
+                        }
+                        slice = vec![vertex.clone()];
+                    }
+                    // if the next vertex is increasing, simple case
+                    else if !loops && vertex.angle > last.angle {
+                        slice.push(vertex.clone());
+                    }
+                    // if the next vertex is increasing and loops over
+                    else {
+                        let mut old_vertex = last.clone();
+                        let mut new_vertex = vertex.clone();
+                        new_vertex.angle += 2. * PI;
+                        slice.push(new_vertex.clone());
+
+                        push_slice(&slice);
+
+                        old_vertex.angle -= 2. * PI;
+                        slice = vec![old_vertex, vertex.clone()];
+                    }
+                } else {
+                    slice.push(vertex.clone());
+                }
+            }
+
+            if slice.len() > 1 {
+                push_slice(&slice);
             }
 
             meta_buffer.push(meta);
         }
         meta_buffer.push(default());
+        sequence_buffer.push(default());
         vertices_buffer.push(default());
         round_buffer.push(default());
         id_buffer.push(default());
 
         meta_buffer.write_buffer(&render_device, &render_queue);
+        sequence_buffer.write_buffer(&render_device, &render_queue);
         vertices_buffer.write_buffer(&render_device, &render_queue);
         round_buffer.write_buffer(&render_device, &render_queue);
         id_buffer.write_buffer(&render_device, &render_queue);
 
-        occluder_set
-            .0
-            .push((meta_buffer, vertices_buffer, round_buffer, id_buffer));
+        occluder_set.0.push((
+            meta_buffer,
+            sequence_buffer,
+            vertices_buffer,
+            round_buffer,
+            id_buffer,
+        ));
     }
 }

@@ -64,6 +64,8 @@ impl FromWorld for LightmapCreationPipeline {
                     uniform_buffer::<UniformPointLight>(false),
                     // occluders
                     GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
+                    // sequences
+                    GpuArrayBuffer::<u32>::binding_layout(render_device),
                     // vertices
                     GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
                     // round occluders

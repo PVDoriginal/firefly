@@ -82,7 +82,7 @@ impl ViewNode for CreateLightmapNode {
         for (i, light) in lights.0.iter().enumerate() {
             {
                 // info!("rendering light #{i}");
-                let (occluders, vertices, round_occluders, ids) = &occluder_set.0[i];
+                let (occluders, sequences, vertices, round_occluders, ids) = &occluder_set.0[i];
 
                 let (Some(occluders), Some(vertices), Some(round_occluders), Some(ids)) = (
                     occluders.binding(),
@@ -102,6 +102,7 @@ impl ViewNode for CreateLightmapNode {
                         &c_pipeline.sampler,
                         light.binding().unwrap(),
                         occluders.clone(),
+                        sequences.binding().unwrap(),
                         vertices.clone(),
                         round_occluders.clone(),
                         &sprite_stencil_texture.0.default_view,

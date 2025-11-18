@@ -136,10 +136,7 @@ fn vertices_rect(vertices: Vec<Vec2>) -> Rect {
 
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformOccluder {
-    pub n_vertices: u32,
-    pub seam: f32,
-    pub concave: u32,
-    pub line: u32,
+    pub n_sequences: u32,
     pub round: u32,
     pub n_sprites: u32,
     pub z: f32,
@@ -166,6 +163,7 @@ pub(crate) struct UniformVertex {
 pub(crate) struct OccluderSet(
     pub  Vec<(
         GpuArrayBuffer<UniformOccluder>,
+        GpuArrayBuffer<u32>,
         GpuArrayBuffer<UniformVertex>,
         GpuArrayBuffer<UniformRoundOccluder>,
         GpuArrayBuffer<f32>,
@@ -218,7 +216,15 @@ impl OccluderShape {
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
             Self::Polygon { vertices, .. } => rotate_vertices(vertices.to_vec(), pos, rot),
-            Self::Polyline { vertices, .. } => rotate_vertices(vertices.to_vec(), pos, rot),
+            Self::Polyline { vertices, .. } => {
+                let mut vertices = vertices.clone();
+
+                let mut double_vertices = vertices.to_vec();
+                vertices.reverse();
+                double_vertices.extend_from_slice(&vertices[1..vertices.len()]);
+
+                rotate_vertices(double_vertices, pos, rot)
+            }
             Self::RoundRectangle { .. } => default(),
         }
     }

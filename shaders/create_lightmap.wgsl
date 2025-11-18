@@ -20,15 +20,18 @@ var<uniform> light: PointLight;
 var<storage> occluders: array<Occluder>;
 
 @group(0) @binding(5)
-var<storage> vertices: array<Vertex>;
+var<storage> sequences: array<u32>;
 
 @group(0) @binding(6)
-var<storage> round_occluders: array<RoundOccluder>;
+var<storage> vertices: array<Vertex>;
 
 @group(0) @binding(7)
-var sprite_stencil: texture_2d<f32>;
+var<storage> round_occluders: array<RoundOccluder>;
 
 @group(0) @binding(8)
+var sprite_stencil: texture_2d<f32>;
+
+@group(0) @binding(9)
 var<storage> ids: array<f32>;
 
 const PI2: f32 = 6.28318530718;
@@ -48,6 +51,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         var round_index = 0u;
         var start_vertex = 0u;
+        var sequence_index = 0u;
         var id_index = 0u;
 
         var shadow = vec3f(1); 
@@ -67,25 +71,30 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     continue;
                 }
             }
-
             
             if (occluders[i].round == 1) {
                 if (!round_check(pos, round_index)){
                     continue;
                 }
             }
-            else if (occluders[i].concave == 1) {
-                if (concave_check(pos, i, start_vertex) == 0) {
+            else {
+                var occluded = false; 
+
+                for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {
+                    if is_occluded(pos, s, start_vertex) {
+                        occluded = true;
+                    }
+                    start_vertex += sequences[s];
+                }
+
+                if !occluded {
                     continue;
                 }
-            }
-            else if (!is_occluded(pos, i, start_vertex)) {
-                continue;
-            }
+            } 
 
             shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
             continuing {
-                start_vertex += occluders[i].n_vertices;
+                sequence_index += occluders[i].n_sequences;
                 id_index += occluders[i].n_sprites;
                 
                 if (occluders[i].round == 1) {
@@ -109,12 +118,12 @@ fn is_excluded(occluder: u32, start_id: u32, id: f32) -> bool {
     return false;
 }
 
-fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {
-    let raw_angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+fn is_occluded(pos: vec2f, sequence: u32, start_vertex: u32) -> bool {
+    let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
 
-    let angle = (raw_angle - occluders[occluder].seam) + PI2 * floor((occluders[occluder].seam - raw_angle) / PI2);
+    // let angle = (raw_angle - occluders[occluder].seam) + PI2 * floor((occluders[occluder].seam - raw_angle) / PI2);
 
-    let maybe_prev = bs_vertex(angle, start_vertex, occluders[occluder].n_vertices);
+    let maybe_prev = bs_vertex(angle, start_vertex, sequences[sequence]);
 
     if maybe_prev == -1 {
         return false;
@@ -122,7 +131,7 @@ fn is_occluded(pos: vec2f, occluder: u32, start_vertex: u32) -> bool {
 
     let prev = u32(maybe_prev);
 
-    if prev + 1 >= occluders[occluder].n_vertices  {
+    if prev + 1 >= sequences[sequence]  {
         return false;
     }
     
@@ -135,11 +144,15 @@ fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
     var low = 0i; 
     var high = i32(size) - 1;
 
+    if angle < vertices[u32(low) + offset].angle || angle >= vertices[u32(high) + offset].angle {
+        return -1;
+    }
+
     while (low <= high) {
         let mid = low + (high - low + 1) / 2;
         let val = vertices[u32(mid) + offset].angle;
 
-        if (val  < angle) {
+        if (val < angle) {
             ans = i32(mid);
             low = mid + 1;
         }
@@ -152,25 +165,25 @@ fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
 }
 
 // returns number of times pixel was blocked by occluder
-fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
-    var intersections = 0u;
+// fn concave_check(pos: vec2f, occluder: u32, start_vertex: u32) -> u32 {
+//     var intersections = 0u;
 
-    for (var i = start_vertex; i < start_vertex + occluders[occluder].n_vertices - 1; i++) {
-        if (intersect(vertices[i].pos, vertices[i+1].pos, pos, light.pos)) {
-            intersections += 1;
-        }
-    }
+//     for (var i = start_vertex; i < start_vertex + occluders[occluder].n_vertices - 1; i++) {
+//         if (intersect(vertices[i].pos, vertices[i+1].pos, pos, light.pos)) {
+//             intersections += 1;
+//         }
+//     }
 
-    if (occluders[occluder].line == 0 && intersect(vertices[start_vertex].pos, vertices[start_vertex + occluders[occluder].n_vertices - 1].pos, pos, light.pos)) {
-        intersections += 1;
-    }
+//     if (occluders[occluder].line == 0 && intersect(vertices[start_vertex].pos, vertices[start_vertex + occluders[occluder].n_vertices - 1].pos, pos, light.pos)) {
+//         intersections += 1;
+//     }
 
-    if (occluders[occluder].line == 1) {
-        return intersections;
-    }
+//     if (occluders[occluder].line == 1) {
+//         return intersections;
+//     }
     
-    return (intersections + 1) / 2;
-}
+//     return (intersections + 1) / 2;
+// }
 
 // checks if pixel is blocked by round occluder
 fn round_check(pos: vec2f, occluder: u32) -> bool {
