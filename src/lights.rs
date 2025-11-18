@@ -34,6 +34,12 @@ pub(crate) struct ExtractedPointLight {
     pub z: f32,
 }
 
+impl PartialEq for ExtractedPointLight {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos && self.range == other.range
+    }
+}
+
 #[derive(Component, Default, Clone, ShaderType)]
 pub(crate) struct UniformPointLight {
     pub pos: Vec2,

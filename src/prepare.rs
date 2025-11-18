@@ -5,6 +5,7 @@ use std::f32::{
 
 use crate::{
     data::ExtractedWorldData,
+    occluders::{OccluderCache, OccluderCacheSet},
     sprites::{ExtractedSprite, ExtractedSprites},
 };
 
@@ -18,6 +19,7 @@ use bevy::{
             UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
+        sync_world::RenderEntity,
         texture::TextureCache,
         view::ViewTarget,
     },
@@ -158,8 +160,8 @@ fn prepare_lightmap(
 fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    lights: Query<&ExtractedPointLight>,
-    occluders: Query<&ExtractedOccluder>,
+    lights: Query<(Entity, &ExtractedPointLight)>,
+    mut occluders: Query<(&ExtractedOccluder, &mut OccluderCacheSet)>,
     sprites: Res<ExtractedSprites>,
     camera: Single<(&ExtractedWorldData, &Projection)>,
     mut light_set: ResMut<LightSet>,
@@ -176,7 +178,7 @@ fn prepare_data(
 
     *light_set = default();
 
-    let lights = lights.iter().filter(|light| {
+    let lights = lights.iter().filter(|(_, light)| {
         !Rect {
             min: light.pos - light.range,
             max: light.pos + light.range,
@@ -185,7 +187,7 @@ fn prepare_data(
         .is_empty()
     });
 
-    for light in lights.clone() {
+    for (_, light) in lights.clone() {
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
         buffer.set(UniformPointLight {
             pos: light.pos,
@@ -200,7 +202,7 @@ fn prepare_data(
     }
     *occluder_set = default();
 
-    for light in lights {
+    for (light_entity, light) in lights {
         let light_pos = light.pos;
         let light_rect = Rect {
             min: light.pos - light.range,
@@ -213,7 +215,7 @@ fn prepare_data(
         let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
-        for occluder in occluders {
+        for (occluder, mut cache_set) in &mut occluders {
             let occluder_rect = occluder.rect();
 
             if occluder_rect.intersect(light_rect).is_empty() {
@@ -260,71 +262,99 @@ fn prepare_data(
                 continue;
             }
 
-            let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
+            let mut cache: OccluderCache = default();
 
-            let mut vertices: Vec<_> = occluder
-                .vertices()
-                .iter()
-                .map(|&pos| UniformVertex {
-                    angle: angle(pos, light_pos),
-                    pos,
-                })
-                .collect();
+            if let Some(old_cache) = cache_set.0.get(&light_entity)
+                && let Some(prev_light) = &old_cache.prev_light
+                && let Some(prev_occluder) = &old_cache.prev_occluder
+                && *prev_light == *light
+                && *prev_occluder == *occluder
+            {
+                cache = old_cache.clone();
+            } else {
+                let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
 
-            if point_inside_poly(light_pos, occluder.vertices(), occluder_rect) {
-                vertices.reverse();
-            }
+                let mut vertices: Vec<_> = occluder
+                    .vertices()
+                    .iter()
+                    .map(|&pos| UniformVertex {
+                        angle: angle(pos, light_pos),
+                        pos,
+                    })
+                    .collect();
 
-            vertices.push(vertices[0].clone());
-
-            let mut slice: Vec<UniformVertex> = default();
-
-            let mut push_slice = |slice: &Vec<UniformVertex>| {
-                sequence_buffer.push(slice.len() as u32);
-
-                for v in slice {
-                    vertices_buffer.push(v.clone());
+                if point_inside_poly(light_pos, occluder.vertices(), occluder_rect) {
+                    vertices.reverse();
                 }
 
-                meta.n_sequences += 1;
-            };
+                vertices.push(vertices[0].clone());
 
-            for vertex in &vertices {
-                if let Some(last) = slice.last() {
-                    let loops = (vertex.angle - last.angle).abs() > PI;
+                let mut slice: Vec<UniformVertex> = default();
 
-                    // if the next vertex is decreasing
-                    if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle)
-                    {
-                        if slice.len() > 1 {
-                            push_slice(&slice);
+                let mut push_slice = |slice: &Vec<UniformVertex>| {
+                    // sequence_buffer.push(slice.len() as u32);
+
+                    // for v in slice {
+                    //     vertices_buffer.push(v.clone());
+                    // }
+
+                    // meta.n_sequences += 1;
+
+                    cache.sequences.push(slice.len() as u32);
+                    cache.vertices.extend_from_slice(slice);
+                };
+
+                for vertex in &vertices {
+                    if let Some(last) = slice.last() {
+                        let loops = (vertex.angle - last.angle).abs() > PI;
+
+                        // if the next vertex is decreasing
+                        if (!loops && vertex.angle < last.angle)
+                            || (loops && vertex.angle > last.angle)
+                        {
+                            if slice.len() > 1 {
+                                push_slice(&slice);
+                            }
+                            slice = vec![vertex.clone()];
                         }
-                        slice = vec![vertex.clone()];
-                    }
-                    // if the next vertex is increasing, simple case
-                    else if !loops && vertex.angle > last.angle {
+                        // if the next vertex is increasing, simple case
+                        else if !loops && vertex.angle > last.angle {
+                            slice.push(vertex.clone());
+                        }
+                        // if the next vertex is increasing and loops over
+                        else {
+                            let mut old_vertex = last.clone();
+                            let mut new_vertex = vertex.clone();
+                            new_vertex.angle += 2. * PI;
+                            slice.push(new_vertex.clone());
+
+                            push_slice(&slice);
+
+                            old_vertex.angle -= 2. * PI;
+                            slice = vec![old_vertex, vertex.clone()];
+                        }
+                    } else {
                         slice.push(vertex.clone());
                     }
-                    // if the next vertex is increasing and loops over
-                    else {
-                        let mut old_vertex = last.clone();
-                        let mut new_vertex = vertex.clone();
-                        new_vertex.angle += 2. * PI;
-                        slice.push(new_vertex.clone());
-
-                        push_slice(&slice);
-
-                        old_vertex.angle -= 2. * PI;
-                        slice = vec![old_vertex, vertex.clone()];
-                    }
-                } else {
-                    slice.push(vertex.clone());
                 }
+
+                if slice.len() > 1 {
+                    push_slice(&slice);
+                }
+
+                cache.prev_light = Some(light.clone());
+                cache.prev_occluder = Some(occluder.clone());
+                cache_set.0.insert(light_entity, cache.clone());
+            }
+            for vertex in cache.vertices {
+                vertices_buffer.push(vertex.clone());
             }
 
-            if slice.len() > 1 {
-                push_slice(&slice);
+            for sequence in cache.sequences.clone() {
+                sequence_buffer.push(sequence);
             }
+
+            meta.n_sequences = cache.sequences.len() as u32;
 
             meta_buffer.push(meta);
         }

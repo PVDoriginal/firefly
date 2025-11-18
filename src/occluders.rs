@@ -1,7 +1,9 @@
 use core::f32;
+use std::collections::HashMap;
 
 use bevy::{
     color::palettes::css::{BLACK, WHITE},
+    pbr::ExtractedPointLight,
     prelude::*,
     render::{
         render_resource::{GpuArrayBuffer, ShaderType},
@@ -89,7 +91,8 @@ impl Occluder {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Clone, Debug)]
+#[require(OccluderCacheSet)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
@@ -98,6 +101,12 @@ pub(crate) struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
+}
+
+impl PartialEq for ExtractedOccluder {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos && self.rot == other.rot && self.shape == other.shape
+    }
 }
 
 impl ExtractedOccluder {
@@ -159,18 +168,7 @@ pub(crate) struct UniformVertex {
     pub pos: Vec2,
 }
 
-#[derive(Resource, Default)]
-pub(crate) struct OccluderSet(
-    pub  Vec<(
-        GpuArrayBuffer<UniformOccluder>,
-        GpuArrayBuffer<u32>,
-        GpuArrayBuffer<UniformVertex>,
-        GpuArrayBuffer<UniformRoundOccluder>,
-        GpuArrayBuffer<f32>,
-    )>,
-);
-
-#[derive(Reflect, Clone, Debug)]
+#[derive(Reflect, Clone, Debug, PartialEq)]
 pub enum OccluderShape {
     Polygon {
         vertices: Vec<Vec2>,
@@ -323,4 +321,26 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
         }
     }
     inside
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct OccluderSet(
+    pub  Vec<(
+        GpuArrayBuffer<UniformOccluder>,
+        GpuArrayBuffer<u32>,
+        GpuArrayBuffer<UniformVertex>,
+        GpuArrayBuffer<UniformRoundOccluder>,
+        GpuArrayBuffer<f32>,
+    )>,
+);
+
+#[derive(Component, Default, Clone)]
+pub(crate) struct OccluderCacheSet(pub HashMap<Entity, OccluderCache>);
+
+#[derive(Default, Clone)]
+pub(crate) struct OccluderCache {
+    pub prev_light: Option<crate::lights::ExtractedPointLight>,
+    pub prev_occluder: Option<ExtractedOccluder>,
+    pub sequences: Vec<u32>,
+    pub vertices: Vec<UniformVertex>,
 }
