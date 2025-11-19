@@ -1,16 +1,12 @@
-use std::f32::{
-    EPSILON,
-    consts::{FRAC_2_PI, FRAC_PI_2, PI},
-};
+use std::f32::consts::PI;
 
 use crate::{
     data::ExtractedWorldData,
     occluders::{OccluderCache, OccluderCacheSet},
-    sprites::{ExtractedSprite, ExtractedSprites},
+    sprites::ExtractedSprites,
 };
 
 use bevy::{
-    math::ops::floor,
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
@@ -19,7 +15,6 @@ use bevy::{
             UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
-        sync_world::RenderEntity,
         texture::TextureCache,
         view::ViewTarget,
     },

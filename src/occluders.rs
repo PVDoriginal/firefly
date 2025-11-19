@@ -29,7 +29,7 @@ impl Occluder {
         Self {
             shape,
             opacity: 1.,
-            color: bevy::prelude::Color::Srgba(WHITE),
+            color: bevy::prelude::Color::Srgba(BLACK),
             ..default()
         }
     }
