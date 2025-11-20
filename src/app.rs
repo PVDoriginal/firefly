@@ -14,19 +14,22 @@ use bevy::{
 use crate::{
     extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
-    occluders::{OccluderShape, translate_vertices},
+    occluders::{Occluder2dShape, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
     sprites::{SpriteStencilLabel, SpritesPlugin},
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
 
+/// Plugin necessary to use Firefly.
+///
+/// You will also need to add [`FireflyConfig`] to your camera.
 pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<crate::prelude::PointLight>();
-        app.register_type::<crate::prelude::Occluder>();
+        app.register_type::<crate::prelude::PointLight2d>();
+        app.register_type::<crate::prelude::Occluder2d>();
         app.register_type::<FireflyConfig>();
 
         // app.add_systems(Startup, stress_test);
@@ -111,12 +114,13 @@ fn _stress_test(mut commands: Commands) {
     for _ in 0..5 {
         commands.spawn((
             Name::new("Point Light"),
-            lights::PointLight::default(),
+            lights::PointLight2d::default(),
             Transform::default(),
         ));
     }
 }
 
+/// Plugin that shows gizmos for firefly occluders and lights. Useful for debugging.
 pub struct FireflyGizmosPlugin;
 impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
@@ -129,7 +133,7 @@ const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
 fn draw_gizmos(
     mut gizmos: Gizmos,
     // lights: Query<&Transform, With<crate::prelude::PointLight>>,
-    occluders: Query<(&GlobalTransform, &Occluder)>,
+    occluders: Query<(&GlobalTransform, &Occluder2d)>,
 ) {
     // for transform in &lights {
     //     let isometry = Isometry2d::from_translation(transform.translation.truncate());
@@ -138,7 +142,7 @@ fn draw_gizmos(
 
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
-            OccluderShape::Polygon { vertices, .. } => {
+            Occluder2dShape::Polygon { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
@@ -150,7 +154,7 @@ fn draw_gizmos(
                 }
                 gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
             }
-            OccluderShape::Polyline { vertices, .. } => {
+            Occluder2dShape::Polyline { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
@@ -161,7 +165,7 @@ fn draw_gizmos(
                     gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
                 }
             }
-            OccluderShape::RoundRectangle {
+            Occluder2dShape::RoundRectangle {
                 width,
                 height,
                 radius,

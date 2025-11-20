@@ -7,15 +7,19 @@ use bevy::{
     },
 };
 
+/// Point light with adjustable fields.
 #[derive(Component, Clone, Reflect)]
 #[require(SyncToRenderWorld)]
-pub struct PointLight {
+pub struct PointLight2d {
+    /// Color of the point light. Alpha is ignored.
     pub color: Color,
+    /// Intensity of the point light.
     pub intensity: f32,
+    /// Range of the point light.
     pub range: f32,
 }
 
-impl Default for PointLight {
+impl Default for PointLight2d {
     fn default() -> Self {
         Self {
             color: bevy::prelude::Color::Srgba(WHITE),
@@ -51,9 +55,3 @@ pub(crate) struct UniformPointLight {
 
 #[derive(Resource, Default)]
 pub(crate) struct LightSet(pub Vec<UniformBuffer<UniformPointLight>>);
-
-#[derive(Clone, Reflect)]
-pub struct LightColor {
-    pub color: Color,
-    pub intensity: f32,
-}

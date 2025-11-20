@@ -3,7 +3,6 @@ use std::{f32::consts::PI, slice::Iter};
 use crate::{data::ExtractedWorldData, sprites::ExtractedSprites};
 
 use bevy::{
-    math::VectorSpace,
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
@@ -22,8 +21,8 @@ use crate::{
     data::{FireflyConfig, UniformFireflyConfig},
     lights::{ExtractedPointLight, LightSet, UniformPointLight},
     occluders::{
-        ExtractedOccluder, OccluderSet, OccluderShape, UniformOccluder, UniformRoundOccluder,
-        UniformVertex, point_inside_poly,
+        ExtractedOccluder, Occluder2dShape, OccluderSet, UniformOccluder, UniformRoundOccluder,
+        UniformVertex,
     },
     sprites::SpriteStencilTexture,
 };
@@ -183,7 +182,8 @@ fn prepare_data(
         .is_empty()
     });
 
-    for light in lights.clone() {
+    *occluder_set = default();
+    for light in lights {
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
         buffer.set(UniformPointLight {
             pos: light.pos,
@@ -195,10 +195,7 @@ fn prepare_data(
         buffer.write_buffer(&render_device, &render_queue);
 
         light_set.0.push(buffer);
-    }
-    *occluder_set = default();
 
-    for light in lights {
         let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
             min: light.pos - light.range,
             max: light.pos + light.range,
@@ -238,7 +235,7 @@ fn prepare_data(
             meta.color = occluder.color.to_linear().to_vec3();
             meta.opacity = occluder.opacity;
 
-            if let OccluderShape::RoundRectangle {
+            if let Occluder2dShape::RoundRectangle {
                 width,
                 height,
                 radius,

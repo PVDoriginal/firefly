@@ -2,7 +2,7 @@ use bevy::{
     color::palettes::css::{BLUE, GREEN, PURPLE, RED},
     prelude::*,
 };
-use firefly::{lights::PointLight, prelude::*};
+use firefly::prelude::*;
 use iyes_perf_ui::PerfUiPlugin;
 use iyes_perf_ui::entries::PerfUiDefaultEntries;
 use rand::{Rng, rng, seq::IndexedRandom};
@@ -96,7 +96,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
         let r = rng.random_range(1000.0..7000.0);
 
         commands.spawn((
-            PointLight {
+            PointLight2d {
                 color: *COLORS.choose(&mut rng).unwrap(),
                 intensity: 1.,
                 range: r,
@@ -133,13 +133,15 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 
         let occluder_type = rng.random_range(0..4);
         let occluder = match occluder_type {
-            0 => Occluder::round_rectangle(
+            0 => Occluder2d::round_rectangle(
                 rng.random_range(10.0..30.0),
                 rng.random_range(10.0..30.0),
                 rng.random_range(10.0..30.0),
             ),
-            1 => Occluder::polygon(vec![vec2(-20., -10.), vec2(0., 20.), vec2(20., -10.)]).unwrap(),
-            2 => Occluder::polyline(vec![
+            1 => {
+                Occluder2d::polygon(vec![vec2(-20., -10.), vec2(0., 20.), vec2(20., -10.)]).unwrap()
+            }
+            2 => Occluder2d::polyline(vec![
                 vec2(-30., -3.),
                 vec2(-20., 2.),
                 vec2(-12., -7.),
@@ -151,7 +153,7 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
                 vec2(30., 5.),
             ])
             .unwrap(),
-            _ => Occluder::polygon(vec![
+            _ => Occluder2d::polygon(vec![
                 vec2(-15., -30.),
                 vec2(15., -30.),
                 vec2(30., 0.),
@@ -172,7 +174,7 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 }
 
 fn move_occluders(
-    mut occluders: Query<(Entity, &mut Transform), With<Occluder>>,
+    mut occluders: Query<(Entity, &mut Transform), With<Occluder2d>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {

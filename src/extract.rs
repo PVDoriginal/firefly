@@ -7,9 +7,9 @@ use bevy::{
 
 use crate::{
     data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, PointLight},
+    lights::ExtractedPointLight,
     occluders::ExtractedOccluder,
-    prelude::Occluder,
+    prelude::Occluder2d,
 };
 
 pub(crate) struct ExtractPlugin;
@@ -55,7 +55,7 @@ fn extract_lights(
 
 fn extract_occluders(
     mut commands: Commands,
-    occluders: Extract<Query<(&RenderEntity, &Occluder, &GlobalTransform)>>,
+    occluders: Extract<Query<(&RenderEntity, &Occluder2d, &GlobalTransform)>>,
 ) {
     for (render_entity, occluder, global_transform) in &occluders {
         let mut rect = occluder.rect();

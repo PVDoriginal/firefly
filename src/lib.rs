@@ -18,8 +18,8 @@ mod sprites;
 pub mod prelude {
     pub use crate::app::{FireflyGizmosPlugin, FireflyPlugin};
     pub use crate::data::FireflyConfig;
-    pub use crate::lights::{LightColor, PointLight};
-    pub use crate::occluders::Occluder;
+    pub use crate::lights::PointLight2d;
+    pub use crate::occluders::Occluder2d;
     pub use crate::{ApplyLightmapLabel, CreateLightmapLabel};
 }
 
@@ -32,9 +32,15 @@ struct IntermediaryLightMapTexture(pub CachedTexture);
 #[derive(Component)]
 struct EmptyLightMapTexture(pub CachedTexture);
 
+/// Render graph label for creating the lightmap.
+///
+/// Useful if you want to add your own render passes before / after it.   
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct CreateLightmapLabel;
 
+/// Render graph label for when the lightmap is applied over the camera view.
+///
+/// Useful if you want to add your own render passes before / after it.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct ApplyLightmapLabel;
 

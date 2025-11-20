@@ -1,31 +1,44 @@
-use core::f32;
-use std::collections::HashMap;
-
 use bevy::{
-    color::palettes::css::{BLACK, WHITE},
-    pbr::ExtractedPointLight,
+    color::palettes::css::BLACK,
     prelude::*,
     render::{
         render_resource::{GpuArrayBuffer, ShaderType},
         sync_world::SyncToRenderWorld,
     },
 };
+use core::f32;
 
+/// An occluder that blocks light.
+///
+/// Can be semi-transparent, have a color, any polygonal shape
+/// and a few other select shapes (capsule, circle, round_rectangle).
+///
+/// Can be moved around or rotated by their transform.
+///
+/// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
 #[derive(Component, Clone, Default, Reflect)]
 #[require(SyncToRenderWorld)]
-pub struct Occluder {
-    shape: OccluderShape,
+pub struct Occluder2d {
+    shape: Occluder2dShape,
+    /// Color of the occluder, alpha is ignored.
     pub color: Color,
+    /// Opacity of the occluder.
+    ///
+    /// An occluder of opacity 0 won't block any light.
+    /// An occluder of opacity 1 will completely both light (and cast a fully black shadow).
+    ///
+    /// Anything in-between will cast a colored shadow depending on how opaque it is.
     pub opacity: f32,
+    /// List of entities that this occluder will not cast shadows over.
     pub ignored_sprites: Vec<Entity>,
 }
 
-impl Occluder {
-    pub fn shape(&self) -> &OccluderShape {
+impl Occluder2d {
+    pub fn shape(&self) -> &Occluder2dShape {
         &self.shape
     }
 
-    fn from_shape(shape: OccluderShape) -> Self {
+    fn from_shape(shape: Occluder2dShape) -> Self {
         Self {
             shape,
             opacity: 1.,
@@ -34,9 +47,10 @@ impl Occluder {
         }
     }
 
+    /// Bounding rect of the occluder.
     pub fn rect(&self) -> Rect {
         match &self.shape {
-            OccluderShape::RoundRectangle {
+            Occluder2dShape::RoundRectangle {
                 width,
                 height,
                 radius,
@@ -44,63 +58,94 @@ impl Occluder {
                 min: Vec2::splat(-width.min(-*height) / 2. - radius),
                 max: Vec2::splat(width.max(*height) / 2. + radius),
             },
-            OccluderShape::Polyline { vertices, .. } => vertices_rect(vertices),
-            OccluderShape::Polygon { vertices, .. } => vertices_rect(vertices),
+            Occluder2dShape::Polyline { vertices, .. } => vertices_rect(vertices),
+            Occluder2dShape::Polygon { vertices, .. } => vertices_rect(vertices),
         }
     }
 
+    /// Construct a new occluder with the specified [color].
+    ///
+    /// [color]: Occluder2d::color
     pub fn with_color(&self, color: Color) -> Self {
         let mut res = self.clone();
         res.color = color;
         res
     }
 
+    /// Construct a new occluder with the specified opacity.
+    ///
+    /// An occluder of opacity 0 won't block any light.
+    /// An occluder of opacity 1 will completely both light (and cast a fully black shadow).
+    ///
+    /// Anything in-between will cast a colored shadow depending on how opaque it is.
     pub fn with_opacity(&self, opacity: f32) -> Self {
         let mut res = self.clone();
         res.opacity = opacity;
         res
     }
 
+    /// Construct a polygonal occluder from the given points.
+    ///
+    /// The points can form a convex or concave polygon. However,
+    /// having self-intersections can cause unexpected behavior.
+    ///
+    /// The points should be relative to the entity's translation.
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
         normalize_vertices(vertices).and_then(|(vertices, concave)| {
-            Some(Self::from_shape(OccluderShape::Polygon {
+            Some(Self::from_shape(Occluder2dShape::Polygon {
                 vertices,
                 concave,
             }))
         })
     }
 
+    /// Construct a polyline occluder from the given points.
+    ///
+    /// Having self-intersections can cause unexpected behavior.
+    ///
+    /// The points should be relative to the entity's translation.
     pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
-        Some(Self::from_shape(OccluderShape::Polyline {
+        Some(Self::from_shape(Occluder2dShape::Polyline {
             vertices,
             concave: true,
         }))
     }
 
+    /// Construct a rectangle occluder from width and height.
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self::round_rectangle(width, height, 0.)
     }
 
+    /// Construct a round rectangle occluder from width, height and radius.
+    ///
+    /// The resulted occluder is esentially a rectangle a radius-sized padding around it.
+    ///  
+    /// For instance, a circle is a round rectangle with no height or width, and a capsule
+    /// is a round rectangle with only height or only width (and radius).
     pub fn round_rectangle(width: f32, height: f32, radius: f32) -> Self {
-        Self::from_shape(OccluderShape::RoundRectangle {
+        Self::from_shape(Occluder2dShape::RoundRectangle {
             width,
             height,
             radius,
         })
     }
 
+    /// Construct a circle occluder.
     pub fn circle(radius: f32) -> Self {
         Self::round_rectangle(0., 0., radius)
     }
 
+    /// Construct a vertical capsule occluder.
     pub fn vertical_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(0., length, radius)
     }
 
+    /// Construct a horizontal_capsule occluder.
     pub fn horizontal_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(length, 0., radius)
     }
 
+    /// Construct a capsule occluder. This is vertical by default. For a horizontal capsule check [`Occluder2d::horizontal_capsule()`]
     pub fn capsule(length: f32, radius: f32) -> Self {
         Self::vertical_capsule(length, radius)
     }
@@ -110,7 +155,7 @@ impl Occluder {
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
-    pub shape: OccluderShape,
+    pub shape: Occluder2dShape,
     pub rect: Rect,
     pub z: f32,
     pub color: Color,
@@ -170,7 +215,7 @@ pub(crate) struct UniformVertex {
 }
 
 #[derive(Reflect, Clone, Debug, PartialEq)]
-pub enum OccluderShape {
+pub enum Occluder2dShape {
     Polygon {
         vertices: Vec<Vec2>,
         concave: bool,
@@ -186,7 +231,7 @@ pub enum OccluderShape {
     },
 }
 
-impl Default for OccluderShape {
+impl Default for Occluder2dShape {
     fn default() -> Self {
         Self::RoundRectangle {
             width: 10.,
@@ -196,9 +241,9 @@ impl Default for OccluderShape {
     }
 }
 
-impl OccluderShape {
+impl Occluder2dShape {
     pub fn is_round(&self) -> bool {
-        matches!(self, OccluderShape::RoundRectangle { .. })
+        matches!(self, Occluder2dShape::RoundRectangle { .. })
     }
 
     pub fn is_concave(&self) -> bool {
@@ -209,7 +254,7 @@ impl OccluderShape {
         }
     }
     pub fn is_line(&self) -> bool {
-        matches!(self, OccluderShape::Polyline { .. })
+        matches!(self, Occluder2dShape::Polyline { .. })
     }
 
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
