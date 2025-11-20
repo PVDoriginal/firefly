@@ -35,6 +35,7 @@ struct FireflyConfig {
     ambient_color: vec3f,
     ambient_brightness: f32, 
     light_bands: u32,
+    softness: f32,
 }
 
 struct SpriteId {

@@ -1,7 +1,7 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
-#import firefly::types::{PointLight, LightingData, Occluder, Vertex, RoundOccluder}
+#import firefly::types::{PointLight, LightingData, Occluder, Vertex, RoundOccluder, FireflyConfig}
 #import firefly::utils::{ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan}
 
 @group(0) @binding(0)
@@ -34,16 +34,20 @@ var sprite_stencil: texture_2d<f32>;
 @group(0) @binding(9)
 var<storage> ids: array<f32>;
 
+@group(0) @binding(10)
+var<uniform> config: FireflyConfig;
+
 const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
 const PIDIV2: f32 = 1.57079632679; 
-const MAXANGLE: f32 = 0.7;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     var prev = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
+
+    let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
     if (dist < light.range) {
@@ -79,10 +83,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 if result.occluded == true {
                     shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
                 }
-                else {
-                    if result.extreme_angle < MAXANGLE {
-                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / MAXANGLE)));
-                    }
+                else if config.softness > 0 && result.extreme_angle < soft_angle {
+                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
                 }
             }
 
@@ -93,10 +95,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     if result.occluded == true {    
                         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
                     }
-                    else {
-                        if result.extreme_angle < MAXANGLE {
-                            shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / MAXANGLE)));
-                        }
+                    else if config.softness > 0 && result.extreme_angle < soft_angle {
+                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
                     }
 
                     start_vertex += sequences[s];
@@ -149,14 +149,19 @@ fn is_occluded(pos: vec2f, sequence: u32, start_vertex: u32) -> OcclusionResult 
     let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
 
     let maybe_prev = bs_vertex(angle, start_vertex, sequences[sequence]);
+    var extreme_angle = 0f;
+
+    if config.softness > 0 {
+        extreme_angle = min(
+            get_extreme_angle(pos, vertices[start_vertex].pos),  
+            get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
+        );
+    }
 
     if maybe_prev == -1 {
         return OcclusionResult(
             false, 
-            min(
-                get_extreme_angle(pos, vertices[start_vertex].pos),  
-                get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
-            )
+            extreme_angle
         );
     }
 
@@ -165,26 +170,20 @@ fn is_occluded(pos: vec2f, sequence: u32, start_vertex: u32) -> OcclusionResult 
     if prev + 1 >= sequences[sequence]  {
         return OcclusionResult(
             false, 
-            min(
-                get_extreme_angle(pos, vertices[start_vertex].pos),  
-                get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
-            )
+            extreme_angle
         );
     }
 
     if same_orientation(vertices[start_vertex + prev].pos, vertices[start_vertex + prev + 1].pos, pos, light.pos) {
         return OcclusionResult(
-            false, 
-            min(
-                get_extreme_angle(pos, vertices[start_vertex].pos),  
-                get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
-            )
+            false,
+            extreme_angle
         );
     }
 
     return OcclusionResult(
         true, 
-        0f,
+        extreme_angle
     );
 }
 
@@ -267,13 +266,15 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
             return OcclusionResult(true, extreme_angle);
         }
 
-        extreme_angle = min(
-            extreme_angle, 
-            min(
-                min(get_extreme_angle(pos, center + rotate(vec2f(-width, height + radius), cos_sin)),  get_extreme_angle(pos, center + rotate(vec2f(width, height + radius), cos_sin))),
-                min(get_extreme_angle(pos, center + rotate(vec2f(-width, -height - radius), cos_sin)), get_extreme_angle(pos, center + rotate(vec2f(width, -height - radius), cos_sin)))
-            )
-        );
+        if config.softness > 0 {
+            extreme_angle = min(
+                extreme_angle, 
+                min(
+                    min(get_extreme_angle(pos, center + rotate(vec2f(-width, height + radius), cos_sin)),  get_extreme_angle(pos, center + rotate(vec2f(width, height + radius), cos_sin))),
+                    min(get_extreme_angle(pos, center + rotate(vec2f(-width, -height - radius), cos_sin)), get_extreme_angle(pos, center + rotate(vec2f(width, -height - radius), cos_sin)))
+                )
+            );
+        }
     }
 
     if (height > 0) {
@@ -287,14 +288,15 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
             return OcclusionResult(true, extreme_angle);
         }
 
-        
-        extreme_angle = min(
-            extreme_angle, 
-            min(
-                min(get_extreme_angle(pos, center + rotate(vec2f(width + radius, height), cos_sin)),  get_extreme_angle(pos, center + rotate(vec2f(width + radius, -height), cos_sin))),
-                min(get_extreme_angle(pos, center + rotate(vec2f(-width - radius, height), cos_sin)), get_extreme_angle(pos, center + rotate(vec2f(-width - radius, -height), cos_sin)))
-            )
-        );
+        if config.softness > 0 {
+            extreme_angle = min(
+                extreme_angle, 
+                min(
+                    min(get_extreme_angle(pos, center + rotate(vec2f(width + radius, height), cos_sin)),  get_extreme_angle(pos, center + rotate(vec2f(width + radius, -height), cos_sin))),
+                    min(get_extreme_angle(pos, center + rotate(vec2f(-width - radius, height), cos_sin)), get_extreme_angle(pos, center + rotate(vec2f(-width - radius, -height), cos_sin)))
+                )
+            );
+        }
     }
 
     if (radius > 0) {
@@ -318,19 +320,21 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
             return OcclusionResult(true, extreme_angle);
         }
 
-        extreme_angle = min(
-            extreme_angle, 
-            min(
+        if config.softness > 0 {
+            extreme_angle = min(
+                extreme_angle, 
                 min(
-                    get_arc_extremes(pos, light.pos, center + rotate(vec2f(-width, height), cos_sin), radius, rotate_arctan(PIDIV2, rot), rotate_arctan(PI, rot)),  
-                    get_arc_extremes(pos, light.pos, center + rotate(vec2f(width, height), cos_sin), radius, rotate_arctan(0, rot), rotate_arctan(PIDIV2, rot)),  
-                ),
-                min(
-                    get_arc_extremes(pos, light.pos, center + rotate(vec2f(width, -height), cos_sin), radius, rotate_arctan(-PIDIV2, rot), rotate_arctan(0, rot)), 
-                    get_arc_extremes(pos, light.pos, center + rotate(vec2f(-width, -height), cos_sin), radius, rotate_arctan(-PI, rot), rotate_arctan(-PIDIV2, rot)),  
+                    min(
+                        get_arc_extremes(pos, light.pos, center + rotate(vec2f(-width, height), cos_sin), radius, rotate_arctan(PIDIV2, rot), rotate_arctan(PI, rot)),  
+                        get_arc_extremes(pos, light.pos, center + rotate(vec2f(width, height), cos_sin), radius, rotate_arctan(0, rot), rotate_arctan(PIDIV2, rot)),  
+                    ),
+                    min(
+                        get_arc_extremes(pos, light.pos, center + rotate(vec2f(width, -height), cos_sin), radius, rotate_arctan(-PIDIV2, rot), rotate_arctan(0, rot)), 
+                        get_arc_extremes(pos, light.pos, center + rotate(vec2f(-width, -height), cos_sin), radius, rotate_arctan(-PI, rot), rotate_arctan(-PIDIV2, rot)),  
+                    )
                 )
-            )
-        );
+            );
+        }
 
     }
 

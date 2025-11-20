@@ -1,10 +1,6 @@
 use std::{f32::consts::PI, slice::Iter};
 
-use crate::{
-    data::ExtractedWorldData,
-    occluders::{OccluderCache, OccluderCacheSet},
-    sprites::ExtractedSprites,
-};
+use crate::{data::ExtractedWorldData, sprites::ExtractedSprites};
 
 use bevy::{
     math::VectorSpace,
@@ -71,6 +67,10 @@ fn prepare_config(
             light_bands: match config.light_bands {
                 None => 0,
                 Some(x) => x,
+            },
+            softness: match config.softness {
+                None => 0.,
+                Some(x) => x.min(1.).max(0.),
             },
         };
         buffer.set(uniform);
@@ -156,8 +156,8 @@ fn prepare_lightmap(
 fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    lights: Query<(Entity, &ExtractedPointLight)>,
-    mut occluders: Query<(&ExtractedOccluder, &mut OccluderCacheSet)>,
+    lights: Query<&ExtractedPointLight>,
+    mut occluders: Query<&ExtractedOccluder>,
     sprites: Res<ExtractedSprites>,
     camera: Single<(&ExtractedWorldData, &Projection)>,
     mut light_set: ResMut<LightSet>,
@@ -174,7 +174,7 @@ fn prepare_data(
 
     *light_set = default();
 
-    let lights = lights.iter().filter(|(_, light)| {
+    let lights = lights.iter().filter(|light| {
         !Rect {
             min: light.pos - light.range,
             max: light.pos + light.range,
@@ -183,7 +183,7 @@ fn prepare_data(
         .is_empty()
     });
 
-    for (_, light) in lights.clone() {
+    for light in lights.clone() {
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
         buffer.set(UniformPointLight {
             pos: light.pos,
@@ -198,7 +198,7 @@ fn prepare_data(
     }
     *occluder_set = default();
 
-    for (light_entity, light) in lights {
+    for light in lights {
         let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
             min: light.pos - light.range,
             max: light.pos + light.range,
@@ -210,7 +210,7 @@ fn prepare_data(
         let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
-        for (occluder, mut cache_set) in &mut occluders {
+        for occluder in &mut occluders {
             if occluder.rect.intersect(light_rect).is_empty() {
                 continue;
             }
@@ -255,92 +255,71 @@ fn prepare_data(
                 continue;
             }
 
-            let mut cache: OccluderCache = default();
+            let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
 
-            if let Some(old_cache) = cache_set.0.get(&light_entity)
-                && let Some(prev_light) = &old_cache.prev_light
-                && let Some(prev_occluder) = &old_cache.prev_occluder
-                && *prev_light == *light
-                && *prev_occluder == *occluder
-            {
-                cache = old_cache.clone();
-            } else {
-                let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
+            let mut vertices: Vec<_> = occluder
+                .vertices()
+                .iter()
+                .map(|&pos| UniformVertex {
+                    angle: angle(pos, light.pos),
+                    pos,
+                })
+                .collect();
 
-                let mut vertices: Vec<_> = occluder
-                    .vertices()
-                    .iter()
-                    .map(|&pos| UniformVertex {
-                        angle: angle(pos, light.pos),
-                        pos,
-                    })
-                    .collect();
+            let mut push_slice = |slice: &Vec<UniformVertex>| {
+                sequence_buffer.push(slice.len() as u32);
+                for vertex in slice {
+                    vertices_buffer.push(vertex.clone());
+                }
+                meta.n_vertices += slice.len() as u32;
+                meta.n_sequences += 1;
+            };
 
-                let mut push_slice = |slice: &Vec<UniformVertex>| {
-                    cache.sequences.push(slice.len() as u32);
-                    cache.vertices.extend_from_slice(slice);
-                };
+            let mut process_vertices = |vertices: Iter<UniformVertex>| {
+                let mut slice: Vec<UniformVertex> = default();
 
-                let mut process_vertices = |vertices: Iter<UniformVertex>| {
-                    let mut slice: Vec<UniformVertex> = default();
+                for vertex in vertices {
+                    if let Some(last) = slice.last() {
+                        let loops = (vertex.angle - last.angle).abs() > PI;
 
-                    for vertex in vertices {
-                        if let Some(last) = slice.last() {
-                            let loops = (vertex.angle - last.angle).abs() > PI;
-
-                            // if the next vertex is decreasing
-                            if (!loops && vertex.angle < last.angle)
-                                || (loops && vertex.angle > last.angle)
-                            {
-                                if slice.len() > 1 {
-                                    push_slice(&slice);
-                                }
-                                slice = vec![vertex.clone()];
-                            }
-                            // if the next vertex is increasing, simple case
-                            else if !loops && vertex.angle > last.angle {
-                                slice.push(vertex.clone());
-                            }
-                            // if the next vertex is increasing and loops over
-                            else {
-                                let mut old_vertex = last.clone();
-                                let mut new_vertex = vertex.clone();
-                                new_vertex.angle += 2. * PI;
-                                slice.push(new_vertex.clone());
-
+                        // if the next vertex is decreasing
+                        if (!loops && vertex.angle < last.angle)
+                            || (loops && vertex.angle > last.angle)
+                        {
+                            if slice.len() > 1 {
                                 push_slice(&slice);
-
-                                old_vertex.angle -= 2. * PI;
-                                slice = vec![old_vertex, vertex.clone()];
                             }
-                        } else {
+                            slice = vec![vertex.clone()];
+                        }
+                        // if the next vertex is increasing, simple case
+                        else if !loops && vertex.angle > last.angle {
                             slice.push(vertex.clone());
                         }
+                        // if the next vertex is increasing and loops over
+                        else {
+                            let mut old_vertex = last.clone();
+                            let mut new_vertex = vertex.clone();
+                            new_vertex.angle += 2. * PI;
+                            slice.push(new_vertex.clone());
+
+                            push_slice(&slice);
+
+                            old_vertex.angle -= 2. * PI;
+                            slice = vec![old_vertex, vertex.clone()];
+                        }
+                    } else {
+                        slice.push(vertex.clone());
                     }
+                }
 
-                    if slice.len() > 1 {
-                        push_slice(&slice);
-                    }
-                };
+                if slice.len() > 1 {
+                    push_slice(&slice);
+                }
+            };
 
-                process_vertices(vertices.iter());
-                vertices.reverse();
-                process_vertices(vertices.iter());
-
-                cache.prev_light = Some(light.clone());
-                cache.prev_occluder = Some(occluder.clone());
-                cache_set.0.insert(light_entity, cache.clone());
-            }
-            for vertex in cache.vertices {
-                vertices_buffer.push(vertex.clone());
-            }
-
-            for sequence in cache.sequences.clone() {
-                sequence_buffer.push(sequence);
-            }
-
-            meta.n_sequences = cache.sequences.len() as u32;
-            meta.n_vertices = cache.sequences.iter().sum();
+            process_vertices(vertices.iter());
+            vertices.reverse();
+            process_vertices(vertices.iter());
 
             meta_buffer.push(meta);
         }

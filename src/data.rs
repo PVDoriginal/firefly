@@ -12,6 +12,7 @@ pub struct FireflyConfig {
     pub ambient_color: Color,
     pub ambient_brightness: f32,
     pub light_bands: Option<u32>,
+    pub softness: Option<f32>,
 }
 
 #[derive(ShaderType, Clone, Default)]
@@ -19,4 +20,5 @@ pub(crate) struct UniformFireflyConfig {
     pub ambient_color: Vec3,
     pub ambient_brightness: f32,
     pub light_bands: u32,
+    pub softness: f32,
 }

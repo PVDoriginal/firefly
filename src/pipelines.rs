@@ -73,6 +73,8 @@ impl FromWorld for LightmapCreationPipeline {
                     texture_2d(TextureSampleType::Float { filterable: false }),
                     // sprite ids
                     GpuArrayBuffer::<f32>::binding_layout(render_device),
+                    //config,
+                    uniform_buffer::<UniformFireflyConfig>(false),
                 ),
             ),
         );

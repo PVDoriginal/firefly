@@ -13,8 +13,8 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 2.3;
-const OCCLUDER_FREQ: f32 = 1.0;
+const LIGHT_FREQ: f32 = 1.5;
+const OCCLUDER_FREQ: f32 = 0.5;
 const HEIGHT: f32 = 15000.0;
 const WIDTH: f32 = 30000.0;
 
@@ -61,6 +61,7 @@ fn setup(mut commands: Commands) {
             ambient_color: Color::Srgba(PURPLE),
             ambient_brightness: 0.15,
             light_bands: None,
+            softness: None,
         },
         Projection::Orthographic(proj),
     ));
@@ -92,7 +93,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let r = rng.random_range(500.0..4000.0);
+        let r = rng.random_range(1000.0..7000.0);
 
         commands.spawn((
             PointLight {

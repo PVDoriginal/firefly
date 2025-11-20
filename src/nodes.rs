@@ -36,13 +36,14 @@ impl ViewNode for CreateLightmapNode {
         Read<EmptyLightMapTexture>,
         Read<ViewTarget>,
         Read<SpriteStencilTexture>,
+        Read<BufferedFireflyConfig>,
     );
 
     fn run<'w>(
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut bevy::render::renderer::RenderContext<'w>,
-        (view_offset, lightmap, inter_lightmap, empty_lightmap, _, sprite_stencil_texture): bevy::ecs::query::QueryItem<
+        (view_offset, lightmap, inter_lightmap, empty_lightmap, _, sprite_stencil_texture, config): bevy::ecs::query::QueryItem<
             'w,
             Self::ViewQuery,
         >,
@@ -107,6 +108,7 @@ impl ViewNode for CreateLightmapNode {
                         round_occluders.clone(),
                         &sprite_stencil_texture.0.default_view,
                         ids.clone(),
+                        config.0.binding().unwrap(),
                     )),
                 );
 

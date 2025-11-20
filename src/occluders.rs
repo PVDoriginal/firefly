@@ -107,7 +107,6 @@ impl Occluder {
 }
 
 #[derive(Component, Clone, Debug)]
-#[require(OccluderCacheSet)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
@@ -324,14 +323,3 @@ pub(crate) struct OccluderSet(
         GpuArrayBuffer<f32>,
     )>,
 );
-
-#[derive(Component, Default, Clone)]
-pub(crate) struct OccluderCacheSet(pub HashMap<Entity, OccluderCache>);
-
-#[derive(Default, Clone)]
-pub(crate) struct OccluderCache {
-    pub prev_light: Option<crate::lights::ExtractedPointLight>,
-    pub prev_occluder: Option<ExtractedOccluder>,
-    pub sequences: Vec<u32>,
-    pub vertices: Vec<UniformVertex>,
-}
