@@ -14,7 +14,7 @@ use bevy::{
 use crate::{
     extract::ExtractPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode},
-    occluders::{OccluderShape, rotate_vertices},
+    occluders::{OccluderShape, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
     sprites::{SpriteStencilLabel, SpritesPlugin},
     *,
@@ -128,21 +128,21 @@ const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
 
 fn draw_gizmos(
     mut gizmos: Gizmos,
-    lights: Query<&Transform, With<crate::prelude::PointLight>>,
+    // lights: Query<&Transform, With<crate::prelude::PointLight>>,
     occluders: Query<(&GlobalTransform, &Occluder)>,
 ) {
-    for transform in &lights {
-        let isometry = Isometry2d::from_translation(transform.translation.truncate());
-        gizmos.circle_2d(isometry, 10., BLUE);
-    }
+    // for transform in &lights {
+    //     let isometry = Isometry2d::from_translation(transform.translation.truncate());
+    //     gizmos.circle_2d(isometry, 10., BLUE);
+    // }
 
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
             OccluderShape::Polygon { vertices, .. } => {
-                let vertices = rotate_vertices(
+                let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
-                    Rot2::degrees(transform.rotation().z),
+                    Rot2::radians(transform.rotation().to_axis_angle().1),
                 );
 
                 for line in vertices.windows(2) {
@@ -151,10 +151,10 @@ fn draw_gizmos(
                 gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
             }
             OccluderShape::Polyline { vertices, .. } => {
-                let vertices = rotate_vertices(
+                let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
-                    Rot2::radians(transform.rotation().z),
+                    Rot2::radians(transform.rotation().to_axis_angle().1),
                 );
 
                 for line in vertices.windows(2) {

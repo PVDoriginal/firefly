@@ -10,6 +10,7 @@ struct PointLight {
 
 struct Occluder {
     n_sequences: u32,
+    n_vertices: u32,
     round: u32,
     n_sprites: u32,
     z: f32,

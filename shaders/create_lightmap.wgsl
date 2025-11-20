@@ -87,9 +87,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
 
             else {
-                var start_vertex_2 = start_vertex;
                 for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {
-                    let result = is_occluded(pos, s, start_vertex_2); 
+                    let result = is_occluded(pos, s, start_vertex); 
 
                     if result.occluded == true {    
                         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
@@ -100,14 +99,13 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                         }
                     }
 
-                    start_vertex_2 += sequences[s];
+                    start_vertex += sequences[s];
                 }
+                start_vertex -= occluders[i].n_vertices;
             }
 
             continuing {
-                for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {
-                    start_vertex += sequences[s];
-                }
+                start_vertex += occluders[i].n_vertices;
                 sequence_index += occluders[i].n_sequences;
                 id_index += occluders[i].n_sprites;
 

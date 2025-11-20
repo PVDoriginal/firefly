@@ -58,12 +58,17 @@ fn extract_occluders(
     occluders: Extract<Query<(&RenderEntity, &Occluder, &GlobalTransform)>>,
 ) {
     for (render_entity, occluder, global_transform) in &occluders {
+        let mut rect = occluder.rect();
+        rect.min += global_transform.translation().truncate();
+        rect.max += global_transform.translation().truncate();
+
         commands
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
                 rot: global_transform.rotation().to_axis_angle().1,
                 shape: occluder.shape().clone(),
+                rect,
                 z: global_transform.translation().z,
                 color: occluder.color,
                 opacity: occluder.opacity,

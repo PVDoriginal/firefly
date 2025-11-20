@@ -34,6 +34,21 @@ impl Occluder {
         }
     }
 
+    pub fn rect(&self) -> Rect {
+        match &self.shape {
+            OccluderShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } => Rect {
+                min: Vec2::splat(-width.min(-*height) / 2. - radius),
+                max: Vec2::splat(width.max(*height) / 2. + radius),
+            },
+            OccluderShape::Polyline { vertices, .. } => vertices_rect(vertices),
+            OccluderShape::Polygon { vertices, .. } => vertices_rect(vertices),
+        }
+    }
+
     pub fn with_color(&self, color: Color) -> Self {
         let mut res = self.clone();
         res.color = color;
@@ -97,6 +112,7 @@ pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
     pub shape: OccluderShape,
+    pub rect: Rect,
     pub z: f32,
     pub color: Color,
     pub opacity: f32,
@@ -113,39 +129,25 @@ impl ExtractedOccluder {
     pub fn vertices(&self) -> Vec<Vec2> {
         self.shape.vertices(self.pos, Rot2::radians(self.rot))
     }
-    pub fn rect(&self) -> Rect {
-        match self.shape {
-            OccluderShape::RoundRectangle {
-                width,
-                height,
-                radius,
-            } => Rect {
-                min: Vec2::splat(-width.max(height) - radius * 2.) + self.pos,
-                max: Vec2::splat(width.max(height) + radius * 2.) + self.pos,
-            },
-            _ => vertices_rect(self.vertices()),
-        }
-    }
 }
 
-fn vertices_rect(vertices: Vec<Vec2>) -> Rect {
-    let mut rect = Rect {
-        min: Vec2::splat(f32::MAX),
-        max: Vec2::splat(f32::MIN),
-    };
+fn vertices_rect(vertices: &Vec<Vec2>) -> Rect {
+    let r = vertices
+        .iter()
+        .max_by(|a, b| a.length_squared().total_cmp(&b.length_squared()))
+        .unwrap()
+        .length();
 
-    for vertex in vertices {
-        rect.min.x = rect.min.x.min(vertex.x);
-        rect.max.x = rect.max.x.max(vertex.x);
-        rect.min.y = rect.min.y.min(vertex.y);
-        rect.max.y = rect.max.y.max(vertex.y);
+    Rect {
+        min: vec2(-r, -r),
+        max: vec2(r, r),
     }
-    rect
 }
 
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformOccluder {
     pub n_sequences: u32,
+    pub n_vertices: u32,
     pub round: u32,
     pub n_sprites: u32,
     pub z: f32,
@@ -213,32 +215,21 @@ impl OccluderShape {
 
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
-            Self::Polygon { vertices, .. } => rotate_vertices(vertices.to_vec(), pos, rot),
-            Self::Polyline { vertices, .. } => {
+            Self::Polygon { vertices, .. } => {
                 let mut vertices = vertices.clone();
-
-                let mut double_vertices = vertices.to_vec();
-                vertices.reverse();
-                double_vertices.extend_from_slice(&vertices[1..vertices.len()]);
-
-                rotate_vertices(double_vertices, pos, rot)
+                vertices.push(vertices[0]);
+                translate_vertices(vertices, pos, rot)
             }
+            Self::Polyline { vertices, .. } => translate_vertices(vertices.to_vec(), pos, rot),
             Self::RoundRectangle { .. } => default(),
         }
     }
 }
 
-pub(crate) fn rotate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
+pub(crate) fn translate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
     vertices
         .iter()
-        .map(|v| {
-            let dir = *v - pos;
-            let new_dir = vec2(
-                dir.x * rot.cos - dir.y * rot.sin,
-                dir.x * rot.sin + dir.y * rot.cos,
-            );
-            new_dir + pos
-        })
+        .map(|v| vec2(v.x * rot.cos - v.y * rot.sin, v.x * rot.sin + v.y * rot.cos) + pos)
         .collect()
 }
 
