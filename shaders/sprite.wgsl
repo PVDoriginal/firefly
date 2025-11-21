@@ -66,7 +66,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // return 1;
 
-    if color.a > 0.5 {
+    if color.a > 0.1 {
         // if (sprite_id.id == 16) {
         //     return vec4f(0, 1, 0, 1);
         // } 

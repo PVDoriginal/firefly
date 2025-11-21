@@ -7,7 +7,7 @@ use bevy::{
 
 use crate::{
     data::{ExtractedWorldData, FireflyConfig},
-    lights::ExtractedPointLight,
+    lights::{ExtractedPointLight, PointLight2d},
     occluders::ExtractedOccluder,
     prelude::Occluder2d,
 };
@@ -40,7 +40,7 @@ fn extract_world_data(
 
 fn extract_lights(
     mut commands: Commands,
-    lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight)>>,
+    lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight2d)>>,
 ) {
     for (entity, transform, light) in &lights {
         commands.entity(entity.id()).insert(ExtractedPointLight {

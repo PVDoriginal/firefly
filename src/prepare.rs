@@ -229,6 +229,7 @@ fn prepare_data(
             };
 
             for id in &ids {
+                info!("pushing id: {}", id.id);
                 id_buffer.push(id.id);
             }
 

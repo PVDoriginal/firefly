@@ -84,6 +84,15 @@ impl Occluder2d {
         res
     }
 
+    /// Construct a new occluder with the specified ignored sprites.
+    ///
+    /// Each entity in the list you provide will not receive shadows cast by this occluder.
+    pub fn with_ignored_sprites(&self, sprites: Vec<Entity>) -> Self {
+        let mut res = self.clone();
+        res.ignored_sprites = sprites;
+        res
+    }
+
     /// Construct a polygonal occluder from the given points.
     ///
     /// The points can form a convex or concave polygon. However,

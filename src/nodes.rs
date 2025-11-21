@@ -82,7 +82,6 @@ impl ViewNode for CreateLightmapNode {
 
         for (i, light) in lights.0.iter().enumerate() {
             {
-                // info!("rendering light #{i}");
                 let (occluders, sequences, vertices, round_occluders, ids) = &occluder_set.0[i];
 
                 let (Some(occluders), Some(vertices), Some(round_occluders), Some(ids)) = (
