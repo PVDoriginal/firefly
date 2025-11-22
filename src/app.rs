@@ -21,9 +21,9 @@ use crate::{
 };
 use crate::{prelude::*, prepare::PreparePlugin};
 
-/// Plugin necessary to use Firefly.
+/// Plugin **necessary** to use Firefly.
 ///
-/// You will also need to add [`FireflyConfig`] to your camera.
+/// You will also need to **add [`FireflyConfig`] to your camera**.
 pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
@@ -120,7 +120,7 @@ fn _stress_test(mut commands: Commands) {
     }
 }
 
-/// Plugin that shows gizmos for firefly occluders and lights. Useful for debugging.
+/// Plugin that **shows gizmos** for firefly occluders and lights. Useful for **debugging**.
 pub struct FireflyGizmosPlugin;
 impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
@@ -146,7 +146,7 @@ fn draw_gizmos(
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
-                    Rot2::radians(transform.rotation().to_axis_angle().1),
+                    Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
 
                 for line in vertices.windows(2) {
@@ -158,7 +158,7 @@ fn draw_gizmos(
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate(),
-                    Rot2::radians(transform.rotation().to_axis_angle().1),
+                    Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
 
                 for line in vertices.windows(2) {
@@ -174,7 +174,7 @@ fn draw_gizmos(
                 let width = width / 2.;
                 let height = height / 2.;
 
-                let rot = Rot2::radians(transform.rotation().to_axis_angle().1);
+                let rot = Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2);
                 let rotate =
                     |v: Vec2| vec2(v.x * rot.cos - v.y * rot.sin, v.x * rot.sin + v.y * rot.cos);
 

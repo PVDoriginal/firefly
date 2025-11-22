@@ -5,6 +5,11 @@ struct PointLight {
     color: vec3f, 
     intensity: f32,
     range: f32,
+    inner_range: f32,
+    // 0 - inverse square, 1 - linear
+    falloff: u32,
+    angle: f32,
+    dir: vec2f,
     z: f32,
 }
 
@@ -36,6 +41,7 @@ struct FireflyConfig {
     ambient_brightness: f32, 
     light_bands: u32,
     softness: f32,
+    z_sorting: u32,
 }
 
 struct SpriteId {

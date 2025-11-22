@@ -20,20 +20,23 @@ use core::f32;
 #[require(SyncToRenderWorld)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
-    /// Color of the occluder, alpha is ignored.
+    /// **Color** of the occluder. **Alpha is ignored**.
     pub color: Color,
-    /// Opacity of the occluder.
+    /// **Opacity** of the occluder.
     ///
-    /// An occluder of opacity 0 won't block any light.
-    /// An occluder of opacity 1 will completely both light (and cast a fully black shadow).
+    /// An occluder of **opacity 0** won't block any light.
+    /// An occluder of **opacity 1** will completely both light (and cast a fully black shadow).
     ///
-    /// Anything in-between will cast a colored shadow depending on how opaque it is.
+    /// Anything in-between will cast a colored shadow depending on how **opaque** it is.
     pub opacity: f32,
-    /// List of entities that this occluder will not cast shadows over.
+    /// List of entities that this occluder will **not cast shadows over**.
+    ///
+    /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub ignored_sprites: Vec<Entity>,
 }
 
 impl Occluder2d {
+    /// Get the occluder's **internal shape**.
     pub fn shape(&self) -> &Occluder2dShape {
         &self.shape
     }
@@ -47,7 +50,7 @@ impl Occluder2d {
         }
     }
 
-    /// Bounding rect of the occluder.
+    /// **Bounding rect** of the occluder.
     pub fn rect(&self) -> Rect {
         match &self.shape {
             Occluder2dShape::RoundRectangle {
@@ -63,69 +66,73 @@ impl Occluder2d {
         }
     }
 
-    /// Construct a new occluder with the specified [color].
-    ///
-    /// [color]: Occluder2d::color
+    /// Construct a new occluder with the specified **color**. **Alpha is ignored**.
     pub fn with_color(&self, color: Color) -> Self {
         let mut res = self.clone();
         res.color = color;
         res
     }
 
-    /// Construct a new occluder with the specified opacity.
+    /// Construct a new occluder with the specified **opacity**.
     ///
-    /// An occluder of opacity 0 won't block any light.
-    /// An occluder of opacity 1 will completely both light (and cast a fully black shadow).
+    /// An occluder of **opacity 0** won't block any light.
+    /// An occluder of **opacity 1** will completely both light (and cast a fully black shadow).
     ///
-    /// Anything in-between will cast a colored shadow depending on how opaque it is.
+    /// Anything in-between will cast a colored shadow depending on how **opaque** it is.
     pub fn with_opacity(&self, opacity: f32) -> Self {
         let mut res = self.clone();
         res.opacity = opacity;
         res
     }
 
-    /// Construct a new occluder with the specified ignored sprites.
+    /// Construct a new occluder with the specified **ignored sprites**.
     ///
-    /// Each entity in the list you provide will not receive shadows cast by this occluder.
+    /// Each entity in the list you provide will **not receive shadows cast by this occluder**.   
+    ///
+    /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub fn with_ignored_sprites(&self, sprites: Vec<Entity>) -> Self {
         let mut res = self.clone();
         res.ignored_sprites = sprites;
         res
     }
 
-    /// Construct a polygonal occluder from the given points.
+    /// Construct a **polygonal occluder** from the given **points**.
     ///
-    /// The points can form a convex or concave polygon. However,
-    /// having self-intersections can cause unexpected behavior.
+    /// The points can form a **convex or concave** polygon. However,
+    /// having **self-intersections can cause unexpected behavior**.
     ///
-    /// The points should be relative to the entity's translation.
+    /// The points should be **relative to the entity's translation**.
+    ///
+    /// # Failure
+    /// This returns None if the provided list doesn't contain **at least 2 vertices**.
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
-        normalize_vertices(vertices).and_then(|(vertices, concave)| {
-            Some(Self::from_shape(Occluder2dShape::Polygon {
-                vertices,
-                concave,
-            }))
-        })
+        if vertices.len() < 2 {
+            return None;
+        };
+        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
     }
 
-    /// Construct a polyline occluder from the given points.
+    /// Construct a **polyline occluder** from the given **points**.
     ///
-    /// Having self-intersections can cause unexpected behavior.
+    /// Having **self-intersections can cause unexpected behavior**.
     ///
-    /// The points should be relative to the entity's translation.
+    /// The points should be **relative to the entity's translation**.
+    ///
+    /// # Failure
+    /// This returns None if the provided list doesn't contain **at least 2 vertices**.
     pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
-        Some(Self::from_shape(Occluder2dShape::Polyline {
-            vertices,
-            concave: true,
-        }))
+        if vertices.len() < 2 {
+            return None;
+        };
+        Some(Self::from_shape(Occluder2dShape::Polyline { vertices }))
     }
 
-    /// Construct a rectangle occluder from width and height.
+    /// Construct a **rectangle occluder** from width and height.
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self::round_rectangle(width, height, 0.)
     }
 
-    /// Construct a round rectangle occluder from width, height and radius.
+    /// Construct a **round rectangle** occluder from width, height and radius.
     ///
     /// The resulted occluder is esentially a rectangle a radius-sized padding around it.
     ///  
@@ -139,22 +146,22 @@ impl Occluder2d {
         })
     }
 
-    /// Construct a circle occluder.
+    /// Construct a **circle occluder**.
     pub fn circle(radius: f32) -> Self {
         Self::round_rectangle(0., 0., radius)
     }
 
-    /// Construct a vertical capsule occluder.
+    /// Construct a **vertical capsule occluder**.
     pub fn vertical_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(0., length, radius)
     }
 
-    /// Construct a horizontal_capsule occluder.
+    /// Construct a **horizontal_capsule occluder**.
     pub fn horizontal_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(length, 0., radius)
     }
 
-    /// Construct a capsule occluder. This is vertical by default. For a horizontal capsule check [`Occluder2d::horizontal_capsule()`]
+    /// Construct a **capsule occluder**. This is **vertical** by default. For a horizontal capsule check [`Occluder2d::horizontal_capsule()`]
     pub fn capsule(length: f32, radius: f32) -> Self {
         Self::vertical_capsule(length, radius)
     }
@@ -227,11 +234,9 @@ pub(crate) struct UniformVertex {
 pub enum Occluder2dShape {
     Polygon {
         vertices: Vec<Vec2>,
-        concave: bool,
     },
     Polyline {
         vertices: Vec<Vec2>,
-        concave: bool,
     },
     RoundRectangle {
         width: f32,
@@ -251,21 +256,6 @@ impl Default for Occluder2dShape {
 }
 
 impl Occluder2dShape {
-    pub fn is_round(&self) -> bool {
-        matches!(self, Occluder2dShape::RoundRectangle { .. })
-    }
-
-    pub fn is_concave(&self) -> bool {
-        match self {
-            Self::Polygon { concave, .. } => *concave,
-            Self::Polyline { concave, .. } => *concave,
-            _ => false,
-        }
-    }
-    pub fn is_line(&self) -> bool {
-        matches!(self, Occluder2dShape::Polyline { .. })
-    }
-
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
             Self::Polygon { vertices, .. } => {
@@ -280,21 +270,18 @@ impl Occluder2dShape {
 }
 
 pub(crate) fn translate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
-    vertices
-        .iter()
-        .map(|v| vec2(v.x * rot.cos - v.y * rot.sin, v.x * rot.sin + v.y * rot.cos) + pos)
-        .collect()
+    vertices.iter().map(|v| rot * *v + pos).collect()
 }
 
 // rotates vertices to be clockwise
-fn normalize_vertices(vertices: Vec<Vec2>) -> Option<(Vec<Vec2>, bool)> {
+fn normalize_vertices(vertices: Vec<Vec2>) -> Option<Vec<Vec2>> {
     if vertices.len() < 1 {
         warn!("Not enough vertices to form shape");
         return None;
     }
 
     if vertices.len() < 3 {
-        return Some((vertices.to_vec(), false));
+        return Some(vertices.to_vec());
     }
 
     let mut orientations: Vec<_> = vertices
@@ -314,14 +301,14 @@ fn normalize_vertices(vertices: Vec<Vec2>) -> Option<(Vec<Vec2>, bool)> {
     ));
 
     if orientations.contains(&Orientation::Left) && orientations.contains(&Orientation::Right) {
-        return Some((vertices.to_vec(), true));
+        return Some(vertices.to_vec());
     }
 
     if orientations.contains(&Orientation::Left) {
-        return Some((vertices.iter().rev().map(|x| *x).collect(), false));
+        return Some(vertices.iter().rev().map(|x| *x).collect());
     }
 
-    Some((vertices.to_vec(), false))
+    Some(vertices.to_vec())
 }
 
 #[derive(PartialEq, Eq)]

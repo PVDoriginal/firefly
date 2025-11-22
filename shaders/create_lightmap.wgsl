@@ -50,9 +50,27 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
-    if (dist < light.range) {
-        let x = dist / light.range;
-        var res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x));
+    
+    let a = pos - light.pos;
+    let b = light.dir;
+    let angle = acos(dot(a, b) / (length(a) * length(b)));
+    
+    if (dist < light.range && angle <= light.angle / 2.) {
+        var res = vec4f(0);
+
+        if dist <= light.inner_range {
+            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity);
+        }
+        else {
+            let x = (dist - light.inner_range) / (light.range - light.inner_range);
+
+            if light.falloff == 0 {
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x));
+            }
+            else if light.falloff == 1 { 
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x));
+            }
+        }
 
         var round_index = 0u;
         var start_vertex = 0u;
@@ -68,7 +86,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
             
             if (stencil.a > 0.1) {
-                if (stencil.g >= occluders[i].z) {
+                if (config.z_sorting == 1 && stencil.g >= occluders[i].z) {
                     continue;
                 }
 

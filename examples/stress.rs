@@ -59,9 +59,10 @@ fn setup(mut commands: Commands) {
         Transform::default(),
         FireflyConfig {
             ambient_color: Color::Srgba(PURPLE),
-            ambient_brightness: 0.15,
+            ambient_brightness: 0.7,
             light_bands: None,
             softness: None,
+            z_sorting: false,
         },
         Projection::Orthographic(proj),
     ));
@@ -100,6 +101,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
                 color: *COLORS.choose(&mut rng).unwrap(),
                 intensity: 1.,
                 range: r,
+                ..default()
             },
             Transform::from_translation(vec3(x, HEIGHT / 2. + r, 0.)),
         ));
@@ -179,10 +181,12 @@ fn move_occluders(
     mut commands: Commands,
 ) {
     for (id, mut transform) in &mut occluders {
-        transform.translation.y += time.delta_secs() * 300.0;
+        transform.translation.y += time.delta_secs() * 700.0;
 
         if transform.translation.y > HEIGHT / 2.0 + 60. {
             commands.entity(id).despawn();
         }
+
+        transform.rotate_z(3. * time.delta_secs());
     }
 }

@@ -1,6 +1,9 @@
-use std::{f32::consts::PI, slice::Iter};
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    slice::Iter,
+};
 
-use crate::{data::ExtractedWorldData, sprites::ExtractedSprites};
+use crate::{data::ExtractedWorldData, lights::Falloff, sprites::ExtractedSprites};
 
 use bevy::{
     prelude::*,
@@ -70,6 +73,10 @@ fn prepare_config(
             softness: match config.softness {
                 None => 0.,
                 Some(x) => x.min(1.).max(0.),
+            },
+            z_sorting: match config.z_sorting {
+                false => 0,
+                true => 1,
             },
         };
         buffer.set(uniform);
@@ -185,12 +192,20 @@ fn prepare_data(
     *occluder_set = default();
     for light in lights {
         let mut buffer = UniformBuffer::<UniformPointLight>::default();
+
         buffer.set(UniformPointLight {
             pos: light.pos,
             color: light.color.to_linear().to_vec3(),
             intensity: light.intensity,
             range: light.range,
             z: light.z,
+            inner_range: light.inner_range.min(light.range),
+            falloff: match light.falloff {
+                Falloff::InverseSquare => 0,
+                Falloff::Linear => 1,
+            },
+            angle: light.angle / 180. * PI,
+            dir: light.dir,
         });
         buffer.write_buffer(&render_device, &render_queue);
 
@@ -208,6 +223,10 @@ fn prepare_data(
         let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
         for occluder in &mut occluders {
+            if !light.cast_shadows {
+                break;
+            }
+
             if occluder.rect.intersect(light_rect).is_empty() {
                 continue;
             }
@@ -223,11 +242,6 @@ fn prepare_data(
             meta.n_sprites = ids.len() as u32;
             meta.z = occluder.z;
 
-            meta.round = match occluder.shape.is_round() {
-                false => 0,
-                true => 1,
-            };
-
             for id in &ids {
                 info!("pushing id: {}", id.id);
                 id_buffer.push(id.id);
@@ -242,6 +256,7 @@ fn prepare_data(
                 radius,
             } = occluder.shape
             {
+                meta.round = 1;
                 round_buffer.push(UniformRoundOccluder {
                     pos: occluder.pos,
                     rot: occluder.rot,

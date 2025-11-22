@@ -7,7 +7,7 @@ use bevy::{
 
 use crate::{
     data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, PointLight2d},
+    lights::{ExtractedPointLight, Falloff, PointLight2d},
     occluders::ExtractedOccluder,
     prelude::Occluder2d,
 };
@@ -49,6 +49,11 @@ fn extract_lights(
             intensity: light.intensity,
             range: light.range,
             z: transform.translation().z,
+            inner_range: light.inner_range,
+            falloff: light.falloff,
+            angle: light.angle,
+            cast_shadows: light.cast_shadows,
+            dir: (transform.rotation() * Vec3::Y).xy(),
         });
     }
 }
@@ -66,7 +71,7 @@ fn extract_occluders(
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
                 pos: global_transform.translation().truncate(),
-                rot: global_transform.rotation().to_axis_angle().1,
+                rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
                 shape: occluder.shape().clone(),
                 rect,
                 z: global_transform.translation().z,
