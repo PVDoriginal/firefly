@@ -58,7 +58,8 @@ fn blend(bg: vec4f, fg: vec4f, intensity: f32) -> vec4f {
 
 
 fn shadow_blend(bg: vec3f, fg: vec3f, opacity: f32) -> vec3f {
-    return bg * min(vec3f(1), (vec3f(2) - (vec3f(1) - fg)) * (1 - opacity));
+    //return bg * min(vec3f(1), (vec3f(2) - (vec3f(1) - fg)) * (1 - opacity));
+    return bg * min(vec3f(1), (vec3f(2) - (vec3f(1) - fg)) * (1 - opacity)); 
 }
 
 // check if the [a, b] segment intersects the circle (c, r) between the 2 angles 
@@ -151,7 +152,7 @@ fn distance_point_to_line(p: vec2f, a: vec2f, b: vec2f) -> f32 {
 fn intersection_point(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> vec2f {
     let denom = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
     if denom == 0. {
-        return vec2f(0);
+        return vec2f(100000000.0);
     }
 
     let r1 = a.x * b.y - a.y * b.x;
