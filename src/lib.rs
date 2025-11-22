@@ -1,3 +1,89 @@
+//! **Firefly** is an open-source **2d lighting** crate made for the [Bevy](https://bevy.org/) game engine.
+//!
+//! The main focus of this crate is offering as many complex 2d lighting features (on par with more mature game engines) while
+//! trying to maximize performance and simplify the end-user API as much as possible.
+//!
+//! Feel free to [create an issue](https://github.com/PVDoriginal/firefly/issues) if you want to request a specific feature or report a bug.
+//!
+//! # Example
+//! Here is a basic example of implementing Firefly into a Bevy game.
+//!
+//! ```
+//! use bevy::prelude::*;
+//! use firefly::prelude::*;
+//!
+//! fn main() {
+//!     App:new()
+//!         // add FireflyPlugin to your app
+//!         .add_plugins((DefaultPlugins, FireflyPlugin))
+//!         .add_systems(Startup, setup)
+//!         .run();
+//! }
+//!
+//! fn setup(mut commands: Commands) {
+//!     commands.spawn((
+//!         Camera2d,
+//!         // make sure to also have the FireflyConfig component on your camera
+//!         FireflyConfig::default()
+//!     ));
+//!     
+//!     // spawn a simple red light
+//!     commands.spawn((
+//!         PointLight2d {
+//!             color: Color::srgb(1.0, 0.0, 0.0),
+//!             range: 100.0,
+//!             ..default()
+//!         },
+//!         Transform::default()
+//!     ));
+//!     
+//!     // spawn a circle occluder
+//!     commands.spawn((
+//!         Occluder2d::circle(10.0),
+//!         Transform::from_translation(vec3(0.0, 50.0, 0.0)),
+//!     ));
+//! }
+//! ```
+//!
+//! # Occluders
+//!
+//! [Occluders](crate::occluders::Occluder2d) are shapes that block light and cast shadows.
+//!
+//! Current supported shapes include:
+//! - [Polylines](crate::occluders::Occluder2d::polyline).
+//! - [Polygons](crate::occluders::Occluder2d::polygon) (concave and convex).
+//! - Round shapes such as [circles](crate::occluders::Occluder2d::circle), [capsules](crate::occluders::Occluder2d::capsule), [round rectangles](crate::occluders::Occluder2d::round_rectangle).
+//!
+//! Occluders have an [opacity](crate::occluders::Occluder2d::opacity), ranging from transprent to fully opaque, and can cast [colored shadows](crate::occluders::Occluder2d::opacity).   
+//!
+//! Occluders can be moved and rotated via the [Transform] component.   
+//!
+//! # Lights
+//!
+//! [PointLight2d](crate::prelude::PointLight2d)
+//!
+//! # Features
+//!
+//! Here are some of the main features currently implemented :
+//!
+//! - **Soft Shadows**:
+//! [FireflyConfig](crate::prelude::FireflyConfig) has a [Softness](crate::prelude::FireflyConfig::softness) field
+//! that can be adjusted to disable / enable soft shadows, as well as give it a value (0 to 1) to set how soft the shadows should be.
+//!
+//! - **Occlusion Layers**: You can enable [z-sorting](crate::prelude::FireflyConfig::z_sorting) on [FireflyConfig](crate::prelude::FireflyConfig) to have shadows
+//! only render over sprites with a lower z position than the occluder that cast them. This is extremely useful for certain 2d games, such as top-down games.
+//! Additionally, [Occluders](crate::prelude::Occluder2d) have a [list of entities](crate::prelude::Occluder2d::ignored_sprites) that
+//! they won't cast shadows over.
+//!
+//! - **Light Banding**: You can enable [light bands](crate::prelude::FireflyConfig::light_bands) on [FireflyConfig](crate::prelude::FireflyConfig) to
+//! reduce the lightmap to a certain number of 'bands', creating a stylized retro look.  
+//!
+//! # Upcoming Features
+//!
+//! Here are some of the features that are still being worked on:
+//! - Normal maps.
+//! - Multiple lightmaps.
+//! - Light textures.
 use bevy::{
     asset::weak_handle,
     prelude::*,
