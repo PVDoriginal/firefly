@@ -109,7 +109,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
 }
 
 fn move_lights(
-    mut lights: Query<(Entity, &mut Transform, &PointLight)>,
+    mut lights: Query<(Entity, &mut Transform, &PointLight2d)>,
     mut gizmos: Gizmos,
     time: Res<Time>,
     mut commands: Commands,

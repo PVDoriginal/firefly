@@ -20,8 +20,11 @@ use core::f32;
 #[require(SyncToRenderWorld)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
+    rect: Rect,
+
     /// **Color** of the occluder. **Alpha is ignored**.
     pub color: Color,
+
     /// **Opacity** of the occluder.
     ///
     /// An occluder of **opacity 0** won't block any light.
@@ -29,10 +32,23 @@ pub struct Occluder2d {
     ///
     /// Anything in-between will cast a colored shadow depending on how **opaque** it is.
     pub opacity: f32,
+
     /// List of entities that this occluder will **not cast shadows over**.
     ///
     /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub ignored_sprites: Vec<Entity>,
+
+    /// **Height** of the occluder.
+    ///
+    /// This is used to create a **2.5D shadow effect**.
+    ///
+    /// A light **far above** the the occluder will cast **really short** shadows.
+    /// A light at the **same height** as the occluder will cast an **infinitely long** shadow.  
+    ///
+    /// Values should be **non-negative**.
+    ///
+    /// If set to **None**, all shadows will be **infinite**. **This is the default behavior**.
+    pub height: Option<f32>,
 }
 
 impl Occluder2d {
@@ -42,57 +58,59 @@ impl Occluder2d {
     }
 
     fn from_shape(shape: Occluder2dShape) -> Self {
+        let rect = match &shape {
+            Occluder2dShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } => Rect {
+                min: Vec2::splat(-(width.max(*height)) / 2. - radius),
+                max: Vec2::splat(width.max(*height) / 2. + radius),
+            },
+            Occluder2dShape::Polyline { vertices, .. } => vertices_rect(vertices),
+            Occluder2dShape::Polygon { vertices, .. } => vertices_rect(vertices),
+        };
+
         Self {
             shape,
+            rect,
             opacity: 1.,
             color: bevy::prelude::Color::Srgba(BLACK),
+            height: Some(3.),
             ..default()
         }
     }
 
     /// **Bounding rect** of the occluder.
     pub fn rect(&self) -> Rect {
-        match &self.shape {
-            Occluder2dShape::RoundRectangle {
-                width,
-                height,
-                radius,
-            } => Rect {
-                min: Vec2::splat(-width.min(-*height) / 2. - radius),
-                max: Vec2::splat(width.max(*height) / 2. + radius),
-            },
-            Occluder2dShape::Polyline { vertices, .. } => vertices_rect(vertices),
-            Occluder2dShape::Polygon { vertices, .. } => vertices_rect(vertices),
-        }
+        self.rect
     }
 
-    /// Construct a new occluder with the specified **color**. **Alpha is ignored**.
+    /// Construct a new occluder with the specified [color](Occluder2d::color).
     pub fn with_color(&self, color: Color) -> Self {
         let mut res = self.clone();
         res.color = color;
         res
     }
 
-    /// Construct a new occluder with the specified **opacity**.
-    ///
-    /// An occluder of **opacity 0** won't block any light.
-    /// An occluder of **opacity 1** will completely both light (and cast a fully black shadow).
-    ///
-    /// Anything in-between will cast a colored shadow depending on how **opaque** it is.
+    /// Construct a new occluder with the specified [opacity](Occluder2d::opacity).
     pub fn with_opacity(&self, opacity: f32) -> Self {
         let mut res = self.clone();
         res.opacity = opacity;
         res
     }
 
-    /// Construct a new occluder with the specified **ignored sprites**.
-    ///
-    /// Each entity in the list you provide will **not receive shadows cast by this occluder**.   
-    ///
-    /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
+    /// Construct a new occluder with the specified [ignored sprites](Occluder2d::ignored_sprites).
     pub fn with_ignored_sprites(&self, sprites: Vec<Entity>) -> Self {
         let mut res = self.clone();
         res.ignored_sprites = sprites;
+        res
+    }
+
+    /// Construct a new occluder with the specified [height](Occluder2d::height).
+    pub fn with_height(&self, height: f32) -> Self {
+        let mut res = self.clone();
+        res.height = Some(height);
         res
     }
 
@@ -106,10 +124,10 @@ impl Occluder2d {
     /// # Failure
     /// This returns None if the provided list doesn't contain **at least 2 vertices**.
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
-        if vertices.len() < 2 {
-            return None;
-        };
-        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
+        normalize_vertices(vertices).and_then(|mut vertices| {
+            vertices.push(vertices[0]);
+            Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
+        })
     }
 
     /// Construct a **polyline occluder** from the given **points**.
@@ -120,11 +138,13 @@ impl Occluder2d {
     ///
     /// # Failure
     /// This returns None if the provided list doesn't contain **at least 2 vertices**.
-    pub fn polyline(vertices: Vec<Vec2>) -> Option<Self> {
-        if vertices.len() < 2 {
-            return None;
-        };
-        Some(Self::from_shape(Occluder2dShape::Polyline { vertices }))
+    pub fn polyline(mut vertices: Vec<Vec2>) -> Option<Self> {
+        let mut vertices_clone = vertices.clone();
+        vertices_clone.reverse();
+        vertices.extend_from_slice(&vertices_clone[1..vertices_clone.len() - 1]);
+
+        normalize_vertices(vertices)
+            .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polyline { vertices })))
     }
 
     /// Construct a **rectangle occluder** from width and height.
@@ -134,7 +154,7 @@ impl Occluder2d {
 
     /// Construct a **round rectangle** occluder from width, height and radius.
     ///
-    /// The resulted occluder is esentially a rectangle a radius-sized padding around it.
+    /// The resulted occluder is esentially a rectangle with a radius-sized padding around it.
     ///  
     /// For instance, a circle is a round rectangle with no height or width, and a capsule
     /// is a round rectangle with only height or only width (and radius).
@@ -177,6 +197,7 @@ pub(crate) struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
+    pub height: Option<f32>,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -188,6 +209,11 @@ impl PartialEq for ExtractedOccluder {
 impl ExtractedOccluder {
     pub fn vertices(&self) -> Vec<Vec2> {
         self.shape.vertices(self.pos, Rot2::radians(self.rot))
+    }
+    pub fn vertices_iter<'a>(&'a self) -> Box<dyn 'a + DoubleEndedIterator<Item = Vec2>> {
+        self.shape
+            .vertices_iter(self.pos, Rot2::radians(self.rot))
+            .unwrap()
     }
 }
 
@@ -204,78 +230,9 @@ fn vertices_rect(vertices: &Vec<Vec2>) -> Rect {
     }
 }
 
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformOccluder {
-    pub n_sequences: u32,
-    pub n_vertices: u32,
-    pub round: u32,
-    pub n_sprites: u32,
-    pub z: f32,
-    pub color: Vec3,
-    pub opacity: f32,
-}
-
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformRoundOccluder {
-    pub pos: Vec2,
-    pub rot: f32,
-    pub width: f32,
-    pub height: f32,
-    pub radius: f32,
-}
-
-#[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformVertex {
-    pub angle: f32,
-    pub pos: Vec2,
-}
-
-#[derive(Reflect, Clone, Debug, PartialEq)]
-pub enum Occluder2dShape {
-    Polygon {
-        vertices: Vec<Vec2>,
-    },
-    Polyline {
-        vertices: Vec<Vec2>,
-    },
-    RoundRectangle {
-        width: f32,
-        height: f32,
-        radius: f32,
-    },
-}
-
-impl Default for Occluder2dShape {
-    fn default() -> Self {
-        Self::RoundRectangle {
-            width: 10.,
-            height: 10.,
-            radius: 0.,
-        }
-    }
-}
-
-impl Occluder2dShape {
-    pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
-        match &self {
-            Self::Polygon { vertices, .. } => {
-                let mut vertices = vertices.clone();
-                vertices.push(vertices[0]);
-                translate_vertices(vertices, pos, rot)
-            }
-            Self::Polyline { vertices, .. } => translate_vertices(vertices.to_vec(), pos, rot),
-            Self::RoundRectangle { .. } => default(),
-        }
-    }
-}
-
-pub(crate) fn translate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
-    vertices.iter().map(|v| rot * *v + pos).collect()
-}
-
 // rotates vertices to be clockwise
 fn normalize_vertices(vertices: Vec<Vec2>) -> Option<Vec<Vec2>> {
-    if vertices.len() < 1 {
+    if vertices.len() < 2 {
         warn!("Not enough vertices to form shape");
         return None;
     }
@@ -352,6 +309,105 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
         }
     }
     inside
+}
+
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformOccluder {
+    pub n_sequences: u32,
+    pub n_vertices: u32,
+    pub round: u32,
+    pub n_sprites: u32,
+    pub z: f32,
+    pub color: Vec3,
+    pub opacity: f32,
+    pub height: f32,
+    pub back_offset: u32,
+    pub back_start_vertex: u32,
+}
+
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformRoundOccluder {
+    pub pos: Vec2,
+    pub rot: f32,
+    pub width: f32,
+    pub height: f32,
+    pub radius: f32,
+}
+
+#[derive(ShaderType, Clone, Default)]
+pub(crate) struct UniformVertex {
+    pub angle: f32,
+    pub pos: Vec2,
+}
+
+#[derive(Reflect, Clone, Debug, PartialEq)]
+pub enum Occluder2dShape {
+    Polygon {
+        vertices: Vec<Vec2>,
+    },
+    Polyline {
+        vertices: Vec<Vec2>,
+    },
+    RoundRectangle {
+        width: f32,
+        height: f32,
+        radius: f32,
+    },
+}
+
+impl Default for Occluder2dShape {
+    fn default() -> Self {
+        Self::RoundRectangle {
+            width: 10.,
+            height: 10.,
+            radius: 0.,
+        }
+    }
+}
+
+impl Occluder2dShape {
+    pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
+        match &self {
+            Self::Polygon { vertices, .. } => {
+                let mut vertices = vertices.clone();
+                vertices.push(vertices[0]);
+                translate_vertices(vertices, pos, rot)
+            }
+            Self::Polyline { vertices, .. } => translate_vertices(vertices.to_vec(), pos, rot),
+            Self::RoundRectangle { .. } => default(),
+        }
+    }
+    pub(crate) fn vertices_iter<'a>(
+        &'a self,
+        pos: Vec2,
+        rot: Rot2,
+    ) -> Option<Box<dyn 'a + DoubleEndedIterator<Item = Vec2>>> {
+        match self {
+            Self::Polygon { vertices, .. } => Some(translate_vertices_iter(
+                Box::new(vertices.iter().map(|v| *v)),
+                pos,
+                rot,
+            )),
+            Self::Polyline { vertices, .. } => Some(translate_vertices_iter(
+                Box::new(vertices.iter().map(|v| *v)),
+                pos,
+                rot,
+            )),
+            Self::RoundRectangle { .. } => None,
+        }
+    }
+}
+
+pub(crate) fn translate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
+    vertices.iter().map(|v| rot * *v + pos).collect()
+}
+
+pub(crate) fn translate_vertices_iter<'a>(
+    vertices: Box<dyn 'a + DoubleEndedIterator<Item = Vec2>>,
+    pos: Vec2,
+    rot: Rot2,
+) -> Box<dyn 'a + DoubleEndedIterator<Item = Vec2>> {
+    Box::new(vertices.map(move |v| rot * v + pos))
 }
 
 #[derive(Resource, Default)]

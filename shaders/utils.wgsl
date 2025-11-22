@@ -141,3 +141,24 @@ fn rotate_arctan(x: f32, r: f32) -> f32 {
     }
     return res;
 }
+
+// distance from p to line [a, b]
+fn distance_point_to_line(p: vec2f, a: vec2f, b: vec2f) -> f32 {
+    return abs((b.y - a.y) * p.x - (b.x - a.x) * p.y + b.x * a.y - b.y * a.x) / distance(a, b);
+}
+
+// get intersection point of [a, b] and [c, d]
+fn intersection_point(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> vec2f {
+    let denom = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
+    if denom == 0. {
+        return vec2f(0);
+    }
+
+    let r1 = a.x * b.y - a.y * b.x;
+    let r2 = c.x * d.y - c.y * d.x;
+
+    return vec2f(
+        (r1 * (c.x - d.x) - (a.x - b.x) * r2) / denom, 
+        (r1 * (c.y - d.y) - (a.y - b.y) * r2) / denom
+    );
+}
