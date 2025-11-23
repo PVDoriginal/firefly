@@ -12,6 +12,10 @@ Short video showing off soft shadows and z-sorting:
 
 https://github.com/user-attachments/assets/1984ef2a-0edd-4a40-93cb-a901057a9b74
 
+Here's the same game but with light banding and hard shadows:
+
+https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
+
 > Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
 
 ## Usage 
