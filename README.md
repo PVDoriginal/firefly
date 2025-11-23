@@ -12,10 +12,12 @@ or use for your games, if you wish to.
 
 ## Features 
 Some of the existing features are: 
-  - Soft shadows
+  - Point lightss
   - Round and polygonal occluders
+  - Soft shadows
   - Occlusion z-sorting
-  - Occlusion sprite masking 
+  - Occlusion sprite masking
+  - Transparent & colored occluders
   - Light banding
 
 Some of the currently planned features are: 
