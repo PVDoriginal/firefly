@@ -35,6 +35,48 @@ Some of the currently planned features are:
 
 Feel free to open an issue if you want to request any specific features or report any bugs!  
 
+## Usage 
+To use this crate, simply run `cargo run firefly` or add firefly to your Cargo.toml file. 
+Here is a basis example of integrating firefly into a bevy app: 
+
+```Rs
+use bevy::prelude::*;
+use firefly::prelude::*;
+
+fn main() {
+  App:new()
+    // add FireflyPlugin to your app
+    .add_plugins((DefaultPlugins, FireflyPlugin))
+    .add_systems(Startup, setup)
+    .run();
+}
+
+fn setup(mut commands: Commands) {
+  commands.spawn((
+    Camera2d,
+    // make sure to also have the FireflyConfig component on your camera
+    FireflyConfig::default()
+  ));
+     
+  // spawn a simple red light
+  commands.spawn((
+    PointLight2d {
+      color: Color::srgb(1.0, 0.0, 0.0),
+      range: 100.0,
+      ..default()
+    },
+    Transform::default()
+  ));
+     
+  // spawn a circle occluder
+  commands.spawn((
+    Occluder2d::circle(10.0),
+    Transform::from_translation(vec3(0.0, 50.0, 0.0)),
+  ));
+}
+```
+Check out the [examples](examples/) and official crate documentation to learn more about using it.  
+
 ## Bevy Compatibility 
 | bevy | firefly |
 |------|---------------|
@@ -42,7 +84,3 @@ Feel free to open an issue if you want to request any specific features or repor
 
 ## Alternatives
 You can check out [bevy_light_2d](https://github.com/jgayfer/bevy_light_2d) and [bevy_lit](https://github.com/malbernaz/bevy_lit). They were both a big inspiration when starting out with this crate! 
-
-# Documentation
-Check out the [examples](examples/) and official crate documentation to learn about using it.  
-
