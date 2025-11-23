@@ -1,6 +1,6 @@
 # firefly
 
-Firefly is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
+[Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
 
 https://github.com/user-attachments/assets/1984ef2a-0edd-4a40-93cb-a901057a9b74
 
@@ -75,7 +75,7 @@ fn setup(mut commands: Commands) {
   ));
 }
 ```
-Check out the [examples](examples/) and official crate documentation to learn more about using it.  
+Check out the [examples](examples/) and the [crate documentation](docs.rs/bevy_firefly/0.1.0) to learn more about using it.
 
 ## Bevy Compatibility 
 | bevy | firefly |
