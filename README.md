@@ -18,7 +18,8 @@ The crate is currently only available for Bevy 0.16. I'm planning to update it b
 
 ## Features 
 Some of the existing features are: 
-  - Point lightss
+  - Dynamic lights and occluders
+  - Point lights
   - Round and polygonal occluders
   - Soft shadows
   - Occlusion z-sorting
