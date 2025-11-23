@@ -1,5 +1,9 @@
 # Firefly
 
+[![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
+[![docs](https://docs.rs/bevy_firefly/badge.svg)](https://docs.rs/bevy_firefly/)
+[![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
+
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
 
 It's goal is to be a fully 2d lighting crate with features akin to the ones of more mature game engines, while 
@@ -61,8 +65,7 @@ fn setup(mut commands: Commands) {
   ));
 }
 ```
-Check out the [examples](examples/) and the [crate documentation](docs.rs/bevy_firefly/0.1.1) to learn more about using it.
-
+Check out the [examples](examples/) and the [crate documentation](https://docs.rs/bevy_firefly/) to learn more about using it.
 
 ## Features 
 Some of the existing features are: 
