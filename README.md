@@ -79,7 +79,7 @@ Feel free to open an issue if you want to request any specific features or repor
 ## Bevy Compatibility 
 | bevy | bevy_firefly  |
 |------|---------------|
-| 0.16 | 0.1           |
+| 0.16 | 0.16          |
 
 I'm planning to update to a newer bevy version soon, but I'm not currently working on it. If you want me to hurry, feel free to open an issue for it, and I'll try to prioritize it more :) 
 
