@@ -363,9 +363,7 @@ fn prepare_data(
                 && let Some(h_light) = light.height
                 && h_occ < h_light
             {
-                if !light_inside_occluder
-                    && !matches!(occluder.shape, Occluder2dShape::Polyline { .. })
-                {
+                if !light_inside_occluder {
                     push_vertices(Box::new(vertices_iter().rev()), true);
                 } else {
                     meta.back_offset = meta.n_sequences;
