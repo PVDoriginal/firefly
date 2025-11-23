@@ -37,6 +37,9 @@ Feel free to open an issue if you want to request any specific features or repor
 
 ## Usage 
 To use this crate, simply run `cargo run bevy_firefly` or add firefly to your Cargo.toml file. 
+
+You can see all the firely versions [here](https://crates.io/crates/bevy_firefly/versions). 
+
 Here is a basis example of integrating firefly into a bevy app: 
 
 ```Rs
