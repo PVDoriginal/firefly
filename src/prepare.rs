@@ -248,6 +248,11 @@ fn prepare_data(
             meta.n_sprites = ids.len() as u32;
             meta.z = occluder.z;
 
+            meta.z_sorting = match occluder.z_sorting {
+                false => 0,
+                true => 1,
+            };
+
             for id in &ids {
                 id_buffer.push(id.id);
             }

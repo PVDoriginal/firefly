@@ -21,6 +21,7 @@ struct Occluder {
     z: f32,
     color: vec3f, 
     opacity: f32,
+    z_sorting: u32,
 }
 
 struct RoundOccluder {

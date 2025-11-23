@@ -105,6 +105,7 @@ fn extract_lights_occluders(
                 color: occluder.color,
                 opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),
+                z_sorting: occluder.z_sorting,
             });
     }
 }

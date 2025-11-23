@@ -2,7 +2,7 @@
 //!
 //! The main focus of this crate is offering as many complex 2d lighting features (on par with more mature game engines) while
 //! trying to maximize performance and simplify the end-user API as much as possible.
-//!
+//!z
 //! Feel free to [create an issue](https://github.com/PVDoriginal/firefly/issues) if you want to request a specific feature or report a bug.
 //!
 //! # Example

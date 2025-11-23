@@ -37,6 +37,11 @@ pub struct Occluder2d {
     ///
     /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub ignored_sprites: Vec<Entity>,
+
+    /// If true, this occluder won't cast shadows over sprites with a higher z value.
+    ///
+    /// This does nothing if z_sorting is set to false in the [config](crate::prelude::FireflyConfig::z_sorting).
+    pub z_sorting: bool,
 }
 
 impl Occluder2d {
@@ -64,6 +69,7 @@ impl Occluder2d {
             rect,
             opacity: 1.,
             color: bevy::prelude::Color::Srgba(BLACK),
+            z_sorting: true,
             ..default()
         }
     }
@@ -91,6 +97,13 @@ impl Occluder2d {
     pub fn with_ignored_sprites(&self, sprites: Vec<Entity>) -> Self {
         let mut res = self.clone();
         res.ignored_sprites = sprites;
+        res
+    }
+
+    /// Construct a ne woccluder with the specified [z-sorting](Occluder2d::z_sorting).
+    pub fn with_z_sorting(&self, z_sorting: bool) -> Self {
+        let mut res = self.clone();
+        res.z_sorting = z_sorting;
         res
     }
 
@@ -177,6 +190,7 @@ pub(crate) struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
+    pub z_sorting: bool,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -299,6 +313,7 @@ pub(crate) struct UniformOccluder {
     pub z: f32,
     pub color: Vec3,
     pub opacity: f32,
+    pub z_sorting: u32,
 }
 
 #[derive(ShaderType, Clone, Default)]

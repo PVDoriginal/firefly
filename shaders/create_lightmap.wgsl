@@ -90,7 +90,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
             
             if (stencil.a > 0.1) {
-                if (config.z_sorting == 1 && stencil.g >= occluders[i].z) {
+                if (config.z_sorting == 1 && occluders[i].z_sorting == 1 && stencil.g >= occluders[i].z) {
                     continue;
                 }
 
