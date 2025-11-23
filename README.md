@@ -35,6 +35,9 @@ Some of the currently planned features are:
 
 Feel free to open an issue if you want to request any specific features or report any bugs!  
 
+## Alternatives
+You can check out [bevy_light_2d](https://github.com/jgayfer/bevy_light_2d) and [bevy_lit](https://github.com/malbernaz/bevy_lit). They were both a big inspiration when starting out with this crate! 
+
 # Documentation
 Check out the [examples](examples/) and official crate documentation to learn about using it.  
 
