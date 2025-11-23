@@ -16,6 +16,10 @@ Here's the same game but with light banding and hard shadows:
 
 https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
 
+And here is a video of the [shapes examples](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs).
+
+https://github.com/user-attachments/assets/387799ba-7834-4fb6-9dbb-52f038c1ab0b
+
 > Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
 
 ## Usage 
