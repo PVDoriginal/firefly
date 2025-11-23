@@ -1,5 +1,5 @@
 use bevy::{color::palettes::css::RED, prelude::*};
-use firefly::prelude::*;
+use bevy_firefly::prelude::*;
 
 // Very basic example. Spawns a red light in the center of the screen, and a few round occluders surrounding it.
 // You can press the arrow keys to move the light.

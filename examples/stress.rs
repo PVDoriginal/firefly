@@ -2,7 +2,7 @@ use bevy::{
     color::palettes::css::{BLUE, GREEN, PURPLE, RED},
     prelude::*,
 };
-use firefly::prelude::*;
+use bevy_firefly::prelude::*;
 use iyes_perf_ui::PerfUiPlugin;
 use iyes_perf_ui::entries::PerfUiDefaultEntries;
 use rand::{Rng, rng, seq::IndexedRandom};

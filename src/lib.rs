@@ -10,7 +10,7 @@
 //!
 //! ```
 //! use bevy::prelude::*;
-//! use firefly::prelude::*;
+//! use bevy_firefly::prelude::*;
 //!
 //! fn main() {
 //!     App:new()

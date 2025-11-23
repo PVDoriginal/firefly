@@ -41,7 +41,7 @@ Here is a basis example of integrating firefly into a bevy app:
 
 ```Rs
 use bevy::prelude::*;
-use firefly::prelude::*;
+use bevy_firefly::prelude::*;
 
 fn main() {
   App:new()
