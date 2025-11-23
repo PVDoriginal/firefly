@@ -2,6 +2,7 @@
 name = "firefly"
 description = "2d lighting crate for the Bevy game engine"
 repository = "https://github.com/PVDoriginal/firefly/"
+license = "MIT OR Apache-2.0"
 keywords = ["gamedev", "graphics", "2d", "lighting", "bevy"]
 version = "0.1.0"
 edition = "2024"
