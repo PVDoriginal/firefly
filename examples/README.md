@@ -1,7 +1,7 @@
 # Examples
 Various examples for using Firefly. 
 
-More examples are coming soon. In the meantime, consider checking the [crates.io documentation](https://crates.io/crates/bevy_firefly/0.1.1) to learn about implementing certain advanced features. 
+More examples are coming soon. In the meantime, consider checking the [crates.io documentation](https://crates.io/crates/bevy_firefly/) to learn about implementing certain advanced features. 
 
 ## Simple 
 Simple example of integrating firefly into your bevy app and spawning a light and some round occluders. You can move the light using the arrow keys.
