@@ -11,7 +11,6 @@ struct PointLight {
     angle: f32,
     dir: vec2f,
     z: f32,
-    height: f32,
 }
 
 struct Occluder {
@@ -22,9 +21,6 @@ struct Occluder {
     z: f32,
     color: vec3f, 
     opacity: f32,
-    height: f32,
-    back_offset: u32,
-    back_start_vertex: u32,
 }
 
 struct RoundOccluder {

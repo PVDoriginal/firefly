@@ -48,18 +48,6 @@ pub struct PointLight2d {
     ///
     /// **Defaults to true**
     pub cast_shadows: bool,
-
-    /// **Height** of the light source.
-    ///
-    /// This is used to create a **2.5D shadow effect**.
-    ///
-    /// A light **far above** the the occluder will cast **really short** shadows.
-    /// A light at the **same height** as the occluder will cast an **infinitely long** shadow.  
-    ///
-    /// Values should be **non-negative**.
-    ///
-    /// If set to **None**, all shadows will be **infinite**. **This is the default behavior**.
-    pub height: Option<f32>,
 }
 
 /// An enum for the **falloff type**.  
@@ -81,7 +69,6 @@ impl Default for PointLight2d {
             falloff: Falloff::InverseSquare,
             angle: 360.0,
             cast_shadows: true,
-            height: None,
         }
     }
 }
@@ -98,7 +85,6 @@ pub(crate) struct ExtractedPointLight {
     pub cast_shadows: bool,
     pub dir: Vec2,
     pub z: f32,
-    pub height: Option<f32>,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -118,7 +104,6 @@ pub(crate) struct UniformPointLight {
     pub angle: f32,
     pub dir: Vec2,
     pub z: f32,
-    pub height: f32,
 }
 
 #[derive(Resource, Default)]

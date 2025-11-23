@@ -37,18 +37,6 @@ pub struct Occluder2d {
     ///
     /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub ignored_sprites: Vec<Entity>,
-
-    /// **Height** of the occluder.
-    ///
-    /// This is used to create a **2.5D shadow effect**.
-    ///
-    /// A light **far above** the the occluder will cast **really short** shadows.
-    /// A light at the **same height** as the occluder will cast an **infinitely long** shadow.  
-    ///
-    /// Values should be **non-negative**.
-    ///
-    /// If set to **None**, all shadows will be **infinite**. **This is the default behavior**.
-    pub height: Option<f32>,
 }
 
 impl Occluder2d {
@@ -76,7 +64,6 @@ impl Occluder2d {
             rect,
             opacity: 1.,
             color: bevy::prelude::Color::Srgba(BLACK),
-            height: Some(3.),
             ..default()
         }
     }
@@ -107,13 +94,6 @@ impl Occluder2d {
         res
     }
 
-    /// Construct a new occluder with the specified [height](Occluder2d::height).
-    pub fn with_height(&self, height: f32) -> Self {
-        let mut res = self.clone();
-        res.height = Some(height);
-        res
-    }
-
     /// Construct a **polygonal occluder** from the given **points**.
     ///
     /// The points can form a **convex or concave** polygon. However,
@@ -141,7 +121,7 @@ impl Occluder2d {
     pub fn polyline(mut vertices: Vec<Vec2>) -> Option<Self> {
         let mut vertices_clone = vertices.clone();
         vertices_clone.reverse();
-        vertices.extend_from_slice(&vertices_clone[1..vertices_clone.len() - 1]);
+        vertices.extend_from_slice(&vertices_clone[1..vertices_clone.len()]);
 
         normalize_vertices(vertices)
             .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polyline { vertices })))
@@ -197,7 +177,6 @@ pub(crate) struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
-    pub height: Option<f32>,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -320,9 +299,6 @@ pub(crate) struct UniformOccluder {
     pub z: f32,
     pub color: Vec3,
     pub opacity: f32,
-    pub height: f32,
-    pub back_offset: u32,
-    pub back_start_vertex: u32,
 }
 
 #[derive(ShaderType, Clone, Default)]

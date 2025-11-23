@@ -99,60 +99,31 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 }
             }
 
-            let has_height = light.height != -1 && occluders[i].height != -1 && occluders[i].height < light.height;
-
             if (occluders[i].round == 1) {
                 let result = round_check(pos, round_index); 
 
-                var height_multi = 1f;
-
                 if result.occluded == true {
-                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * height_multi);
+                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
                 }
                 else if config.softness > 0 && result.extreme_angle < soft_angle {
-                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)) * height_multi);
+                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
                 }
             }
 
             else {
-                let snapshot = start_vertex;
-
-                var calculated_multi = false;
-                var height_multi = 1f;
-
-                for (var s = sequence_index; s < sequence_index + occluders[i].back_offset; s++) {
+                for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {
                     let result = is_occluded(pos, s, start_vertex); 
 
-                    if !calculated_multi && result.occluded == true || (config.softness > 0 && result.extreme_angle < soft_angle) {
-                        var occ_dist = 0f; 
-                        
-                        // light is inside polygon; recheck the same edges
-                        if occluders[i].back_offset == occluders[i].n_sequences {
-                            occ_dist = occlusion_distance(pos, snapshot, sequence_index, sequence_index + occluders[i].back_offset);    
-                        }
-                        else {
-                            occ_dist = occlusion_distance(pos, occluders[i].back_start_vertex, sequence_index + occluders[i].back_offset, sequence_index + occluders[i].n_vertices);
-                        }
-
-                        // height_multi = 1f - min(1f, occ_dist / 10.0);
-
-                        if occ_dist > 20 {
-                            height_multi = 0f;
-                        }
-
-                        calculated_multi = true;
-                    }
-
                     if result.occluded == true {    
-                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * height_multi);
+                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
                     }
                     else if config.softness > 0 && result.extreme_angle < soft_angle {
-                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)) * height_multi);
+                        shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
                     }
 
                     start_vertex += sequences[s];
                 }
-                start_vertex = snapshot;
+                start_vertex -= occluders[i].n_vertices;
             }
 
             continuing {
@@ -238,40 +209,6 @@ fn is_occluded(pos: vec2f, sequence: u32, start_vertex: u32) -> OcclusionResult 
         0f,
     );
 }
-
-fn occlusion_distance(pos: vec2f, start_vertex: u32, start_sequence: u32, end_sequence: u32) -> f32 {
-    var dist = -1f;
-    
-    var sv = start_vertex;
-    for (var s = start_sequence; s < end_sequence; s++) {
-        let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
-
-        let maybe_prev = bs_vertex(angle, sv, sequences[s]);
-
-        if maybe_prev == -1 {
-            continue;
-        }
-
-        let prev = u32(maybe_prev);
-
-        if prev + 1 >= sequences[s]  {
-            continue;
-        }
-
-        if same_orientation(vertices[sv + prev].pos, vertices[sv + prev + 1].pos, pos, light.pos) {
-            continue;
-        }
-
-        let d = distance(pos, intersection_point(pos, light.pos, vertices[sv + prev].pos, vertices[sv + prev + 1].pos));
-
-        if dist == -1 || d < dist {
-            dist = d;
-        }
-
-        sv += sequences[s];
-    }
-    return dist;
-} 
 
 fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
     var ans = -1;

@@ -77,7 +77,6 @@ fn extract_lights_occluders(
             angle: light.angle,
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
-            height: light.height,
         });
 
         light_rect = light_rect.union(camera_rect.union_point(pos).intersect(Rect {
@@ -106,7 +105,6 @@ fn extract_lights_occluders(
                 color: occluder.color,
                 opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),
-                height: occluder.height,
             });
     }
 }

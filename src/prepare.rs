@@ -212,10 +212,6 @@ fn prepare_data(
             },
             angle: light.angle / 180. * PI,
             dir: light.dir,
-            height: match light.height {
-                None => -1.0,
-                Some(x) => x.max(0.0),
-            },
         });
         buffer.write_buffer(&render_device, &render_queue);
 
@@ -251,10 +247,6 @@ fn prepare_data(
 
             meta.n_sprites = ids.len() as u32;
             meta.z = occluder.z;
-            meta.height = match occluder.height {
-                None => -1.0,
-                Some(x) => x.max(0.0),
-            };
 
             for id in &ids {
                 id_buffer.push(id.id);
@@ -292,12 +284,7 @@ fn prepare_data(
             let light_inside_occluder = matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                 && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
 
-            let mut push_slice = |slice: &Vec<UniformVertex>, update_offset: bool| {
-                if update_offset {
-                    meta.back_offset = meta.n_sequences;
-                    meta.back_start_vertex = meta.n_vertices;
-                }
-
+            let mut push_slice = |slice: &Vec<UniformVertex>| {
                 sequence_buffer.push(slice.len() as u32);
                 for vertex in slice {
                     vertices_buffer.push(vertex.clone());
@@ -307,8 +294,7 @@ fn prepare_data(
             };
 
             let mut push_vertices =
-                |vertices: Box<dyn DoubleEndedIterator<Item = UniformVertex>>,
-                 mut back_edge: bool| {
+                |vertices: Box<dyn DoubleEndedIterator<Item = UniformVertex>>| {
                     let mut slice: Vec<UniformVertex> = default();
 
                     for vertex in vertices {
@@ -320,8 +306,7 @@ fn prepare_data(
                                 || (loops && vertex.angle > last.angle)
                             {
                                 if slice.len() > 1 {
-                                    push_slice(&slice, back_edge);
-                                    back_edge &= false;
+                                    push_slice(&slice);
                                 }
                                 slice = vec![vertex.clone()];
                             }
@@ -336,8 +321,7 @@ fn prepare_data(
                                 new_vertex.angle += 2. * PI;
                                 slice.push(new_vertex.clone());
 
-                                push_slice(&slice, back_edge);
-                                back_edge &= false;
+                                push_slice(&slice);
 
                                 old_vertex.angle -= 2. * PI;
                                 slice = vec![old_vertex, vertex.clone()];
@@ -348,29 +332,14 @@ fn prepare_data(
                     }
 
                     if slice.len() > 1 {
-                        push_slice(&slice, back_edge);
+                        push_slice(&slice);
                     }
                 };
 
             if !light_inside_occluder {
-                push_vertices(vertices_iter(), false);
+                push_vertices(vertices_iter());
             } else {
-                push_vertices(Box::new(vertices_iter().rev()), false);
-            }
-
-            // also add back edges in order for 2.5d shadows
-            if let Some(h_occ) = occluder.height
-                && let Some(h_light) = light.height
-                && h_occ < h_light
-            {
-                if !light_inside_occluder {
-                    push_vertices(Box::new(vertices_iter().rev()), true);
-                } else {
-                    meta.back_offset = meta.n_sequences;
-                }
-                // } else {
-                //     push_vertices(vertices_iter(), true);
-                // }
+                push_vertices(Box::new(vertices_iter().rev()));
             }
 
             meta_buffer.push(meta);
