@@ -1,5 +1,5 @@
 [package]
-name = "firefly"
+name = "bevy_firefly"
 description = "2d lighting crate for the Bevy game engine"
 repository = "https://github.com/PVDoriginal/firefly/"
 license = "MIT OR Apache-2.0"
