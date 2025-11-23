@@ -78,7 +78,7 @@ fn setup(mut commands: Commands) {
   ));
 }
 ```
-Check out the [examples](examples/) and the [crate documentation](docs.rs/bevy_firefly/0.1.0) to learn more about using it.
+Check out the [examples](examples/) and the [crate documentation](docs.rs/bevy_firefly/0.1.1) to learn more about using it.
 
 ## Bevy Compatibility 
 | bevy | firefly |
