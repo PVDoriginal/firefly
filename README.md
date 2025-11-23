@@ -2,6 +2,10 @@
 
 Firefly is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
 
+https://github.com/user-attachments/assets/1984ef2a-0edd-4a40-93cb-a901057a9b74
+
+> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game! 
+
 ## Goals 
 The goal of firefly is to have a **fully 2d** lighting crate with features akin to the ones of more mature game engines, while 
 keeping performance as high as possible and the minimizing the end-user API. 
@@ -9,6 +13,8 @@ keeping performance as high as possible and the minimizing the end-user API.
 ## State 
 Firefly is still pretty early in development, with many features to be added still. However, there are already lot of cool stuff for you to play with 
 or use for your games, if you wish to. 
+
+The crate is currently only available for Bevy 0.16. I'm planning to update it but am not currently working on it. You can open an issue if you want me to prioritize it.
 
 ## Features 
 Some of the existing features are: 
@@ -25,4 +31,9 @@ Some of the currently planned features are:
   - Occluders casting sprite-based shadows
   - Mulitple lightmaps
   - Light textures
+
+Feel free to open an issue if you want to request any specific features or report any bugs!  
+
+# Documentation
+Check out the [examples](examples/) and official crate documentation to learn about using it.  
 
