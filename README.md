@@ -36,7 +36,7 @@ Some of the currently planned features are:
 Feel free to open an issue if you want to request any specific features or report any bugs!  
 
 ## Usage 
-To use this crate, simply run `cargo run firefly` or add firefly to your Cargo.toml file. 
+To use this crate, simply run `cargo run bevy_firefly` or add firefly to your Cargo.toml file. 
 Here is a basis example of integrating firefly into a bevy app: 
 
 ```Rs
