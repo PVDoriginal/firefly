@@ -1,9 +1,13 @@
 # Firefly
 
+[![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
+[![docs](https://docs.rs/bevy_firefly/badge.svg)](https://docs.rs/bevy_firefly/)
+[![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
+
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
 
 It's goal is to be a fully 2d lighting crate with features akin to the ones of more mature game engines, while 
-keeping performance as high as possible and the minimizing the end-user API. 
+keeping performance as high as possible and minimizing the end-user API. 
 
 Firefly is still pretty early in development, with many features to be added still. However, there are already lot of cool stuff for you to play with 
 or use for your games, if you wish to. 
@@ -16,6 +20,10 @@ Here's the same game but with light banding and hard shadows:
 
 https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
 
+And here is a video of the [shapes examples](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs).
+
+https://github.com/user-attachments/assets/387799ba-7834-4fb6-9dbb-52f038c1ab0b
+
 > Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
 
 ## Usage 
@@ -23,7 +31,7 @@ To use this crate, simply run `cargo run bevy_firefly` or add firefly to your Ca
 
 You can see all the firely versions [here](https://crates.io/crates/bevy_firefly/versions). 
 
-Here is a basis example of integrating firefly into a bevy app: 
+Here is a basic example of integrating firefly into a bevy app: 
 
 ```Rs
 use bevy::prelude::*;
@@ -57,8 +65,7 @@ fn setup(mut commands: Commands) {
   ));
 }
 ```
-Check out the [examples](examples/) and the [crate documentation](docs.rs/bevy_firefly/0.1.1) to learn more about using it.
-
+Check out the [examples](examples/) and the [crate documentation](https://docs.rs/bevy_firefly/) to learn more about using it.
 
 ## Features 
 Some of the existing features are: 
