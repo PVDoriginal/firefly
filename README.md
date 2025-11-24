@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/387799ba-7834-4fb6-9dbb-52f038c1ab0b
 > Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
 
 ## Usage 
-To use this crate, simply run `cargo run bevy_firefly` or add firefly to your Cargo.toml file. 
+To use this crate, simply run `cargo add bevy_firefly` or add firefly to your Cargo.toml file. 
 
 You can see all the firely versions [here](https://crates.io/crates/bevy_firefly/versions). 
 
