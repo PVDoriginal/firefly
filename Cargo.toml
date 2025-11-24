@@ -8,7 +8,7 @@ version = "0.16.12"
 edition = "2024"
 
 [dependencies]
-bevy = "0.16"
+bevy = {version = "0.16", default-features = false, features = ["bevy_gizmos", "bevy_core_pipeline", "bevy_winit", "x11"]}
 bitflags = "2.10.0"
 bytemuck = "1.24.0"
 fixedbitset = "0.5.7"
@@ -16,4 +16,3 @@ fixedbitset = "0.5.7"
 [dev-dependencies]
 rand = "0.9.2"
 iyes_perf_ui = "0.5"
-
