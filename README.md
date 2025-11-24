@@ -31,7 +31,7 @@ To use this crate, simply run `cargo run bevy_firefly` or add firefly to your Ca
 
 You can see all the firely versions [here](https://crates.io/crates/bevy_firefly/versions). 
 
-Here is a basis example of integrating firefly into a bevy app: 
+Here is a basic example of integrating firefly into a bevy app: 
 
 ```Rs
 use bevy::prelude::*;
