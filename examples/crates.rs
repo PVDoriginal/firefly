@@ -33,14 +33,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
     sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 16.0));
 
-    let image: Handle<Image> = asset_server
-        .load_with_settings("crate_normal.png", |x: &mut ImageLoaderSettings| {
-            x.is_srgb = false
-        });
-
     commands.spawn((
         sprite,
-        NormalMap(image),
+        NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(0., -20., 20.)),
         // Occluder2d::rectangle(10., 5.),
     ));
@@ -48,14 +43,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
     sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 16.0));
 
-    let image: Handle<Image> = asset_server
-        .load_with_settings("vase_normal.png", |x: &mut ImageLoaderSettings| {
-            x.is_srgb = false
-        });
-
     commands.spawn((
         sprite,
-        NormalMap(image),
+        NormalMap::from_file("vase_normal.png", &asset_server),
         Transform::from_translation(vec3(0., 20., -20.)),
         // Occluder2d::round_rectangle(7., 1., 3.),
     ));

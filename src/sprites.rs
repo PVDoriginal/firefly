@@ -4,6 +4,8 @@ use crate::phases::{NormalPhase, Stencil2d};
 use crate::pipelines::{SpriteNormalMapsPipeline, SpriteStencilPipeline};
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
+use bevy::asset::AssetPath;
+use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderDebugFlags;
 use bevy::{
     asset::AssetEvents,
@@ -163,12 +165,35 @@ pub(crate) struct ImageBindGroups {
 /// ```
 /// commands.spawn((
 ///     Sprite::from_image(asset_server.load("some_sprite.png")),
-///     NormalMap(asset_server.load("some_sprite_normal.png")),
+///     NormalMap::from_file("some_sprite_normal.png"),
 /// ));
 /// ```
 /// See [Sprite] for more information on using sprites.
 #[derive(Component)]
-pub struct NormalMap(pub Handle<Image>);
+pub struct NormalMap {
+    image: Handle<Image>,
+}
+
+impl NormalMap {
+    /// Get the **handle of the normal map image**.
+    ///
+    /// Useful if e.g. you want to track its loading state.
+    pub fn handle(&self) -> Handle<Image> {
+        self.image.clone()
+    }
+
+    /// Construct a new [NormalMap] from the [path](AssetPath) to the image and the [AssetServer].
+    ///
+    /// This image file needs to **match the corresponding [Sprite] image** 1:1.  
+    ///
+    /// You can use [.handle()](NormalMap::handle) to get the **resulting image handle**.
+    pub fn from_file<'a>(path: impl Into<AssetPath<'a>>, asset_server: &AssetServer) -> Self {
+        let image: Handle<Image> =
+            asset_server.load_with_settings(path, |x: &mut ImageLoaderSettings| x.is_srgb = false);
+
+        Self { image }
+    }
+}
 
 pub(crate) struct SpritesPlugin;
 impl Plugin for SpritesPlugin {

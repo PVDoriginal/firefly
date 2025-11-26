@@ -120,7 +120,7 @@ pub fn extract_sprites(
                 flip_x: sprite.flip_x,
                 flip_y: sprite.flip_y,
                 image_handle_id: sprite.image.id(),
-                normal_handle_id: normal_map.and_then(|x| Some(x.0.id())),
+                normal_handle_id: normal_map.and_then(|x| Some(x.handle().id())),
                 kind: ExtractedSpriteKind::Slices {
                     indices: start..end,
                 },
@@ -150,7 +150,7 @@ pub fn extract_sprites(
                 flip_x: sprite.flip_x,
                 flip_y: sprite.flip_y,
                 image_handle_id: sprite.image.id(),
-                normal_handle_id: normal_map.and_then(|x| Some(x.0.id())),
+                normal_handle_id: normal_map.and_then(|x| Some(x.handle().id())),
                 kind: ExtractedSpriteKind::Single {
                     anchor: sprite.anchor.as_vec(),
                     rect,
