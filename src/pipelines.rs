@@ -82,7 +82,7 @@ impl FromWorld for LightmapCreationPipeline {
                     // sprite stencil
                     texture_2d(TextureSampleType::Float { filterable: false }),
                     // sprite normal map
-                    texture_2d(TextureSampleType::Float { filterable: false }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
                     // sprite ids
                     GpuArrayBuffer::<f32>::binding_layout(render_device),
                     //config,

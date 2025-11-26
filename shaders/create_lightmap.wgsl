@@ -52,16 +52,32 @@ const PIDIV2: f32 = 1.57079632679;
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     var prev = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
+    // let normal = textureSample(normal_map, texture_sampler, in.uv);
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
     let normal = textureLoad(normal_map, vec2<i32>(in.uv * vec2<f32>(textureDimensions(normal_map))), 0);
+
 
     // if normal.a > 0 {
     //     return vec4f(0);
     // }
 
-    if normal.a > 0 {
-        return normal;
-    }
+    // var light_dir = vec3f(0f, 1f, 0f);
+
+
+    // if normal.a > 0 && normal.r < 0.4 {
+    //     return vec4f(0, 1, 0, 1);
+    // }
+
+    // if normal.a > 0 {
+    //     if (normal * 2f - 1f).r != 0 {
+    //         return vec4f(1, 0, 0, 1);
+    //     }
+    // }
+
+    // if normal.a > 0 {
+    //     return normal;
+    //     // return vec4f(normalize(light_dir) * 0.5 + 0.5, 1f);
+    // }
 
     let soft_angle = config.softness; 
 
@@ -75,11 +91,20 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var res = vec4f(0);
 
         var normal_multi = 1f;
-        let normal_red = mix(normal, vec4f(0), 0.5);
-        
+
+
+        // var light_dir = vec3(light.pos - ((in.position.xy - view.viewport.xy) / view.viewport.zw), 1f);
+        // light_dir.x *= view.viewport.z / view.viewport.w;
+
         if normal.a > 0 {
-            normal_multi = max(0f, dot(normalize(normal.xyz * 2f - 1f), normalize(vec3f(light.pos - pos, 0.))));
+            // let normal_red = mix(normal, vec4f(0), 0.8);
+            let light_dir = vec3f(normalize(light.pos - pos), 1f).xyz;
+            let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), 0.5);
+
+            normal_multi = max(0f, dot(normal_dir, light_dir));
         };
+
+        res = vec4f(light.color, 0f) * normal_multi;
 
         if dist <= light.inner_range {
             res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * normal_multi);

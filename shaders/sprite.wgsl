@@ -85,6 +85,7 @@ fn fragment_stencil(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fragment_normal(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(sprite_texture, sprite_sampler, in.uv);
+    // var color = textureSample(sprite_texture, sprite_sampler, in.uv);
+    let color = textureLoad(sprite_texture, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_texture))), 0);
     return color;
 }

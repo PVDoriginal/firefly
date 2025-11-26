@@ -1,4 +1,7 @@
-use bevy::{color::palettes::css::RED, prelude::*, sprite::Anchor, window::PrimaryWindow};
+use bevy::{
+    color::palettes::css::RED, image::ImageLoaderSettings, prelude::*, sprite::Anchor,
+    window::PrimaryWindow,
+};
 use bevy_firefly::prelude::*;
 
 fn main() {
@@ -21,7 +24,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Camera2d,
         Projection::Orthographic(proj),
         FireflyConfig {
-            ambient_brightness: 0.,
+            ambient_color: Color::srgb(0.5, 0.2, 0.7),
+            ambient_brightness: 0.4,
             ..default()
         },
     ));
@@ -29,11 +33,31 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
     sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 16.0));
 
+    let image: Handle<Image> = asset_server
+        .load_with_settings("crate_normal.png", |x: &mut ImageLoaderSettings| {
+            x.is_srgb = false
+        });
+
     commands.spawn((
         sprite,
-        NormalMap(asset_server.load("crate_normal.png")),
-        Transform::from_translation(vec3(0., -20., 0.)),
+        NormalMap(image),
+        Transform::from_translation(vec3(0., -20., 20.)),
         // Occluder2d::rectangle(10., 5.),
+    ));
+
+    let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
+    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 16.0));
+
+    let image: Handle<Image> = asset_server
+        .load_with_settings("vase_normal.png", |x: &mut ImageLoaderSettings| {
+            x.is_srgb = false
+        });
+
+    commands.spawn((
+        sprite,
+        NormalMap(image),
+        Transform::from_translation(vec3(0., 20., -20.)),
+        // Occluder2d::round_rectangle(7., 1., 3.),
     ));
 
     commands.spawn((PointLight2d::default(), Transform::default()));
