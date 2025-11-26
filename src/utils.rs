@@ -1,6 +1,8 @@
 use bevy::{platform::collections::HashSet, prelude::*};
 
-use crate::sprites::pipeline::ExtractedSlice;
+use crate::sprites::ExtractedSlice;
+
+// use crate::sprites::stencil::ExtractedSlice;
 /// Component storing texture slices for tiled or sliced sprite entities
 ///
 /// This component is automatically inserted and updated
@@ -145,6 +147,92 @@ pub(crate) fn compute_slices_on_sprite_change(
         }
         if let Some(slices) = compute_sprite_slices(sprite, &images, &atlas_layouts) {
             commands.entity(entity).insert(slices);
+        }
+    }
+}
+
+/// Scales a texture to fit within a given quad size with keeping the aspect ratio.
+pub(crate) fn apply_scaling(
+    scaling_mode: ScalingMode,
+    texture_size: Vec2,
+    quad_size: &mut Vec2,
+    quad_translation: &mut Vec2,
+    uv_offset_scale: &mut Vec4,
+) {
+    let quad_ratio = quad_size.x / quad_size.y;
+    let texture_ratio = texture_size.x / texture_size.y;
+    let tex_quad_scale = texture_ratio / quad_ratio;
+    let quad_tex_scale = quad_ratio / texture_ratio;
+
+    match scaling_mode {
+        ScalingMode::FillCenter => {
+            if quad_ratio > texture_ratio {
+                // offset texture to center by y coordinate
+                uv_offset_scale.y += (uv_offset_scale.w - uv_offset_scale.w * tex_quad_scale) * 0.5;
+                // sum up scales
+                uv_offset_scale.w *= tex_quad_scale;
+            } else {
+                // offset texture to center by x coordinate
+                uv_offset_scale.x += (uv_offset_scale.z - uv_offset_scale.z * quad_tex_scale) * 0.5;
+                uv_offset_scale.z *= quad_tex_scale;
+            };
+        }
+        ScalingMode::FillStart => {
+            if quad_ratio > texture_ratio {
+                uv_offset_scale.y += uv_offset_scale.w - uv_offset_scale.w * tex_quad_scale;
+                uv_offset_scale.w *= tex_quad_scale;
+            } else {
+                uv_offset_scale.z *= quad_tex_scale;
+            }
+        }
+        ScalingMode::FillEnd => {
+            if quad_ratio > texture_ratio {
+                uv_offset_scale.w *= tex_quad_scale;
+            } else {
+                uv_offset_scale.x += uv_offset_scale.z - uv_offset_scale.z * quad_tex_scale;
+                uv_offset_scale.z *= quad_tex_scale;
+            }
+        }
+        ScalingMode::FitCenter => {
+            if texture_ratio > quad_ratio {
+                // Scale based on width
+                quad_size.y *= quad_tex_scale;
+            } else {
+                // Scale based on height
+                quad_size.x *= tex_quad_scale;
+            }
+        }
+        ScalingMode::FitStart => {
+            if texture_ratio > quad_ratio {
+                // The quad is scaled to match the image ratio, and the quad translation is adjusted
+                // to start of the quad within the original quad size.
+                let scale = Vec2::new(1.0, quad_tex_scale);
+                let new_quad = *quad_size * scale;
+                let offset = *quad_size - new_quad;
+                *quad_translation = Vec2::new(0.0, -offset.y);
+                *quad_size = new_quad;
+            } else {
+                let scale = Vec2::new(tex_quad_scale, 1.0);
+                let new_quad = *quad_size * scale;
+                let offset = *quad_size - new_quad;
+                *quad_translation = Vec2::new(offset.x, 0.0);
+                *quad_size = new_quad;
+            }
+        }
+        ScalingMode::FitEnd => {
+            if texture_ratio > quad_ratio {
+                let scale = Vec2::new(1.0, quad_tex_scale);
+                let new_quad = *quad_size * scale;
+                let offset = *quad_size - new_quad;
+                *quad_translation = Vec2::new(0.0, offset.y);
+                *quad_size = new_quad;
+            } else {
+                let scale = Vec2::new(tex_quad_scale, 1.0);
+                let new_quad = *quad_size * scale;
+                let offset = *quad_size - new_quad;
+                *quad_translation = Vec2::new(-offset.x, 0.0);
+                *quad_size = new_quad;
+            }
         }
     }
 }

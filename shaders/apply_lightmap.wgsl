@@ -25,6 +25,7 @@ fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
         light_frag = floor(light_frag * vec4f(config.light_bands)) / vec4f(config.light_bands);
     }
 
-    let scene_frag = textureSample(screen_texture, texture_sampler, vo.uv);
-    return scene_frag * light_frag;
+    return light_frag;
+    // let scene_frag = textureSample(screen_texture, texture_sampler, vo.uv);
+    // return scene_frag * light_frag;
 }

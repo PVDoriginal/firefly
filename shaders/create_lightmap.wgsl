@@ -36,9 +36,12 @@ var<storage> round_occluders: array<RoundOccluder>;
 var sprite_stencil: texture_2d<f32>;
 
 @group(0) @binding(9)
-var<storage> ids: array<f32>;
+var normal_map: texture_2d<f32>;
 
 @group(0) @binding(10)
+var<storage> ids: array<f32>;
+
+@group(0) @binding(11)
 var<uniform> config: FireflyConfig;
 
 const PI2: f32 = 6.28318530718;
@@ -50,6 +53,15 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     var prev = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
+    let normal = textureLoad(normal_map, vec2<i32>(in.uv * vec2<f32>(textureDimensions(normal_map))), 0);
+
+    // if normal.a > 0 {
+    //     return vec4f(0);
+    // }
+
+    if normal.a > 0 {
+        return normal;
+    }
 
     let soft_angle = config.softness; 
 
@@ -62,17 +74,24 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     if (dist < light.range && angle <= light.angle / 2.) {
         var res = vec4f(0);
 
+        var normal_multi = 1f;
+        let normal_red = mix(normal, vec4f(0), 0.5);
+        
+        if normal.a > 0 {
+            normal_multi = max(0f, dot(normalize(normal.xyz * 2f - 1f), normalize(vec3f(light.pos - pos, 0.))));
+        };
+
         if dist <= light.inner_range {
-            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity);
+            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * normal_multi);
         }
         else {
             let x = (dist - light.inner_range) / (light.range - light.inner_range);
 
             if light.falloff == 0 {
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x));
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x) * normal_multi);
             }
             else if light.falloff == 1 { 
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x));
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x) * normal_multi);
             }
         }
 
