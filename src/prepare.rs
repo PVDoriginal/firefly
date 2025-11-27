@@ -1,6 +1,7 @@
 use std::{
     f32::consts::{FRAC_PI_2, PI},
     slice::Iter,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
 use bevy::{
     core_pipeline::tonemapping::{Tonemapping, TonemappingLuts, get_lut_bindings},
     math::Affine3A,
+    pbr::LightMeta,
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
@@ -34,6 +36,7 @@ use bevy::{
         texture::{FallbackImage, GpuImage, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
+    tasks::{ComputeTaskPool, ParallelSlice},
 };
 
 use crate::{
@@ -206,7 +209,7 @@ fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     lights: Query<(Entity, &ExtractedPointLight)>,
-    mut occluders: Query<&ExtractedOccluder>,
+    occluders: Query<&ExtractedOccluder>,
     sprites: Res<ExtractedSprites>,
     camera: Single<(&ExtractedWorldData, &Projection)>,
     mut light_set: ResMut<LightSet>,
@@ -222,8 +225,6 @@ fn prepare_data(
         max: projection.area.max + camera.0.camera_pos,
     };
 
-    *light_set = default();
-
     // let lights = lights.iter().filter(|light| {
     //     !Rect {
     //         min: light.pos - light.range,
@@ -233,182 +234,232 @@ fn prepare_data(
     //     .is_empty()
     // });
 
-    *occluder_set = default();
-    for (light_id, light) in lights {
+    for (light_id, _) in lights {
         commands.entity(light_id).remove::<ExtractedPointLight>();
+    }
 
-        let mut buffer = UniformBuffer::<UniformPointLight>::default();
+    *occluder_set = default();
+    *light_set = default();
 
-        buffer.set(UniformPointLight {
-            pos: light.pos,
-            color: light.color.to_linear().to_vec3(),
-            intensity: light.intensity,
-            range: light.range,
-            z: light.z,
-            inner_range: light.inner_range.min(light.range),
-            falloff: match light.falloff {
-                Falloff::InverseSquare => 0,
-                Falloff::Linear => 1,
-            },
-            angle: light.angle / 180. * PI,
-            dir: light.dir,
-        });
-        buffer.write_buffer(&render_device, &render_queue);
+    let lights: Vec<_> = lights.iter().collect();
+    lights
+        .par_splat_map(ComputeTaskPool::get(), None, |_, lights| {
+            let mut results = vec![];
 
-        light_set.0.push(buffer);
-
-        let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
-            min: light.pos - light.range,
-            max: light.pos + light.range,
-        });
-
-        let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
-        let mut sequence_buffer = GpuArrayBuffer::<u32>::new(&render_device);
-        let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
-        let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
-        let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
-
-        for occluder in &mut occluders {
-            if !light.cast_shadows {
-                break;
-            }
-
-            if occluder.rect.intersect(light_rect).is_empty() {
-                continue;
-            }
-
-            let mut meta: UniformOccluder = default();
-
-            let ids: Vec<_> = sprites
-                .sprites
-                .iter()
-                .filter(|x| occluder.ignored_sprites.contains(&x.main_entity))
-                .collect();
-
-            meta.n_sprites = ids.len() as u32;
-            meta.z = occluder.z;
-
-            meta.z_sorting = match occluder.z_sorting {
-                false => 0,
-                true => 1,
-            };
-
-            for id in &ids {
-                id_buffer.push(id.id);
-            }
-
-            meta.color = occluder.color.to_linear().to_vec3();
-            meta.opacity = occluder.opacity;
-
-            if let Occluder2dShape::RoundRectangle {
-                width,
-                height,
-                radius,
-            } = occluder.shape
-            {
-                meta.round = 1;
-                round_buffer.push(UniformRoundOccluder {
-                    pos: occluder.pos,
-                    rot: occluder.rot,
-                    width,
-                    height,
-                    radius,
-                });
-                meta_buffer.push(meta);
-                continue;
-            }
-
-            let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
-            let vertices_iter = || {
-                Box::new(occluder.vertices_iter().map(|pos| UniformVertex {
-                    angle: angle(pos, light.pos),
-                    pos,
-                }))
-            };
-
-            let light_inside_occluder = matches!(occluder.shape, Occluder2dShape::Polygon { .. })
-                && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
-
-            let mut push_slice = |slice: &Vec<UniformVertex>| {
-                sequence_buffer.push(slice.len() as u32);
-                for vertex in slice {
-                    vertices_buffer.push(vertex.clone());
-                }
-                meta.n_vertices += slice.len() as u32;
-                meta.n_sequences += 1;
-            };
-
-            let mut push_vertices =
-                |vertices: Box<dyn DoubleEndedIterator<Item = UniformVertex>>| {
-                    let mut slice: Vec<UniformVertex> = default();
-
-                    for vertex in vertices {
-                        if let Some(last) = slice.last() {
-                            let loops = (vertex.angle - last.angle).abs() > PI;
-
-                            // if the next vertex is decreasing
-                            if (!loops && vertex.angle < last.angle)
-                                || (loops && vertex.angle > last.angle)
-                            {
-                                if slice.len() > 1 {
-                                    push_slice(&slice);
-                                }
-                                slice = vec![vertex.clone()];
-                            }
-                            // if the next vertex is increasing, simple case
-                            else if !loops && vertex.angle > last.angle {
-                                slice.push(vertex.clone());
-                            }
-                            // if the next vertex is increasing and loops over
-                            else {
-                                let mut old_vertex = last.clone();
-                                let mut new_vertex = vertex.clone();
-                                new_vertex.angle += 2. * PI;
-                                slice.push(new_vertex.clone());
-
-                                push_slice(&slice);
-
-                                old_vertex.angle -= 2. * PI;
-                                slice = vec![old_vertex, vertex.clone()];
-                            }
-                        } else {
-                            slice.push(vertex.clone());
-                        }
-                    }
-
-                    if slice.len() > 1 {
-                        push_slice(&slice);
-                    }
+            for (_, light) in lights {
+                let light_buffer = UniformPointLight {
+                    pos: light.pos,
+                    color: light.color.to_linear().to_vec3(),
+                    intensity: light.intensity,
+                    range: light.range,
+                    z: light.z,
+                    inner_range: light.inner_range.min(light.range),
+                    falloff: match light.falloff {
+                        Falloff::InverseSquare => 0,
+                        Falloff::Linear => 1,
+                    },
+                    angle: light.angle / 180. * PI,
+                    dir: light.dir,
                 };
 
-            if !light_inside_occluder {
-                push_vertices(vertices_iter());
-            } else {
-                push_vertices(Box::new(vertices_iter().rev()));
+                let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
+                    min: light.pos - light.range,
+                    max: light.pos + light.range,
+                });
+
+                let mut meta_buffer = vec![];
+                let mut sequence_buffer = vec![];
+                let mut vertices_buffer = vec![];
+                let mut round_buffer = vec![];
+                let mut id_buffer = vec![];
+
+                for occluder in &occluders {
+                    if !light.cast_shadows {
+                        break;
+                    }
+
+                    if occluder.rect.intersect(light_rect).is_empty() {
+                        continue;
+                    }
+
+                    let mut meta: UniformOccluder = default();
+                    let ids: Vec<_> = sprites
+                        .sprites
+                        .iter()
+                        .filter(|x| occluder.ignored_sprites.contains(&x.main_entity))
+                        .collect();
+
+                    meta.n_sprites = ids.len() as u32;
+                    meta.z = occluder.z;
+
+                    meta.z_sorting = match occluder.z_sorting {
+                        false => 0,
+                        true => 1,
+                    };
+
+                    for id in &ids {
+                        id_buffer.push(id.id);
+                    }
+
+                    meta.color = occluder.color.to_linear().to_vec3();
+                    meta.opacity = occluder.opacity;
+
+                    if let Occluder2dShape::RoundRectangle {
+                        width,
+                        height,
+                        radius,
+                    } = occluder.shape
+                    {
+                        meta.round = 1;
+                        round_buffer.push(UniformRoundOccluder {
+                            pos: occluder.pos,
+                            rot: occluder.rot,
+                            width,
+                            height,
+                            radius,
+                        });
+                        meta_buffer.push(meta);
+                        continue;
+                    }
+
+                    let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
+                    let vertices_iter = || {
+                        Box::new(occluder.vertices_iter().map(|pos| UniformVertex {
+                            angle: angle(pos, light.pos),
+                            pos,
+                        }))
+                    };
+
+                    let light_inside_occluder =
+                        matches!(occluder.shape, Occluder2dShape::Polygon { .. })
+                            && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
+
+                    let mut push_slice = |slice: &Vec<UniformVertex>| {
+                        sequence_buffer.push(slice.len() as u32);
+                        // for vertex in slice {
+                        //     vertices_buffer.push(vertex.clone());
+                        // }
+                        vertices_buffer.extend_from_slice(slice);
+                        meta.n_vertices += slice.len() as u32;
+                        meta.n_sequences += 1;
+                    };
+
+                    let mut push_vertices =
+                        |vertices: Box<dyn DoubleEndedIterator<Item = UniformVertex>>| {
+                            let mut slice: Vec<UniformVertex> = default();
+
+                            for vertex in vertices {
+                                if let Some(last) = slice.last() {
+                                    let loops = (vertex.angle - last.angle).abs() > PI;
+
+                                    // if the next vertex is decreasing
+                                    if (!loops && vertex.angle < last.angle)
+                                        || (loops && vertex.angle > last.angle)
+                                    {
+                                        if slice.len() > 1 {
+                                            push_slice(&slice);
+                                        }
+                                        slice = vec![vertex.clone()];
+                                    }
+                                    // if the next vertex is increasing, simple case
+                                    else if !loops && vertex.angle > last.angle {
+                                        slice.push(vertex.clone());
+                                    }
+                                    // if the next vertex is increasing and loops over
+                                    else {
+                                        let mut old_vertex = last.clone();
+                                        let mut new_vertex = vertex.clone();
+                                        new_vertex.angle += 2. * PI;
+                                        slice.push(new_vertex.clone());
+
+                                        push_slice(&slice);
+
+                                        old_vertex.angle -= 2. * PI;
+                                        slice = vec![old_vertex, vertex.clone()];
+                                    }
+                                } else {
+                                    slice.push(vertex.clone());
+                                }
+                            }
+
+                            if slice.len() > 1 {
+                                push_slice(&slice);
+                            }
+                        };
+
+                    if !light_inside_occluder {
+                        push_vertices(vertices_iter());
+                    } else {
+                        push_vertices(Box::new(vertices_iter().rev()));
+                    }
+
+                    meta_buffer.push(meta);
+                }
+                meta_buffer.push(default());
+                sequence_buffer.push(default());
+                vertices_buffer.push(default());
+                round_buffer.push(default());
+                id_buffer.push(default());
+                results.push((
+                    light_buffer,
+                    meta_buffer,
+                    sequence_buffer,
+                    vertices_buffer,
+                    round_buffer,
+                    id_buffer,
+                ));
             }
+            results
+        })
+        .iter()
+        .for_each(|results| {
+            results.iter().for_each(|result| {
+                let mut light_buffer = UniformBuffer::from(result.0.clone());
+                light_buffer.write_buffer(&render_device, &render_queue);
 
-            meta_buffer.push(meta);
-        }
-        meta_buffer.push(default());
-        sequence_buffer.push(default());
-        vertices_buffer.push(default());
-        round_buffer.push(default());
-        id_buffer.push(default());
+                light_set.0.push(light_buffer);
 
-        meta_buffer.write_buffer(&render_device, &render_queue);
-        sequence_buffer.write_buffer(&render_device, &render_queue);
-        vertices_buffer.write_buffer(&render_device, &render_queue);
-        round_buffer.write_buffer(&render_device, &render_queue);
-        id_buffer.write_buffer(&render_device, &render_queue);
+                let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
+                let mut sequence_buffer = GpuArrayBuffer::<u32>::new(&render_device);
+                let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
+                let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
+                let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
-        occluder_set.0.push((
-            meta_buffer,
-            sequence_buffer,
-            vertices_buffer,
-            round_buffer,
-            id_buffer,
-        ));
-    }
+                for meta in &result.1 {
+                    meta_buffer.push(meta.clone());
+                }
+
+                for sequence in &result.2 {
+                    sequence_buffer.push(*sequence);
+                }
+
+                for vertex in &result.3 {
+                    vertices_buffer.push(vertex.clone());
+                }
+
+                for round in &result.4 {
+                    round_buffer.push(round.clone());
+                }
+
+                for id in &result.5 {
+                    id_buffer.push(*id);
+                }
+
+                meta_buffer.write_buffer(&render_device, &render_queue);
+                sequence_buffer.write_buffer(&render_device, &render_queue);
+                vertices_buffer.write_buffer(&render_device, &render_queue);
+                round_buffer.write_buffer(&render_device, &render_queue);
+                id_buffer.write_buffer(&render_device, &render_queue);
+
+                occluder_set.0.push((
+                    meta_buffer,
+                    sequence_buffer,
+                    vertices_buffer,
+                    round_buffer,
+                    id_buffer,
+                ));
+            });
+        });
 }
 
 fn prepare_sprite_view_bind_groups(

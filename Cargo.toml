@@ -8,7 +8,7 @@ version = "0.16.13"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_gizmos", "bevy_core_pipeline", "bevy_winit", "bevy_sprite", "x11", "bevy_log"] }
+bevy = { version = "0.16", default-features = false, features = ["bevy_gizmos", "bevy_core_pipeline", "bevy_winit", "bevy_sprite", "x11", "bevy_log", "async_executor"] }
 
 bitflags = "2.10.0"
 bytemuck = "1.24.0"
