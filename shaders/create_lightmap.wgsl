@@ -92,16 +92,20 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         var normal_multi = 1f;
 
-
         // var light_dir = vec3(light.pos - ((in.position.xy - view.viewport.xy) / view.viewport.zw), 1f);
         // light_dir.x *= view.viewport.z / view.viewport.w;
 
         if normal.a > 0 {
-            // let normal_red = mix(normal, vec4f(0), 0.8);
-            let light_dir = vec3f(normalize(light.pos - pos), 1f).xyz;
-            let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), 0.5);
+            if normal.b == 0f {
+                normal_multi = 0f;
+            }
+            else {
+                // let normal_red = mix(normal, vec4f(0), 0.8);
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, pos.y - light.pos.y, light.height - 0.0)).xzy;
+                let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), 0.5);
 
-            normal_multi = max(0f, dot(normal_dir, light_dir));
+                normal_multi = max(0f, dot(normal_dir, light_dir));
+            }
         };
 
         res = vec4f(light.color, 0f) * normal_multi;

@@ -9,7 +9,7 @@ use bevy::{
 
 /// Point light with adjustable fields.
 #[derive(Component, Clone, Reflect)]
-#[require(SyncToRenderWorld)]
+#[require(SyncToRenderWorld, Transform)]
 pub struct PointLight2d {
     /// **Color** of the point light. **Alpha is ignored**.
     pub color: Color,
@@ -48,6 +48,11 @@ pub struct PointLight2d {
     ///
     /// **Defaults to true**
     pub cast_shadows: bool,
+
+    /// **Height** fields that's used for certain kinds of normal mapping.
+    ///
+    /// **Should be non-negative**.  
+    pub height: f32,
 }
 
 /// An enum for the **falloff type**.  
@@ -69,6 +74,7 @@ impl Default for PointLight2d {
             falloff: Falloff::InverseSquare,
             angle: 360.0,
             cast_shadows: true,
+            height: 0.,
         }
     }
 }
@@ -85,6 +91,7 @@ pub(crate) struct ExtractedPointLight {
     pub cast_shadows: bool,
     pub dir: Vec2,
     pub z: f32,
+    pub height: f32,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -104,6 +111,7 @@ pub(crate) struct UniformPointLight {
     pub angle: f32,
     pub dir: Vec2,
     pub z: f32,
+    pub height: f32,
 }
 
 #[derive(Resource, Default)]

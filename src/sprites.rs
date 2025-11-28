@@ -119,12 +119,27 @@ impl SpriteInstance {
 }
 
 #[derive(Resource)]
-pub(crate) struct SpriteMeta {
+pub(crate) struct SpriteStencilMeta {
     pub sprite_index_buffer: RawBufferVec<u32>,
     pub sprite_instance_buffer: RawBufferVec<SpriteInstance>,
 }
 
-impl Default for SpriteMeta {
+#[derive(Resource)]
+pub(crate) struct SpriteNormalMeta {
+    pub sprite_index_buffer: RawBufferVec<u32>,
+    pub sprite_instance_buffer: RawBufferVec<SpriteInstance>,
+}
+
+impl Default for SpriteStencilMeta {
+    fn default() -> Self {
+        Self {
+            sprite_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
+            sprite_instance_buffer: RawBufferVec::<SpriteInstance>::new(BufferUsages::VERTEX),
+        }
+    }
+}
+
+impl Default for SpriteNormalMeta {
     fn default() -> Self {
         Self {
             sprite_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
@@ -221,7 +236,8 @@ impl Plugin for SpritesPlugin {
                 .init_resource::<SpecializedRenderPipelines<SpriteNormalMapsPipeline>>()
                 .init_resource::<DrawFunctions<Stencil2d>>()
                 .init_resource::<DrawFunctions<NormalPhase>>()
-                .init_resource::<SpriteMeta>()
+                .init_resource::<SpriteStencilMeta>()
+                .init_resource::<SpriteNormalMeta>()
                 .init_resource::<ExtractedSprites>()
                 .init_resource::<ExtractedSlices>()
                 .init_resource::<SpriteAssetEvents>()
@@ -472,7 +488,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteNormalTextureBi
 
 pub(crate) struct DrawSpriteStencilBatch;
 impl<P: PhaseItem> RenderCommand<P> for DrawSpriteStencilBatch {
-    type Param = (SRes<SpriteMeta>, SRes<SpriteStencilBatches>);
+    type Param = (SRes<SpriteStencilMeta>, SRes<SpriteStencilBatches>);
     type ViewQuery = Read<ExtractedView>;
     type ItemQuery = ();
 
@@ -508,7 +524,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteStencilBatch {
 
 pub(crate) struct DrawSpriteNormalBatch;
 impl<P: PhaseItem> RenderCommand<P> for DrawSpriteNormalBatch {
-    type Param = (SRes<SpriteMeta>, SRes<SpriteNormalBatches>);
+    type Param = (SRes<SpriteNormalMeta>, SRes<SpriteNormalBatches>);
     type ViewQuery = Read<ExtractedView>;
     type ItemQuery = ();
 

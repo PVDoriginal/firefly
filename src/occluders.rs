@@ -17,7 +17,7 @@ use core::f32;
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
 #[derive(Component, Clone, Default, Reflect)]
-#[require(SyncToRenderWorld)]
+#[require(SyncToRenderWorld, Transform)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
     rect: Rect,
@@ -42,6 +42,11 @@ pub struct Occluder2d {
     ///
     /// This does nothing if z_sorting is set to false in the [config](crate::prelude::FireflyConfig::z_sorting).
     pub z_sorting: bool,
+
+    /// **Height** fields that's used for certain kinds of normal mapping.
+    ///
+    /// **Should be non-negative**.  
+    pub height: f32,
 }
 
 impl Occluder2d {
@@ -191,6 +196,7 @@ pub(crate) struct ExtractedOccluder {
     pub opacity: f32,
     pub ignored_sprites: Vec<Entity>,
     pub z_sorting: bool,
+    pub height: f32,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -314,6 +320,7 @@ pub(crate) struct UniformOccluder {
     pub color: Vec3,
     pub opacity: f32,
     pub z_sorting: u32,
+    pub height: f32,
 }
 
 #[derive(ShaderType, Clone, Default)]

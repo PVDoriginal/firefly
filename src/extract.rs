@@ -192,7 +192,7 @@ fn extract_lights_occluders(
 
     let mut light_rect = Rect::default();
     for (entity, transform, light) in &lights {
-        let pos = transform.translation().truncate();
+        let pos = transform.translation().truncate() - vec2(0.0, light.height);
 
         if (Rect {
             min: pos - light.range,
@@ -205,7 +205,7 @@ fn extract_lights_occluders(
         }
 
         commands.entity(entity.id()).insert(ExtractedPointLight {
-            pos,
+            pos: pos,
             color: light.color,
             intensity: light.intensity,
             range: light.range,
@@ -215,6 +215,7 @@ fn extract_lights_occluders(
             angle: light.angle,
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
+            height: light.height,
         });
 
         light_rect = light_rect.union(camera_rect.union_point(pos).intersect(Rect {
@@ -244,6 +245,7 @@ fn extract_lights_occluders(
                 opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),
                 z_sorting: occluder.z_sorting,
+                height: occluder.height,
             });
     }
 }

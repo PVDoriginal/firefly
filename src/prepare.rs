@@ -13,8 +13,8 @@ use crate::{
     pipelines::{SpriteNormalMapsPipeline, SpriteStencilPipeline},
     sprites::{
         ExtractedSlices, ExtractedSpriteKind, ExtractedSprites, ImageBindGroups, SpriteAssetEvents,
-        SpriteBatch, SpriteInstance, SpriteMeta, SpriteNormalBatches, SpriteStencilBatches,
-        SpriteViewBindGroup,
+        SpriteBatch, SpriteInstance, SpriteNormalBatches, SpriteNormalMeta, SpriteStencilBatches,
+        SpriteStencilMeta, SpriteViewBindGroup,
     },
     utils::apply_scaling,
 };
@@ -260,6 +260,7 @@ fn prepare_data(
                     },
                     angle: light.angle / 180. * PI,
                     dir: light.dir,
+                    height: light.height,
                 };
 
                 let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
@@ -291,6 +292,7 @@ fn prepare_data(
 
                     meta.n_sprites = ids.len() as u32;
                     meta.z = occluder.z;
+                    meta.height = occluder.height;
 
                     meta.z_sorting = match occluder.z_sorting {
                         false => 0,
@@ -498,7 +500,7 @@ fn prepare_sprite_view_bind_groups(
 fn prepare_sprite_image_bind_groups_stencil(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut sprite_meta: ResMut<SpriteMeta>,
+    mut sprite_meta: ResMut<SpriteStencilMeta>,
     sprite_pipeline: Res<SpriteStencilPipeline>,
     mut image_bind_groups: ResMut<ImageBindGroups>,
     gpu_images: Res<RenderAssets<GpuImage>>,
@@ -744,7 +746,7 @@ fn prepare_sprite_image_bind_groups_stencil(
 fn prepare_sprite_image_bind_groups_normal(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut sprite_meta: ResMut<SpriteMeta>,
+    mut sprite_meta: ResMut<SpriteNormalMeta>,
     sprite_pipeline: Res<SpriteNormalMapsPipeline>,
     mut image_bind_groups: ResMut<ImageBindGroups>,
     gpu_images: Res<RenderAssets<GpuImage>>,
@@ -767,6 +769,9 @@ fn prepare_sprite_image_bind_groups_normal(
     }
 
     batches.clear();
+
+    // Clear the sprite instances
+    sprite_meta.sprite_instance_buffer.clear();
 
     // Index buffer indices
     let mut index = 0;
