@@ -214,7 +214,6 @@ fn prepare_data(
     camera: Single<(&ExtractedWorldData, &Projection)>,
     mut light_set: ResMut<LightSet>,
     mut occluder_set: ResMut<OccluderSet>,
-    mut commands: Commands,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -233,10 +232,6 @@ fn prepare_data(
     //     .intersect(camera_rect)
     //     .is_empty()
     // });
-
-    for (light_id, _) in lights {
-        commands.entity(light_id).remove::<ExtractedPointLight>();
-    }
 
     *occluder_set = default();
     *light_set = default();

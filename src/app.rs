@@ -13,6 +13,7 @@ use bevy::{
 
 use crate::{
     extract::ExtractPlugin,
+    lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNormalNode, SpriteStencilNode},
     occluders::{Occluder2dShape, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
@@ -72,7 +73,7 @@ impl Plugin for FireflyPlugin {
         );
 
         app.add_plugins((PreparePlugin, ExtractPlugin));
-        app.add_plugins(SpritesPlugin);
+        app.add_plugins((LightPlugin, SpritesPlugin));
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;

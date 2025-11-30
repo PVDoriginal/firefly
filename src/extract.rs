@@ -2,13 +2,18 @@ use bevy::{
     platform::collections::HashSet,
     prelude::*,
     render::{
-        Extract, RenderApp, extract_component::ExtractComponentPlugin,
-        render_phase::ViewSortedRenderPhases, sync_world::RenderEntity, view::RetainedViewEntity,
+        Extract, RenderApp,
+        batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
+        extract_component::ExtractComponentPlugin,
+        render_phase::{BinnedRenderPhase, ViewBinnedRenderPhases, ViewSortedRenderPhases},
+        sync_world::RenderEntity,
+        view::{NoIndirectDrawing, RetainedViewEntity},
     },
     sprite::SpriteSystem,
 };
 
 use crate::{
+    LightmapPhase,
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, PointLight2d},
     occluders::ExtractedOccluder,
@@ -44,11 +49,14 @@ impl Plugin for ExtractPlugin {
 fn extract_camera_phases(
     mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
     mut normal_phases: ResMut<ViewSortedRenderPhases<NormalPhase>>,
-    cameras: Extract<Query<(Entity, &Camera), With<Camera2d>>>,
+    mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
+    cameras: Extract<Query<(Entity, &Camera, Has<NoIndirectDrawing>), With<Camera2d>>>,
+    mut commands: Commands,
     mut live_entities: Local<HashSet<RetainedViewEntity>>,
+    gpu_preprocessing_support: Res<GpuPreprocessingSupport>,
 ) {
     live_entities.clear();
-    for (main_entity, camera) in &cameras {
+    for (main_entity, camera, no_indirect_drawing) in &cameras {
         if !camera.is_active {
             continue;
         }
@@ -58,12 +66,21 @@ fn extract_camera_phases(
         stencil_phases.insert_or_clear(retained_view_entity);
         normal_phases.insert_or_clear(retained_view_entity);
 
+        let gpu_preprocessing_mode = gpu_preprocessing_support.min(if !no_indirect_drawing {
+            GpuPreprocessingMode::Culling
+        } else {
+            GpuPreprocessingMode::PreprocessingOnly
+        });
+
+        lightmap_phases.prepare_for_new_frame(retained_view_entity, gpu_preprocessing_mode);
+
         live_entities.insert(retained_view_entity);
     }
 
     // Clear out all dead views.
     stencil_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
     normal_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+    lightmap_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
 }
 
 pub fn extract_sprite_events(
@@ -193,16 +210,6 @@ fn extract_lights_occluders(
     let mut light_rect = Rect::default();
     for (entity, transform, light) in &lights {
         let pos = transform.translation().truncate() - vec2(0.0, light.height);
-
-        if (Rect {
-            min: pos - light.range,
-            max: pos + light.range,
-        })
-        .intersect(camera_rect)
-        .is_empty()
-        {
-            continue;
-        }
 
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: pos,

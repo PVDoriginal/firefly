@@ -101,6 +101,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
                 color: *COLORS.choose(&mut rng).unwrap(),
                 intensity: 1.,
                 range: r,
+                cast_shadows: false,
                 ..default()
             },
             Transform::from_translation(vec3(x, HEIGHT / 2. + r, 0.)),

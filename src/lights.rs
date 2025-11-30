@@ -1,15 +1,50 @@
+use std::{any::TypeId, ops::Range};
+
 use bevy::{
     color::palettes::css::WHITE,
+    core_pipeline::tonemapping::{DebandDither, Tonemapping},
+    ecs::{
+        component::Tick,
+        observer::TriggerTargets,
+        query::ROQueryItem,
+        system::{
+            SystemParamItem,
+            lifetimeless::{Read, SRes},
+        },
+    },
+    pbr::PointLightShadowMap,
+    platform::collections::HashMap,
     prelude::*,
     render::{
-        render_resource::{ShaderType, UniformBuffer},
+        Render, RenderApp, RenderSet,
+        batching::sort_binned_render_phase,
+        render_phase::{
+            AddRenderCommand, BinnedRenderPhasePlugin, BinnedRenderPhaseType, DrawFunctions,
+            InputUniformIndex, PhaseItem, RenderCommand, RenderCommandResult, SetItemPipeline,
+            TrackedRenderPass, ViewBinnedRenderPhases, sort_phase_system,
+        },
+        render_resource::{
+            BindGroup, BufferUsages, IndexFormat, PipelineCache, RawBufferVec, ShaderType,
+            UniformBuffer,
+        },
         sync_world::SyncToRenderWorld,
+        view::{
+            ExtractedView, PreviousVisibleEntities, RenderVisibleEntities, RetainedViewEntity,
+            VisibilityClass, VisibilitySystems, VisibleEntities, check_visibility, visibility,
+        },
     },
+};
+use fixedbitset::FixedBitSet;
+
+use crate::{
+    LightBatchSetKey, data::FireflyConfig, phases::LightmapPhase,
+    pipelines::LightmapCreationPipeline,
 };
 
 /// Point light with adjustable fields.
 #[derive(Component, Clone, Reflect)]
-#[require(SyncToRenderWorld, Transform)]
+#[require(SyncToRenderWorld, Transform, VisibilityClass, ViewVisibility)]
+#[component(on_add = visibility::add_visibility_class::<PointLight2d>)]
 pub struct PointLight2d {
     /// **Color** of the point light. **Alpha is ignored**.
     pub color: Color,
@@ -116,3 +151,184 @@ pub(crate) struct UniformPointLight {
 
 #[derive(Resource, Default)]
 pub(crate) struct LightSet(pub Vec<UniformBuffer<UniformPointLight>>);
+
+pub(crate) struct LightPlugin;
+impl Plugin for LightPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            PostUpdate,
+            mark_visible_lights
+                .in_set(VisibilitySystems::CheckVisibility)
+                .after(check_visibility),
+        );
+
+        if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app.init_resource::<LightBindGroups>();
+            render_app.init_resource::<DrawFunctions<LightmapPhase>>();
+            render_app.init_resource::<ViewBinnedRenderPhases<LightmapPhase>>();
+            render_app.init_resource::<LightBufferMeta>();
+            render_app.add_render_command::<LightmapPhase, DrawLightmap>();
+
+            render_app.add_systems(
+                Render,
+                sort_binned_render_phase::<LightmapPhase>.in_set(RenderSet::PhaseSort),
+            );
+
+            render_app.add_systems(Render, queue_lights.in_set(RenderSet::Queue));
+        }
+    }
+
+    fn finish(&self, app: &mut App) {
+        if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app.init_resource::<LightBatches>();
+        }
+    }
+}
+
+#[derive(Resource)]
+pub(crate) struct LightBufferMeta {
+    pub light_index_buffer: RawBufferVec<u32>,
+}
+impl Default for LightBufferMeta {
+    fn default() -> Self {
+        Self {
+            light_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
+        }
+    }
+}
+
+#[derive(Resource, Deref, DerefMut, Default)]
+pub(crate) struct LightBatches(pub HashMap<(RetainedViewEntity, Entity), LightBatch>);
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub(crate) struct LightBatch {
+    pub id: Entity,
+    pub range: Range<u32>,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct LightBindGroups {
+    pub values: HashMap<Entity, BindGroup>,
+}
+
+fn mark_visible_lights(
+    mut lights: Query<(Entity, &GlobalTransform, &PointLight2d, &mut ViewVisibility)>,
+    mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
+    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
+) {
+    let Projection::Orthographic(projection) = camera.2 else {
+        return;
+    };
+
+    let camera_rect = Rect {
+        min: projection.area.min + camera.0.translation().truncate(),
+        max: projection.area.max + camera.0.translation().truncate(),
+    };
+
+    for (entity, transform, light, mut visibility) in &mut lights {
+        let pos = transform.translation().truncate() - vec2(0.0, light.height);
+
+        if !(Rect {
+            min: pos - light.range,
+            max: pos + light.range,
+        })
+        .intersect(camera_rect)
+        .is_empty()
+        {
+            if !**visibility {
+                visibility.set();
+
+                let visible_lights = camera.1.get_mut(TypeId::of::<PointLight2d>());
+                visible_lights.push(entity);
+
+                previous_visible_entities.remove(&entity);
+            }
+        }
+    }
+}
+
+fn queue_lights(
+    light_draw_functions: Res<DrawFunctions<LightmapPhase>>,
+    lightmap_pipeline: Res<LightmapCreationPipeline>,
+    mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
+    views: Query<(&ExtractedView, &RenderVisibleEntities)>,
+) {
+    let draw_lightmap_function = light_draw_functions.read().id::<DrawLightmap>();
+    info!("weird");
+
+    for (view, visible_entities) in &views {
+        info!("ah");
+        let Some(lightmap_phase) = lightmap_phases.get_mut(&view.retained_view_entity) else {
+            continue;
+        };
+
+        for (render_entity, visible_entity) in visible_entities.iter::<PointLight2d>() {
+            let batch_set_key = LightBatchSetKey {
+                pipeline: lightmap_pipeline.pipeline_id,
+                draw_function: draw_lightmap_function,
+            };
+
+            lightmap_phase.add(
+                batch_set_key,
+                (),
+                (*render_entity, *visible_entity),
+                InputUniformIndex::default(),
+                BinnedRenderPhaseType::NonMesh,
+                Tick::new(10),
+            );
+        }
+    }
+}
+
+pub(crate) type DrawLightmap = (SetItemPipeline, SetLightTextureBindGroup<0>, DrawLightBatch);
+
+pub(crate) struct SetLightTextureBindGroup<const I: usize>;
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup<I> {
+    type Param = (SRes<LightBindGroups>, SRes<LightBatches>);
+    type ViewQuery = Read<ExtractedView>;
+    type ItemQuery = ();
+
+    fn render<'w>(
+        item: &P,
+        view: ROQueryItem<'w, Self::ViewQuery>,
+        _entity: Option<()>,
+        (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let image_bind_groups = image_bind_groups.into_inner();
+        let Some(batch) = batches.get(&(view.retained_view_entity, item.entity())) else {
+            return RenderCommandResult::Skip;
+        };
+
+        pass.set_bind_group(I, image_bind_groups.values.get(&batch.id).unwrap(), &[]);
+        RenderCommandResult::Success
+    }
+}
+
+pub(crate) struct DrawLightBatch;
+impl<P: PhaseItem> RenderCommand<P> for DrawLightBatch {
+    type Param = (SRes<LightBufferMeta>, SRes<LightBatches>);
+    type ViewQuery = Read<ExtractedView>;
+    type ItemQuery = ();
+
+    fn render<'w>(
+        item: &P,
+        view: ROQueryItem<'w, Self::ViewQuery>,
+        _entity: Option<()>,
+        (light_meta, batches): SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let light_meta = light_meta.into_inner();
+        let Some(batch) = batches.get(&(view.retained_view_entity, item.entity())) else {
+            return RenderCommandResult::Skip;
+        };
+
+        pass.set_index_buffer(
+            light_meta.light_index_buffer.buffer().unwrap().slice(..),
+            0,
+            IndexFormat::Uint32,
+        );
+        pass.draw_indexed(0..3, 0, batch.range.clone());
+        RenderCommandResult::Success
+    }
+}

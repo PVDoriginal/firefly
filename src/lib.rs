@@ -103,6 +103,8 @@ mod prepare;
 mod sprites;
 mod utils;
 
+pub(crate) use phases::*;
+
 pub mod prelude {
     pub use crate::app::{FireflyGizmosPlugin, FireflyPlugin};
     pub use crate::data::FireflyConfig;
