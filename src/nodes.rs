@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
     render::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
-        render_phase::ViewSortedRenderPhases,
+        render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
             BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
             RenderPipeline,
@@ -15,8 +15,8 @@ use bevy::{
 };
 
 use crate::{
-    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture, NormalMapTexture,
-    SpriteStencilTexture,
+    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture, LightmapPhase,
+    NormalMapTexture, SpriteStencilTexture,
     lights::LightSet,
     occluders::OccluderSet,
     phases::{NormalPhase, Stencil2d},
@@ -31,130 +31,41 @@ pub(crate) struct CreateLightmapNode;
 pub(crate) struct ApplyLightmapNode;
 
 impl ViewNode for CreateLightmapNode {
-    type ViewQuery = (
-        Read<ViewUniformOffset>,
-        Read<LightMapTexture>,
-        Read<IntermediaryLightMapTexture>,
-        Read<EmptyLightMapTexture>,
-        Read<ViewTarget>,
-        Read<SpriteStencilTexture>,
-        Read<BufferedFireflyConfig>,
-        Read<NormalMapTexture>,
-    );
+    type ViewQuery = (&'static ExtractedView, Read<LightMapTexture>);
 
     fn run<'w>(
         &self,
-        _graph: &mut bevy::render::render_graph::RenderGraphContext,
-        render_context: &mut bevy::render::renderer::RenderContext<'w>,
-        (
-            view_offset,
-            lightmap,
-            inter_lightmap,
-            empty_lightmap,
-            _,
-            sprite_stencil_texture,
-            config,
-            normal_map,
-        ): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
+        graph: &mut RenderGraphContext,
+        render_context: &mut RenderContext<'w>,
+        (view, lightmap_texture): QueryItem<'w, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
-        let pipeline_cache = world.resource::<PipelineCache>();
-
-        let c_pipeline = world.resource::<LightmapCreationPipeline>();
-        let Some(c_render_pipeline) = pipeline_cache.get_render_pipeline(c_pipeline.pipeline_id)
+        let Some(lightmap_phases) = world.get_resource::<ViewBinnedRenderPhases<LightmapPhase>>()
         else {
             return Ok(());
         };
 
-        let t_pipeline = world.resource::<TransferTexturePipeline>();
-        let Some(t_render_pipeline) = pipeline_cache.get_render_pipeline(t_pipeline.pipeline_id)
-        else {
+        let view_entity = graph.view_entity();
+
+        let Some(lightmap_phase) = lightmap_phases.get(&view.retained_view_entity) else {
             return Ok(());
         };
 
-        let view_buffer = world.resource::<ViewUniforms>();
+        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("lightmap pass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &lightmap_texture.0.default_view,
+                resolve_target: None,
+                ops: default(),
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
 
-        let lights = world.resource::<LightSet>();
-        let occluder_set = world.resource::<OccluderSet>();
-
-        // if there are no lights, clear the lightmap and return
-        if lights.0.is_empty() {
-            transfer_texture(
-                &empty_lightmap.0,
-                &lightmap.0,
-                render_context,
-                t_pipeline,
-                t_render_pipeline,
-            );
-            return Ok(());
+        if let Err(err) = lightmap_phase.render(&mut render_pass, world, view_entity) {
+            error!("Error encountered while rendering the stencil phase {err:?}");
         }
-
-        for (i, light) in lights.0.iter().enumerate() {
-            {
-                let (occluders, sequences, vertices, round_occluders, ids) = &occluder_set.0[i];
-
-                let (Some(occluders), Some(vertices), Some(round_occluders), Some(ids)) = (
-                    occluders.binding(),
-                    vertices.binding(),
-                    round_occluders.binding(),
-                    ids.binding(),
-                ) else {
-                    return Ok(());
-                };
-
-                let bind_group = render_context.render_device().create_bind_group(
-                    "create lightmap bind group",
-                    &c_pipeline.layout,
-                    &BindGroupEntries::sequential((
-                        view_buffer.uniforms.binding().unwrap(),
-                        &inter_lightmap.0.default_view,
-                        &c_pipeline.sampler,
-                        light.binding().unwrap(),
-                        occluders.clone(),
-                        sequences.binding().unwrap(),
-                        vertices.clone(),
-                        round_occluders.clone(),
-                        &sprite_stencil_texture.0.default_view,
-                        &normal_map.0.default_view,
-                        ids.clone(),
-                        config.0.binding().unwrap(),
-                    )),
-                );
-
-                let mut render_pass =
-                    render_context.begin_tracked_render_pass(RenderPassDescriptor {
-                        label: Some("create lightmap pass"),
-                        color_attachments: &[Some(RenderPassColorAttachment {
-                            view: &lightmap.0.default_view,
-                            resolve_target: None,
-                            ops: default(),
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
-
-                render_pass.set_render_pipeline(c_render_pipeline);
-                render_pass.set_bind_group(0, &bind_group, &[view_offset.offset]);
-                render_pass.draw(0..3, 0..1);
-            }
-
-            transfer_texture(
-                &lightmap.0,
-                &inter_lightmap.0,
-                render_context,
-                t_pipeline,
-                t_render_pipeline,
-            );
-        }
-
-        transfer_texture(
-            &empty_lightmap.0,
-            &inter_lightmap.0,
-            render_context,
-            t_pipeline,
-            t_render_pipeline,
-        );
 
         Ok(())
     }

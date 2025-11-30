@@ -5,12 +5,12 @@ use std::{
 };
 
 use crate::{
-    NormalMapTexture, SpriteStencilTexture,
+    LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     data::ExtractedWorldData,
-    lights::Falloff,
+    lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBufferMeta},
     occluders::point_inside_poly,
     phases::{NormalPhase, Stencil2d},
-    pipelines::{SpriteNormalMapsPipeline, SpriteStencilPipeline},
+    pipelines::{LightmapCreationPipeline, SpriteNormalMapsPipeline, SpriteStencilPipeline},
     sprites::{
         ExtractedSlices, ExtractedSpriteKind, ExtractedSprites, ImageBindGroups, SpriteAssetEvents,
         SpriteBatch, SpriteInstance, SpriteNormalBatches, SpriteNormalMeta, SpriteStencilBatches,
@@ -27,7 +27,9 @@ use bevy::{
     render::{
         Render, RenderApp, RenderSet,
         render_asset::RenderAssets,
-        render_phase::{PhaseItem, SortedPhaseItem, ViewSortedRenderPhases},
+        render_phase::{
+            PhaseItem, SortedPhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases,
+        },
         render_resource::{
             BindGroupEntries, GpuArrayBuffer, TextureDescriptor, TextureDimension, TextureFormat,
             TextureUsages, UniformBuffer,
@@ -211,9 +213,21 @@ fn prepare_data(
     lights: Query<(Entity, &ExtractedPointLight)>,
     occluders: Query<&ExtractedOccluder>,
     sprites: Res<ExtractedSprites>,
-    camera: Single<(&ExtractedWorldData, &Projection)>,
+    camera: Single<(
+        &ExtractedWorldData,
+        &Projection,
+        &SpriteStencilTexture,
+        &NormalMapTexture,
+        &BufferedFireflyConfig,
+    )>,
     mut light_set: ResMut<LightSet>,
     mut occluder_set: ResMut<OccluderSet>,
+    mut phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
+    mut light_buffer_meta: ResMut<LightBufferMeta>,
+    lightmap_pipeline: Res<LightmapCreationPipeline>,
+    mut light_bind_groups: ResMut<LightBindGroups>,
+    mut batches: ResMut<LightBatches>,
+    view_uniforms: Res<ViewUniforms>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -224,25 +238,30 @@ fn prepare_data(
         max: projection.area.max + camera.0.camera_pos,
     };
 
-    // let lights = lights.iter().filter(|light| {
-    //     !Rect {
-    //         min: light.pos - light.range,
-    //         max: light.pos + light.range,
-    //     }
-    //     .intersect(camera_rect)
-    //     .is_empty()
-    // });
+    batches.clear();
 
-    *occluder_set = default();
-    *light_set = default();
+    // Clear the sprite instances
+    light_buffer_meta.light_index_buffer.clear();
 
-    let lights: Vec<_> = lights.iter().collect();
-    lights
-        .par_splat_map(ComputeTaskPool::get(), None, |_, lights| {
-            let mut results = vec![];
+    // Index buffer indices
+    let mut index = 0;
 
-            for (_, light) in lights {
-                let light_buffer = UniformPointLight {
+    let light_bind_groups = &mut *light_bind_groups;
+
+    for (retained_view, transparent_phase) in phases.iter_mut() {
+        let mut batch_item_index = index;
+
+        let mut index = 0;
+
+        for item_index in 0..transparent_phase.non_mesh_items.len() {
+            let item = &transparent_phase.non_mesh_items[item_index];
+
+            for (_, entity) in &item.entities {
+                let Ok((_, light)) = lights.get(*entity) else {
+                    continue;
+                };
+
+                let uniform_light = UniformPointLight {
                     pos: light.pos,
                     color: light.color.to_linear().to_vec3(),
                     intensity: light.intensity,
@@ -258,16 +277,19 @@ fn prepare_data(
                     height: light.height,
                 };
 
+                let mut light_buffer = UniformBuffer::<UniformPointLight>::from(uniform_light);
+                light_buffer.write_buffer(&render_device, &render_queue);
+
                 let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
                     min: light.pos - light.range,
                     max: light.pos + light.range,
                 });
 
-                let mut meta_buffer = vec![];
-                let mut sequence_buffer = vec![];
-                let mut vertices_buffer = vec![];
-                let mut round_buffer = vec![];
-                let mut id_buffer = vec![];
+                let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
+                let mut sequence_buffer = GpuArrayBuffer::<u32>::new(&render_device);
+                let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
+                let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
+                let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
 
                 for occluder in &occluders {
                     if !light.cast_shadows {
@@ -333,10 +355,9 @@ fn prepare_data(
 
                     let mut push_slice = |slice: &Vec<UniformVertex>| {
                         sequence_buffer.push(slice.len() as u32);
-                        // for vertex in slice {
-                        //     vertices_buffer.push(vertex.clone());
-                        // }
-                        vertices_buffer.extend_from_slice(slice);
+                        for vertex in slice {
+                            vertices_buffer.push(vertex.clone());
+                        }
                         meta.n_vertices += slice.len() as u32;
                         meta.n_sequences += 1;
                     };
@@ -397,50 +418,6 @@ fn prepare_data(
                 vertices_buffer.push(default());
                 round_buffer.push(default());
                 id_buffer.push(default());
-                results.push((
-                    light_buffer,
-                    meta_buffer,
-                    sequence_buffer,
-                    vertices_buffer,
-                    round_buffer,
-                    id_buffer,
-                ));
-            }
-            results
-        })
-        .iter()
-        .for_each(|results| {
-            results.iter().for_each(|result| {
-                let mut light_buffer = UniformBuffer::from(result.0.clone());
-                light_buffer.write_buffer(&render_device, &render_queue);
-
-                light_set.0.push(light_buffer);
-
-                let mut meta_buffer = GpuArrayBuffer::<UniformOccluder>::new(&render_device);
-                let mut sequence_buffer = GpuArrayBuffer::<u32>::new(&render_device);
-                let mut vertices_buffer = GpuArrayBuffer::<UniformVertex>::new(&render_device);
-                let mut round_buffer = GpuArrayBuffer::<UniformRoundOccluder>::new(&render_device);
-                let mut id_buffer = GpuArrayBuffer::<f32>::new(&render_device);
-
-                for meta in &result.1 {
-                    meta_buffer.push(meta.clone());
-                }
-
-                for sequence in &result.2 {
-                    sequence_buffer.push(*sequence);
-                }
-
-                for vertex in &result.3 {
-                    vertices_buffer.push(vertex.clone());
-                }
-
-                for round in &result.4 {
-                    round_buffer.push(round.clone());
-                }
-
-                for id in &result.5 {
-                    id_buffer.push(*id);
-                }
 
                 meta_buffer.write_buffer(&render_device, &render_queue);
                 sequence_buffer.write_buffer(&render_device, &render_queue);
@@ -448,15 +425,41 @@ fn prepare_data(
                 round_buffer.write_buffer(&render_device, &render_queue);
                 id_buffer.write_buffer(&render_device, &render_queue);
 
-                occluder_set.0.push((
-                    meta_buffer,
-                    sequence_buffer,
-                    vertices_buffer,
-                    round_buffer,
-                    id_buffer,
-                ));
-            });
-        });
+                light_bind_groups.values.entry(*entity).insert({
+                    render_device.create_bind_group(
+                        "light bind group",
+                        &lightmap_pipeline.layout,
+                        &BindGroupEntries::sequential((
+                            view_uniforms.uniforms.binding().unwrap(),
+                            &lightmap_pipeline.sampler,
+                            light_buffer.binding().unwrap(),
+                            meta_buffer.binding().unwrap(),
+                            sequence_buffer.binding().unwrap(),
+                            vertices_buffer.binding().unwrap(),
+                            round_buffer.binding().unwrap(),
+                            &camera.2.0.default_view,
+                            &camera.3.0.default_view,
+                            id_buffer.binding().unwrap(),
+                            camera.4.0.binding().unwrap(),
+                        )),
+                    )
+                });
+
+                batches.entry((*retained_view, *entity)).insert(LightBatch {
+                    id: *entity,
+                    range: index..index,
+                });
+
+                index += 1;
+
+                light_buffer_meta.light_index_buffer.push(3);
+            }
+        }
+
+        light_buffer_meta
+            .light_index_buffer
+            .write_buffer(&render_device, &render_queue);
+    }
 }
 
 fn prepare_sprite_view_bind_groups(

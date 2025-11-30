@@ -30,7 +30,8 @@ use bevy::{
         sync_world::SyncToRenderWorld,
         view::{
             ExtractedView, PreviousVisibleEntities, RenderVisibleEntities, RetainedViewEntity,
-            VisibilityClass, VisibilitySystems, VisibleEntities, check_visibility, visibility,
+            ViewUniform, ViewUniformOffset, ViewUniforms, VisibilityClass, VisibilitySystems,
+            VisibleEntities, check_visibility, visibility,
         },
     },
 };
@@ -254,10 +255,8 @@ fn queue_lights(
     views: Query<(&ExtractedView, &RenderVisibleEntities)>,
 ) {
     let draw_lightmap_function = light_draw_functions.read().id::<DrawLightmap>();
-    info!("weird");
 
     for (view, visible_entities) in &views {
-        info!("ah");
         let Some(lightmap_phase) = lightmap_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
@@ -285,12 +284,12 @@ pub(crate) type DrawLightmap = (SetItemPipeline, SetLightTextureBindGroup<0>, Dr
 pub(crate) struct SetLightTextureBindGroup<const I: usize>;
 impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup<I> {
     type Param = (SRes<LightBindGroups>, SRes<LightBatches>);
-    type ViewQuery = Read<ExtractedView>;
+    type ViewQuery = (Read<ExtractedView>, Read<ViewUniformOffset>);
     type ItemQuery = ();
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        (view, view_uniform_offset): ROQueryItem<'w, Self::ViewQuery>,
         _entity: Option<()>,
         (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -300,7 +299,11 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup
             return RenderCommandResult::Skip;
         };
 
-        pass.set_bind_group(I, image_bind_groups.values.get(&batch.id).unwrap(), &[]);
+        pass.set_bind_group(
+            I,
+            image_bind_groups.values.get(&batch.id).unwrap(),
+            &[view_uniform_offset.offset],
+        );
         RenderCommandResult::Success
     }
 }
@@ -323,12 +326,13 @@ impl<P: PhaseItem> RenderCommand<P> for DrawLightBatch {
             return RenderCommandResult::Skip;
         };
 
-        pass.set_index_buffer(
-            light_meta.light_index_buffer.buffer().unwrap().slice(..),
-            0,
-            IndexFormat::Uint32,
-        );
-        pass.draw_indexed(0..3, 0, batch.range.clone());
+        // pass.set_index_buffer(
+        //     light_meta.light_index_buffer.buffer().unwrap().slice(..),
+        //     0,
+        //     IndexFormat::Uint32,
+        // );
+        pass.draw(0..3, 0..1);
+        // pass.draw_indexed(0..3, 0, batch.range.clone());
         RenderCommandResult::Success
     }
 }

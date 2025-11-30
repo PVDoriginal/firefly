@@ -213,7 +213,7 @@ fn draw_gizmos(
                 gizmos.arc_2d(
                     Isometry2d {
                         translation: center + rotate(vec2(-width, height)),
-                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1),
+                        rotation: Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                     },
                     FRAC_PI_2,
                     radius,
@@ -224,7 +224,9 @@ fn draw_gizmos(
                 gizmos.arc_2d(
                     Isometry2d {
                         translation: center + rotate(vec2(width, height)),
-                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 - FRAC_PI_2),
+                        rotation: Rot2::radians(
+                            transform.rotation().to_euler(EulerRot::XYZ).2 - FRAC_PI_2,
+                        ),
                     },
                     FRAC_PI_2,
                     radius,
@@ -235,7 +237,9 @@ fn draw_gizmos(
                 gizmos.arc_2d(
                     Isometry2d {
                         translation: center + rotate(vec2(width, -height)),
-                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 + PI),
+                        rotation: Rot2::radians(
+                            transform.rotation().to_euler(EulerRot::XYZ).2 + PI,
+                        ),
                     },
                     FRAC_PI_2,
                     radius,
@@ -246,7 +250,9 @@ fn draw_gizmos(
                 gizmos.arc_2d(
                     Isometry2d {
                         translation: center + rotate(vec2(-width, -height)),
-                        rotation: Rot2::radians(transform.rotation().to_axis_angle().1 + FRAC_PI_2),
+                        rotation: Rot2::radians(
+                            transform.rotation().to_euler(EulerRot::XYZ).2 + FRAC_PI_2,
+                        ),
                     },
                     FRAC_PI_2,
                     radius,

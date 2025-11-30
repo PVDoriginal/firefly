@@ -7,16 +7,17 @@ use bevy::{
     },
     ecs::system::SystemState,
     image::{ImageSampler, TextureFormatPixelInfo},
+    pbr::LIGHTMAP_SHADER_HANDLE,
     prelude::*,
     render::{
         mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
         render_resource::{
-            BindGroupLayout, BindGroupLayoutEntries, BlendState, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FragmentState, FrontFace, GpuArrayBuffer, PipelineCache,
-            PolygonMode, PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderDefVal, ShaderStages, SpecializedRenderPipeline,
-            TexelCopyBufferLayout, TextureFormat, TextureSampleType, TextureViewDescriptor,
-            VertexAttribute, VertexState, VertexStepMode,
+            BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
+            BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
+            FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderDefVal,
+            ShaderStages, SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat,
+            TextureSampleType, TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::{RenderDevice, RenderQueue},
@@ -65,8 +66,6 @@ impl FromWorld for LightmapCreationPipeline {
                 (
                     // view uniform
                     uniform_buffer::<ViewUniform>(true),
-                    // previous lightmap
-                    texture_2d(TextureSampleType::Float { filterable: true }),
                     // sampler
                     sampler(SamplerBindingType::Filtering),
                     // point light
@@ -93,14 +92,36 @@ impl FromWorld for LightmapCreationPipeline {
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        let pipeline_id = new_pipeline(
-            world,
-            Some(Cow::Borrowed("lightmap creation pipeline")),
-            layout.clone(),
-            CREATE_LIGHTMAP_SHADER,
-            Cow::Borrowed("fragment"),
-            TextureFormat::Rgba16Float,
-        );
+        let pipeline_id =
+            world
+                .resource_mut::<PipelineCache>()
+                .queue_render_pipeline(RenderPipelineDescriptor {
+                    label: Some(Cow::Borrowed("lightmap creation pipeline")),
+                    layout: vec![layout.clone()],
+                    vertex: fullscreen_shader_vertex_state(),
+                    fragment: Some(FragmentState {
+                        shader: CREATE_LIGHTMAP_SHADER,
+                        targets: vec![Some(ColorTargetState {
+                            format: TextureFormat::Rgba16Float,
+                            blend: Some(BlendState {
+                                color: BlendComponent {
+                                    src_factor: BlendFactor::Src,
+                                    dst_factor: BlendFactor::Dst,
+                                    operation: BlendOperation::Max,
+                                },
+                                alpha: BlendComponent::REPLACE,
+                            }),
+                            write_mask: ColorWrites::ALL,
+                        })],
+                        shader_defs: default(),
+                        entry_point: Cow::Borrowed("fragment"),
+                    }),
+                    push_constant_ranges: default(),
+                    primitive: default(),
+                    depth_stencil: default(),
+                    multisample: default(),
+                    zero_initialize_workgroup_memory: default(),
+                });
 
         Self {
             layout,
