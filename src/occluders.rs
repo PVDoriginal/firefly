@@ -4,9 +4,12 @@ use bevy::{
     render::{
         render_resource::{GpuArrayBuffer, ShaderType},
         sync_world::SyncToRenderWorld,
+        view::{VisibilityClass, visibility},
     },
 };
 use core::f32;
+
+use crate::lights::PointLight2d;
 
 /// An occluder that blocks light.
 ///
@@ -17,7 +20,7 @@ use core::f32;
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
 #[derive(Component, Clone, Default, Reflect)]
-#[require(SyncToRenderWorld, Transform)]
+#[require(SyncToRenderWorld, Transform, ViewVisibility)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
     rect: Rect,

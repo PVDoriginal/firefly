@@ -39,7 +39,7 @@ use fixedbitset::FixedBitSet;
 
 use crate::{
     LightBatchSetKey, data::FireflyConfig, phases::LightmapPhase,
-    pipelines::LightmapCreationPipeline,
+    pipelines::LightmapCreationPipeline, prelude::Occluder2d,
 };
 
 /// Point light with adjustable fields.
@@ -156,9 +156,12 @@ pub(crate) struct LightSet(pub Vec<UniformBuffer<UniformPointLight>>);
 pub(crate) struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<LightRect>();
+
         app.add_systems(
             PostUpdate,
-            mark_visible_lights
+            (mark_visible_lights, mark_visible_occluders)
+                .chain()
                 .in_set(VisibilitySystems::CheckVisibility)
                 .after(check_visibility),
         );
@@ -212,10 +215,14 @@ pub(crate) struct LightBindGroups {
     pub values: HashMap<Entity, BindGroup>,
 }
 
+#[derive(Resource, Default)]
+pub struct LightRect(pub Rect);
+
 fn mark_visible_lights(
     mut lights: Query<(Entity, &GlobalTransform, &PointLight2d, &mut ViewVisibility)>,
     mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
     mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
+    mut light_rect: ResMut<LightRect>,
 ) {
     let Projection::Orthographic(projection) = camera.2 else {
         return;
@@ -226,6 +233,7 @@ fn mark_visible_lights(
         max: projection.area.max + camera.0.translation().truncate(),
     };
 
+    light_rect.0 = Rect::default();
     for (entity, transform, light, mut visibility) in &mut lights {
         let pos = transform.translation().truncate() - vec2(0.0, light.height);
 
@@ -244,6 +252,28 @@ fn mark_visible_lights(
 
                 previous_visible_entities.remove(&entity);
             }
+        }
+
+        light_rect.0 = light_rect
+            .0
+            .union(camera_rect.union_point(pos).intersect(Rect {
+                min: pos - light.range,
+                max: pos + light.range,
+            }));
+    }
+}
+
+fn mark_visible_occluders(
+    mut occluders: Query<(&Occluder2d, &GlobalTransform, &mut ViewVisibility)>,
+    light_rect: Res<LightRect>,
+) {
+    for (occluder, global_transform, mut visibility) in &mut occluders {
+        let mut rect = occluder.rect();
+        rect.min += global_transform.translation().truncate();
+        rect.max += global_transform.translation().truncate();
+
+        if !rect.intersect(light_rect.0).is_empty() {
+            visibility.set();
         }
     }
 }

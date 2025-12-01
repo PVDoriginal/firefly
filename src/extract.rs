@@ -40,7 +40,8 @@ impl Plugin for ExtractPlugin {
                 extract_sprites.in_set(SpriteSystem::ExtractSprites),
                 extract_sprite_events,
                 extract_world_data,
-                extract_lights_occluders,
+                extract_lights,
+                extract_occluders,
             ),
         );
     }
@@ -192,25 +193,23 @@ fn extract_world_data(
     }
 }
 
-fn extract_lights_occluders(
+fn extract_lights(
     mut commands: Commands,
-    camera: Extract<Single<(&GlobalTransform, &Projection), With<FireflyConfig>>>,
-    lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight2d)>>,
-    occluders: Extract<Query<(&RenderEntity, &Occluder2d, &GlobalTransform)>>,
+    lights: Extract<
+        Query<(
+            &RenderEntity,
+            &GlobalTransform,
+            &PointLight2d,
+            &ViewVisibility,
+        )>,
+    >,
 ) {
-    let Projection::Orthographic(projection) = camera.1 else {
-        return;
-    };
+    for (entity, transform, light, view_visibility) in &lights {
+        if !view_visibility.get() {
+            continue;
+        }
 
-    let camera_rect = Rect {
-        min: projection.area.min + camera.0.translation().truncate(),
-        max: projection.area.max + camera.0.translation().truncate(),
-    };
-
-    let mut light_rect = Rect::default();
-    for (entity, transform, light) in &lights {
         let pos = transform.translation().truncate() - vec2(0.0, light.height);
-
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: pos,
             color: light.color,
@@ -224,21 +223,28 @@ fn extract_lights_occluders(
             dir: (transform.rotation() * Vec3::Y).xy(),
             height: light.height,
         });
-
-        light_rect = light_rect.union(camera_rect.union_point(pos).intersect(Rect {
-            min: pos - light.range,
-            max: pos + light.range,
-        }));
     }
+}
 
-    for (render_entity, occluder, global_transform) in &occluders {
+fn extract_occluders(
+    mut commands: Commands,
+    occluders: Extract<
+        Query<(
+            &RenderEntity,
+            &Occluder2d,
+            &GlobalTransform,
+            &ViewVisibility,
+        )>,
+    >,
+) {
+    for (render_entity, occluder, global_transform, view_visibility) in &occluders {
+        if !view_visibility.get() {
+            continue;
+        }
+
         let mut rect = occluder.rect();
         rect.min += global_transform.translation().truncate();
         rect.max += global_transform.translation().truncate();
-
-        if rect.intersect(light_rect).is_empty() {
-            continue;
-        }
 
         commands
             .entity(render_entity.id())
