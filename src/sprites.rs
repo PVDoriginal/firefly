@@ -162,12 +162,13 @@ pub(crate) struct SpriteNormalBatches(pub HashMap<(RetainedViewEntity, Entity), 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct SpriteBatch {
     pub image_handle_id: AssetId<Image>,
+    pub normal_dummy: bool,
     pub range: Range<u32>,
 }
 
 #[derive(Resource, Default)]
 pub(crate) struct ImageBindGroups {
-    pub values: HashMap<AssetId<Image>, BindGroup>,
+    pub values: HashMap<(AssetId<Image>, bool), BindGroup>,
 }
 
 /// **Component** you can add to an entity that also has a **Sprite**, containing the corresponding **sprite's normal map**.
@@ -375,22 +376,20 @@ fn queue_sprites(
                 indexed: true,
             });
 
-            if extracted_sprite.normal_handle_id.is_some() {
-                normal_phase.add(NormalPhase {
-                    draw_function: draw_normal_function,
-                    pipeline: normal_pipeline,
-                    entity: (
-                        extracted_sprite.render_entity,
-                        extracted_sprite.main_entity.into(),
-                    ),
-                    sort_key,
-                    // `batch_range` is calculated in `prepare_sprite_image_bind_groups`z
-                    batch_range: 0..0,
-                    extra_index: PhaseItemExtraIndex::None,
-                    extracted_index: index,
-                    indexed: true,
-                });
-            }
+            normal_phase.add(NormalPhase {
+                draw_function: draw_normal_function,
+                pipeline: normal_pipeline,
+                entity: (
+                    extracted_sprite.render_entity,
+                    extracted_sprite.main_entity.into(),
+                ),
+                sort_key,
+                // `batch_range` is calculated in `prepare_sprite_image_bind_groups`z
+                batch_range: 0..0,
+                extra_index: PhaseItemExtraIndex::None,
+                extracted_index: index,
+                indexed: true,
+            });
         }
     }
 }
@@ -448,7 +447,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteStencilTextureB
             I,
             image_bind_groups
                 .values
-                .get(&batch.image_handle_id)
+                .get(&(batch.image_handle_id, batch.normal_dummy))
                 .unwrap(),
             &[],
         );
@@ -478,7 +477,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteNormalTextureBi
             I,
             image_bind_groups
                 .values
-                .get(&batch.image_handle_id)
+                .get(&(batch.image_handle_id, batch.normal_dummy))
                 .unwrap(),
             &[],
         );

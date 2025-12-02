@@ -76,6 +76,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     //     // return vec4f(normalize(light_dir) * 0.5 + 0.5, 1f);
     // }
 
+    // if 1 > 0 {
+    //     return vec4f(0, 0, 0, 1);
+    // }
+
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
@@ -91,8 +95,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         // light_dir.x *= view.viewport.z / view.viewport.w;
 
         if normal.a > 0 {
-            if normal.b == 0f {
-                normal_multi = 0f;
+            if normal.b == 0.0 {
+                normal_multi = 0.0;
+            }
+            else if normal.b == 0.1 {
+                normal_multi = 1.0;
             }
             else {
                 // let normal_red = mix(normal, vec4f(0), 0.8);

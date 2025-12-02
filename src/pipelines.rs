@@ -276,6 +276,7 @@ impl FromWorld for SpriteStencilPipeline {
                 (
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<u32>(false),
                 ),
             ),
         );
@@ -415,7 +416,7 @@ impl SpecializedRenderPipeline for SpriteStencilPipeline {
             fragment: Some(FragmentState {
                 shader: SPRITE_SHADER,
                 shader_defs,
-                entry_point: "fragment_stencil".into(),
+                entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::Rgba32Float, //format,
                     blend: Some(BlendState::ALPHA_BLENDING),
@@ -485,6 +486,7 @@ impl FromWorld for SpriteNormalMapsPipeline {
                 (
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<u32>(false),
                 ),
             ),
         );

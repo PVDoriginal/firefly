@@ -508,6 +508,9 @@ fn prepare_sprite_image_bind_groups_stencil(
     events: Res<SpriteAssetEvents>,
     mut batches: ResMut<SpriteStencilBatches>,
 ) {
+    let mut is_dummy = UniformBuffer::<u32>::from(0);
+    is_dummy.write_buffer(&render_device, &render_queue);
+
     // If an image has changed, the GpuImage has (probably) changed
     for event in &events.images {
         match event {
@@ -515,7 +518,7 @@ fn prepare_sprite_image_bind_groups_stencil(
             // Images don't have dependencies
             AssetEvent::LoadedWithDependencies { .. } => {}
             AssetEvent::Unused { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                image_bind_groups.values.remove(id);
+                image_bind_groups.values.remove(&(*id, false));
             }
         };
     }
@@ -563,7 +566,7 @@ fn prepare_sprite_image_bind_groups_stencil(
 
                 image_bind_groups
                     .values
-                    .entry(batch_image_handle)
+                    .entry((batch_image_handle, false))
                     .or_insert_with(|| {
                         render_device.create_bind_group(
                             "sprite_material_bind_group",
@@ -571,6 +574,7 @@ fn prepare_sprite_image_bind_groups_stencil(
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &gpu_image.sampler,
+                                is_dummy.binding().unwrap(),
                             )),
                         )
                     });
@@ -579,6 +583,7 @@ fn prepare_sprite_image_bind_groups_stencil(
                 current_batch = Some(batches.entry((*retained_view, item.entity())).insert(
                     SpriteBatch {
                         image_handle_id: batch_image_handle,
+                        normal_dummy: false,
                         range: index..index,
                     },
                 ));
@@ -761,7 +766,8 @@ fn prepare_sprite_image_bind_groups_normal(
             // Images don't have dependencies
             AssetEvent::LoadedWithDependencies { .. } => {}
             AssetEvent::Unused { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                image_bind_groups.values.remove(id);
+                image_bind_groups.values.remove(&(*id, false));
+                image_bind_groups.values.remove(&(*id, true));
             }
         };
     }
@@ -800,9 +806,18 @@ fn prepare_sprite_image_bind_groups_normal(
                 continue;
             };
 
-            let normal_handle_id = extracted_sprite
-                .normal_handle_id
-                .expect("this should have a normal map");
+            let (normal_handle_id, is_dummy) = match extracted_sprite.normal_handle_id {
+                None => (extracted_sprite.image_handle_id, 1),
+                Some(id) => (id, 0),
+            };
+
+            let normal_dummy = match is_dummy {
+                1 => true,
+                _ => false,
+            };
+
+            let mut is_dummy = UniformBuffer::<u32>::from(is_dummy);
+            is_dummy.write_buffer(&render_device, &render_queue);
 
             if batch_image_handle != normal_handle_id {
                 let Some(gpu_image) = gpu_images.get(normal_handle_id) else {
@@ -813,7 +828,7 @@ fn prepare_sprite_image_bind_groups_normal(
 
                 image_bind_groups
                     .values
-                    .entry(batch_image_handle)
+                    .entry((batch_image_handle, normal_dummy))
                     .or_insert_with(|| {
                         render_device.create_bind_group(
                             "sprite_material_bind_group",
@@ -821,6 +836,7 @@ fn prepare_sprite_image_bind_groups_normal(
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &gpu_image.sampler,
+                                is_dummy.binding().unwrap(),
                             )),
                         )
                     });
@@ -829,6 +845,7 @@ fn prepare_sprite_image_bind_groups_normal(
                 current_batch = Some(batches.entry((*retained_view, item.entity())).insert(
                     SpriteBatch {
                         image_handle_id: batch_image_handle,
+                        normal_dummy,
                         range: index..index,
                     },
                 ));
