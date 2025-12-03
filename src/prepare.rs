@@ -1,12 +1,8 @@
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    slice::Iter,
-    sync::{Arc, Mutex},
-};
+use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    data::ExtractedWorldData,
+    data::{ExtractedWorldData, NormalMode},
     lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBufferMeta},
     occluders::point_inside_poly,
     phases::{NormalPhase, Stencil2d},
@@ -21,15 +17,13 @@ use crate::{
 
 use bevy::{
     core_pipeline::tonemapping::{Tonemapping, TonemappingLuts, get_lut_bindings},
+    ecs::schedule::Nor,
     math::Affine3A,
-    pbr::LightMeta,
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
         render_asset::RenderAssets,
-        render_phase::{
-            PhaseItem, SortedPhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases,
-        },
+        render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
             BindGroupEntries, GpuArrayBuffer, TextureDescriptor, TextureDimension, TextureFormat,
             TextureUsages, UniformBuffer,
@@ -38,16 +32,14 @@ use bevy::{
         texture::{FallbackImage, GpuImage, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
-    tasks::{ComputeTaskPool, ParallelSlice},
 };
 
 use crate::{
-    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture,
+    LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig},
-    lights::{ExtractedPointLight, LightSet, UniformPointLight},
+    lights::{ExtractedPointLight, UniformPointLight},
     occluders::{
-        ExtractedOccluder, Occluder2dShape, OccluderSet, UniformOccluder, UniformRoundOccluder,
-        UniformVertex,
+        ExtractedOccluder, Occluder2dShape, UniformOccluder, UniformRoundOccluder, UniformVertex,
     },
 };
 
@@ -61,8 +53,6 @@ impl Plugin for PreparePlugin {
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-
-        render_app.init_resource::<LightSet>();
 
         render_app.add_systems(Render, prepare_data.in_set(RenderSet::Prepare));
         render_app.add_systems(Render, prepare_config.in_set(RenderSet::Prepare));
@@ -80,12 +70,6 @@ impl Plugin for PreparePlugin {
             ),
         );
     }
-    fn finish(&self, app: &mut App) {
-        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-        render_app.init_resource::<OccluderSet>();
-    }
 }
 
 fn prepare_config(
@@ -95,24 +79,34 @@ fn prepare_config(
     mut commands: Commands,
 ) {
     for (entity, config) in &configs {
-        let mut buffer = UniformBuffer::<UniformFireflyConfig>::default();
         let uniform = UniformFireflyConfig {
             ambient_color: config.ambient_color.to_linear().to_vec3(),
             ambient_brightness: config.ambient_brightness,
+
             light_bands: match config.light_bands {
                 None => 0,
                 Some(x) => x,
             },
+
             softness: match config.softness {
                 None => 0.,
                 Some(x) => x.min(1.).max(0.),
             },
+
             z_sorting: match config.z_sorting {
                 false => 0,
                 true => 1,
             },
+
+            normal_mode: match config.normal_mode {
+                NormalMode::None => 0,
+                NormalMode::Simple => 1,
+                NormalMode::TopDown => 2,
+            },
+
+            normal_attenuation: config.normal_attenuation,
         };
-        buffer.set(uniform);
+        let mut buffer = UniformBuffer::<UniformFireflyConfig>::from(uniform);
         buffer.write_buffer(&render_device, &render_queue);
         commands
             .entity(entity)
@@ -131,34 +125,6 @@ fn prepare_lightmap(
             &render_device,
             TextureDescriptor {
                 label: Some("lightmap"),
-                size: view_target.main_texture().size(),
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba16Float,
-                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-        );
-
-        let inter_light_map_texture = texture_cache.get(
-            &render_device,
-            TextureDescriptor {
-                label: Some("intermediary lightmap"),
-                size: view_target.main_texture().size(),
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba16Float,
-                usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-        );
-
-        let empty_light_map_texture = texture_cache.get(
-            &render_device,
-            TextureDescriptor {
-                label: Some("empty lightmap"),
                 size: view_target.main_texture().size(),
                 mip_level_count: 1,
                 sample_count: 1,
@@ -199,8 +165,6 @@ fn prepare_lightmap(
 
         commands.entity(entity).insert((
             LightMapTexture(light_map_texture),
-            IntermediaryLightMapTexture(inter_light_map_texture),
-            EmptyLightMapTexture(empty_light_map_texture),
             SpriteStencilTexture(sprite_stencil_texture),
             NormalMapTexture(normal_map_texture),
         ));
@@ -220,8 +184,6 @@ fn prepare_data(
         &NormalMapTexture,
         &BufferedFireflyConfig,
     )>,
-    mut light_set: ResMut<LightSet>,
-    mut occluder_set: ResMut<OccluderSet>,
     mut phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
     mut light_buffer_meta: ResMut<LightBufferMeta>,
     lightmap_pipeline: Res<LightmapCreationPipeline>,
@@ -309,7 +271,6 @@ fn prepare_data(
 
                     meta.n_sprites = ids.len() as u32;
                     meta.z = occluder.z;
-                    meta.height = occluder.height;
 
                     meta.z_sorting = match occluder.z_sorting {
                         false => 0,

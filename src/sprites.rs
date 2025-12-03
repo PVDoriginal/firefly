@@ -180,10 +180,10 @@ pub(crate) struct ImageBindGroups {
     pub values: HashMap<(AssetId<Image>, bool), BindGroup>,
 }
 
-/// **Component** you can add to an entity that also has a **Sprite**, containing the corresponding **sprite's normal map**.
+/// Component you can add to an entity that also has a Sprite, containing the corresponding sprite's normal map.
 ///
-/// The image *MUST* correspond **1:1** with the size and format of the sprite image.
-/// E.g. if the sprite image is a sprite sheet, the normal map will also need to be a sprite sheet of **exactly the same dimensions, padding, etc.**
+/// The image **MUST** correspond 1:1 with the size and format of the sprite image.
+/// E.g. if the sprite image is a sprite sheet, the normal map will also need to be a sprite sheet of exactly the same dimensions, padding, etc.
 ///
 /// # Example
 ///
@@ -208,7 +208,7 @@ pub struct NormalMap {
 pub struct SpriteHeight(pub f32);
 
 impl NormalMap {
-    /// Get the **handle of the normal map image**.
+    /// Get the handle of the normal map image.
     ///
     /// Useful if e.g. you want to track its loading state.
     pub fn handle(&self) -> Handle<Image> {
@@ -217,9 +217,9 @@ impl NormalMap {
 
     /// Construct a new [NormalMap] from the [path](AssetPath) to the image and the [AssetServer].
     ///
-    /// This image file needs to **match the corresponding [Sprite] image** 1:1.  
+    /// This image file needs to match the corresponding [Sprite] image 1:1.  
     ///
-    /// You can use [.handle()](NormalMap::handle) to get the **resulting image handle**.
+    /// You can use [.handle()](NormalMap::handle) to get the resulting image handle.
     pub fn from_file<'a>(path: impl Into<AssetPath<'a>>, asset_server: &AssetServer) -> Self {
         let image: Handle<Image> =
             asset_server.load_with_settings(path, |x: &mut ImageLoaderSettings| x.is_srgb = false);
@@ -322,9 +322,6 @@ fn queue_sprites(
         let Some(stencil_phase) = stencil_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
-        let Some(normal_phase) = normal_phases.get_mut(&view.retained_view_entity) else {
-            continue;
-        };
 
         let msaa_key = SpritePipelineKey::from_msaa_samples(msaa.samples());
         let mut view_key = SpritePipelineKey::from_hdr(view.hdr) | msaa_key;
@@ -365,7 +362,6 @@ fn queue_sprites(
         );
 
         stencil_phase.items.reserve(extracted_sprites.sprites.len());
-        normal_phase.items.reserve(extracted_sprites.sprites.len());
 
         for (index, extracted_sprite) in extracted_sprites.sprites.iter().enumerate() {
             let view_index = extracted_sprite.main_entity.index();
@@ -392,21 +388,35 @@ fn queue_sprites(
                 extracted_index: index,
                 indexed: true,
             });
+        }
 
-            normal_phase.add(NormalPhase {
-                draw_function: draw_normal_function,
-                pipeline: normal_pipeline,
-                entity: (
-                    extracted_sprite.render_entity,
-                    extracted_sprite.main_entity.into(),
-                ),
-                sort_key,
-                // `batch_range` is calculated in `prepare_sprite_image_bind_groups`z
-                batch_range: 0..0,
-                extra_index: PhaseItemExtraIndex::None,
-                extracted_index: index,
-                indexed: true,
-            });
+        if let Some(normal_phase) = normal_phases.get_mut(&view.retained_view_entity) {
+            normal_phase.items.reserve(extracted_sprites.sprites.len());
+
+            for (index, extracted_sprite) in extracted_sprites.sprites.iter().enumerate() {
+                let view_index = extracted_sprite.main_entity.index();
+
+                if !view_entities.contains(view_index as usize) {
+                    continue;
+                }
+
+                let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
+
+                normal_phase.add(NormalPhase {
+                    draw_function: draw_normal_function,
+                    pipeline: normal_pipeline,
+                    entity: (
+                        extracted_sprite.render_entity,
+                        extracted_sprite.main_entity.into(),
+                    ),
+                    sort_key,
+                    // `batch_range` is calculated in `prepare_sprite_image_bind_groups`z
+                    batch_range: 0..0,
+                    extra_index: PhaseItemExtraIndex::None,
+                    extracted_index: index,
+                    indexed: true,
+                });
+            }
         }
     }
 }

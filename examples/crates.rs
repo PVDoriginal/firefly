@@ -1,8 +1,5 @@
-use bevy::{
-    color::palettes::css::RED, image::ImageLoaderSettings, prelude::*, sprite::Anchor,
-    window::PrimaryWindow,
-};
-use bevy_firefly::prelude::*;
+use bevy::{color::palettes::css::RED, prelude::*, sprite::Anchor, window::PrimaryWindow};
+use bevy_firefly::{data::NormalMode, prelude::*};
 
 fn main() {
     let mut app = App::new();
@@ -25,7 +22,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Camera2d,
         Projection::Orthographic(proj),
-        FireflyConfig::default(),
+        FireflyConfig {
+            // normal maps need to be explicitly enabled
+            normal_mode: NormalMode::TopDown,
+            ..default()
+        },
     ));
 
     let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
@@ -35,8 +36,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         sprite,
         NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(0., -20., 20.)),
-        Occluder2d::rectangle(12., 5.),
-        // component added to simulate height for the normal maps. Could be useful if the object is floating off the ground.
+        Occluder2d::rectangle(12., 5.1),
+        // component added to simulate height for the normal maps. Could be useful if the object is floating above the ground.
         // this can safely not be added, and it defaults to 0.
         SpriteHeight(0.),
     ));
@@ -48,7 +49,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         sprite,
         NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(-20., 20., 0.)),
-        Occluder2d::rectangle(12., 5.),
+        Occluder2d::rectangle(12., 5.1),
     ));
 
     let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
@@ -58,7 +59,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         sprite,
         NormalMap::from_file("vase_normal.png", &asset_server),
         Transform::from_translation(vec3(0., 20., 0.)),
-        Occluder2d::round_rectangle(5.5, 0.5, 3.),
+        Occluder2d::round_rectangle(5.4, 0.5, 3.),
     ));
 
     let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
@@ -68,7 +69,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         sprite,
         NormalMap::from_file("vase_normal.png", &asset_server),
         Transform::from_translation(vec3(10., -20., 0.)),
-        Occluder2d::round_rectangle(5.5, 0.5, 3.),
+        Occluder2d::round_rectangle(5.4, 0.5, 3.),
     ));
 
     commands.spawn((
@@ -86,22 +87,20 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut sprite = Sprite::from_image(asset_server.load("lamp.png"));
     sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 5.0 / 32.0));
 
-    commands
-        .spawn((sprite, Transform::from_translation(vec3(20., 0., 0.))))
-        .with_children(|r| {
-            r.spawn((
-                PointLight2d {
-                    range: 100.,
-                    color: Color::srgb(0.8, 0.8, 1.0),
-                    ..default()
-                },
-                LightHeight(22.),
-                Transform::from_translation(vec3(0., 22., 0.)),
-            ));
-        });
+    commands.spawn((
+        sprite,
+        Transform::from_translation(vec3(20., 0., 0.)),
+        PointLight2d {
+            range: 100.,
+            color: Color::srgb(0.8, 0.8, 1.0),
+            offset: vec3(0., 22., 0.),
+            ..default()
+        },
+        LightHeight(22.),
+    ));
 }
 
-// setting the sprite's z in relation to their y, so that Bevy's sprite renderer sorts them properly.
+// setting the sprite's z in relation to their y, so that Bevy's sprite renderer and firefly sort them properly.
 fn z_sorting(mut sprites: Query<&mut Transform, With<Sprite>>) {
     for mut transform in &mut sprites {
         transform.translation.z = -transform.translation.y;

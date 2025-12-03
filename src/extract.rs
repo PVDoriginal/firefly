@@ -5,7 +5,7 @@ use bevy::{
         Extract, RenderApp,
         batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
         extract_component::ExtractComponentPlugin,
-        render_phase::{BinnedRenderPhase, ViewBinnedRenderPhases, ViewSortedRenderPhases},
+        render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
     },
@@ -14,7 +14,7 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
-    data::{ExtractedWorldData, FireflyConfig},
+    data::{ExtractedWorldData, FireflyConfig, NormalMode},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,
     phases::{NormalPhase, Stencil2d},
@@ -51,13 +51,14 @@ fn extract_camera_phases(
     mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
     mut normal_phases: ResMut<ViewSortedRenderPhases<NormalPhase>>,
     mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
-    cameras: Extract<Query<(Entity, &Camera, Has<NoIndirectDrawing>), With<Camera2d>>>,
-    mut commands: Commands,
+    cameras: Extract<
+        Query<(Entity, &Camera, &FireflyConfig, Has<NoIndirectDrawing>), With<Camera2d>>,
+    >,
     mut live_entities: Local<HashSet<RetainedViewEntity>>,
     gpu_preprocessing_support: Res<GpuPreprocessingSupport>,
 ) {
     live_entities.clear();
-    for (main_entity, camera, no_indirect_drawing) in &cameras {
+    for (main_entity, camera, config, no_indirect_drawing) in &cameras {
         if !camera.is_active {
             continue;
         }
@@ -65,7 +66,10 @@ fn extract_camera_phases(
         let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
 
         stencil_phases.insert_or_clear(retained_view_entity);
-        normal_phases.insert_or_clear(retained_view_entity);
+
+        if !matches!(config.normal_mode, NormalMode::None) {
+            normal_phases.insert_or_clear(retained_view_entity);
+        }
 
         let gpu_preprocessing_mode = gpu_preprocessing_support.min(if !no_indirect_drawing {
             GpuPreprocessingMode::Culling
@@ -223,13 +227,13 @@ fn extract_lights(
             continue;
         }
 
-        let pos = transform.translation().truncate() - vec2(0.0, height.0);
+        let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: pos,
             color: light.color,
             intensity: light.intensity,
             range: light.range,
-            z: transform.translation().z,
+            z: transform.translation().z + light.offset.z,
             inner_range: light.inner_range,
             falloff: light.falloff,
             angle: light.angle,
@@ -256,23 +260,24 @@ fn extract_occluders(
             continue;
         }
 
+        let pos = global_transform.translation().truncate() + occluder.offset.xy();
+
         let mut rect = occluder.rect();
-        rect.min += global_transform.translation().truncate();
-        rect.max += global_transform.translation().truncate();
+        rect.min += pos;
+        rect.max += pos;
 
         commands
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
-                pos: global_transform.translation().truncate(),
+                pos,
                 rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
                 shape: occluder.shape().clone(),
                 rect,
-                z: global_transform.translation().z,
+                z: global_transform.translation().z + occluder.offset.z,
                 color: occluder.color,
                 opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),
                 z_sorting: occluder.z_sorting,
-                height: occluder.height,
             });
     }
 }

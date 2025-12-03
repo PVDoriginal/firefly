@@ -10,17 +10,14 @@ use bevy::{
         },
         renderer::RenderContext,
         texture::CachedTexture,
-        view::{ExtractedView, ViewTarget, ViewUniformOffset, ViewUniforms},
+        view::{ExtractedView, ViewTarget},
     },
 };
 
 use crate::{
-    EmptyLightMapTexture, IntermediaryLightMapTexture, LightMapTexture, LightmapPhase,
-    NormalMapTexture, SpriteStencilTexture,
-    lights::LightSet,
-    occluders::OccluderSet,
+    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     phases::{NormalPhase, Stencil2d},
-    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
+    pipelines::LightmapApplicationPipeline,
     prepare::BufferedFireflyConfig,
 };
 
@@ -69,36 +66,6 @@ impl ViewNode for CreateLightmapNode {
 
         Ok(())
     }
-}
-
-fn transfer_texture(
-    src: &CachedTexture,
-    dst: &CachedTexture,
-    render_context: &mut RenderContext,
-    t_pipeline: &TransferTexturePipeline,
-    t_render_pipeline: &RenderPipeline,
-) {
-    let bind_group = render_context.render_device().create_bind_group(
-        "transfer texture bind group",
-        &t_pipeline.layout,
-        &BindGroupEntries::sequential((&src.default_view, &t_pipeline.sampler)),
-    );
-
-    let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-        label: Some("transfer texture pass"),
-        color_attachments: &[Some(RenderPassColorAttachment {
-            view: &dst.default_view,
-            resolve_target: None,
-            ops: default(),
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
-
-    render_pass.set_render_pipeline(t_render_pipeline);
-    render_pass.set_bind_group(0, &bind_group, &[]);
-    render_pass.draw(0..3, 0..1);
 }
 
 impl ViewNode for ApplyLightmapNode {

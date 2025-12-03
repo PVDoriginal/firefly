@@ -63,6 +63,7 @@ fn setup(mut commands: Commands) {
             light_bands: None,
             softness: None,
             z_sorting: false,
+            ..default()
         },
         Projection::Orthographic(proj),
     ));

@@ -7,7 +7,6 @@ use bevy::{
     },
     ecs::system::SystemState,
     image::{ImageSampler, TextureFormatPixelInfo},
-    pbr::LIGHTMAP_SHADER_HANDLE,
     prelude::*,
     render::{
         mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
@@ -28,7 +27,7 @@ use bevy::{
 };
 
 use crate::{
-    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER, TRANSFER_SHADER,
+    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
     data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
@@ -43,13 +42,6 @@ pub(crate) struct LightmapCreationPipeline {
 
 #[derive(Resource)]
 pub(crate) struct LightmapApplicationPipeline {
-    pub layout: BindGroupLayout,
-    pub sampler: Sampler,
-    pub pipeline_id: CachedRenderPipelineId,
-}
-
-#[derive(Resource)]
-pub(crate) struct TransferTexturePipeline {
     pub layout: BindGroupLayout,
     pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
@@ -157,40 +149,6 @@ impl FromWorld for LightmapApplicationPipeline {
             APPLY_LIGHTMAP_SHADER,
             Cow::Borrowed("fragment"),
             TextureFormat::bevy_default(),
-        );
-
-        Self {
-            layout,
-            sampler,
-            pipeline_id,
-        }
-    }
-}
-
-impl FromWorld for TransferTexturePipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let layout = render_device.create_bind_group_layout(
-            "transfer texture layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    sampler(SamplerBindingType::Filtering),
-                ),
-            ),
-        );
-
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-
-        let pipeline_id = new_pipeline(
-            world,
-            Some(Cow::Borrowed("transfer texture pipeline")),
-            layout.clone(),
-            TRANSFER_SHADER,
-            Cow::Borrowed("fragment"),
-            TextureFormat::Rgba16Float,
         );
 
         Self {

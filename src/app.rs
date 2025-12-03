@@ -1,8 +1,8 @@
-use std::f32::consts::{FRAC_2_PI, FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     asset::load_internal_asset,
-    color::palettes::css::{BLUE, PINK},
+    color::palettes::css::PINK,
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
@@ -16,15 +16,15 @@ use crate::{
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNormalNode, SpriteStencilNode},
     occluders::{Occluder2dShape, translate_vertices},
-    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline, TransferTexturePipeline},
+    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
     sprites::SpritesPlugin,
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
 
-/// Plugin **necessary** to use Firefly.
+/// Plugin necessary to use Firefly.
 ///
-/// You will also need to **add [`FireflyConfig`] to your camera**.
+/// You will also need to add [`FireflyConfig`] to your camera.
 pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
@@ -36,8 +36,6 @@ impl Plugin for FireflyPlugin {
         app.register_type::<crate::prelude::LightHeight>();
         app.register_type::<crate::prelude::SpriteHeight>();
 
-        // app.add_systems(Startup, stress_test);
-
         load_internal_asset!(
             app,
             CREATE_LIGHTMAP_SHADER,
@@ -48,12 +46,6 @@ impl Plugin for FireflyPlugin {
             app,
             APPLY_LIGHTMAP_SHADER,
             "../shaders/apply_lightmap.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            TRANSFER_SHADER,
-            "../shaders/transfer.wgsl",
             Shader::from_wgsl
         );
         load_internal_asset!(
@@ -112,21 +104,12 @@ impl Plugin for FireflyPlugin {
 
         render_app.init_resource::<LightmapCreationPipeline>();
         render_app.init_resource::<LightmapApplicationPipeline>();
-        render_app.init_resource::<TransferTexturePipeline>();
     }
 }
 
-fn _stress_test(mut commands: Commands) {
-    for _ in 0..5 {
-        commands.spawn((
-            Name::new("Point Light"),
-            lights::PointLight2d::default(),
-            Transform::default(),
-        ));
-    }
-}
-
-/// Plugin that **shows gizmos** for firefly occluders and lights. Useful for **debugging**.
+/// Plugin that shows gizmos for firefly occluders.
+///
+/// Useful for debugging.
 pub struct FireflyGizmosPlugin;
 impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
@@ -136,22 +119,13 @@ impl Plugin for FireflyGizmosPlugin {
 
 const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
 
-fn draw_gizmos(
-    mut gizmos: Gizmos,
-    // lights: Query<&Transform, With<crate::prelude::PointLight>>,
-    occluders: Query<(&GlobalTransform, &Occluder2d)>,
-) {
-    // for transform in &lights {
-    //     let isometry = Isometry2d::from_translation(transform.translation.truncate());
-    //     gizmos.circle_2d(isometry, 10., BLUE);
-    // }
-
+fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder2d)>) {
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
             Occluder2dShape::Polygon { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
-                    transform.translation().truncate(),
+                    transform.translation().truncate() + occluder.offset.xy(),
                     Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
 
@@ -163,7 +137,7 @@ fn draw_gizmos(
             Occluder2dShape::Polyline { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
-                    transform.translation().truncate(),
+                    transform.translation().truncate() + occluder.offset.xy(),
                     Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
 
@@ -176,7 +150,7 @@ fn draw_gizmos(
                 height,
                 radius,
             } => {
-                let center = transform.translation().truncate();
+                let center = transform.translation().truncate() + occluder.offset.xy();
                 let width = width / 2.;
                 let height = height / 2.;
 

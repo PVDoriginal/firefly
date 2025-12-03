@@ -47,39 +47,11 @@ const PIDIV2: f32 = 1.57079632679;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
-    // return vec4f(1);
     var res = vec4f(0);
+    
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
-    // let normal = textureSample(normal_map, texture_sampler, in.uv);
+    let normal = textureSample(normal_map, texture_sampler, in.uv);
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
-    let normal = textureLoad(normal_map, vec2<i32>(in.uv * vec2<f32>(textureDimensions(normal_map))), 0);
-
-    // if normal.a > 0 {
-    //     return vec4f(0);
-    // }
-
-    // var light_dir = vec3f(0f, 1f, 0f);
-
-
-    // if normal.a > 0 && normal.r < 0.4 {
-    //     return vec4f(0, 1, 0, 1);
-    // }
-
-    // if normal.a > 0 {
-    //     if (normal * 2f - 1f).r != 0 {
-    //         return vec4f(1, 0, 0, 1);
-    //     }
-    // }
-
-    // if normal.a > 0 {
-    //     return normal;
-    //     // return vec4f(normalize(light_dir) * 0.5 + 0.5, 1f);
-    // }
-
-    // if 1 > 0 {
-    //     return vec4f(0, 0, 0, 1);
-    // }
-
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
@@ -91,21 +63,21 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     if (dist < light.range && angle <= light.angle / 2.) {
         var normal_multi = 1f;
 
-        // var light_dir = vec3(light.pos - ((in.position.xy - view.viewport.xy) / view.viewport.zw), 1f);
-        // light_dir.x *= view.viewport.z / view.viewport.w;
+        if config.normal_mode != 0 && normal.a > 0 {
+            let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), config.normal_attenuation);
 
-        if normal.a > 0 {
             if normal.b == 0.0 {
                 normal_multi = 0.0;
             }
             else if normal.b == 0.1 {
                 normal_multi = 1.0;
             }
-            else {
-                // let normal_red = mix(normal, vec4f(0), 0.8);
+            else if config.normal_mode == 1 {
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, light.pos.y - pos.y, light.z - stencil.g));
+                normal_multi = max(0f, dot(normal_dir, light_dir));
+            }
+            else if config.normal_mode == 2 {
                 let light_dir = normalize(vec3f(light.pos.x - pos.x, light.height - stencil.b, light.z - stencil.g));
-                let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), 0.5);
-
                 normal_multi = max(0f, dot(normal_dir, light_dir));
             }
         }; 

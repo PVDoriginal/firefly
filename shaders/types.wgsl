@@ -23,7 +23,6 @@ struct Occluder {
     color: vec3f, 
     opacity: f32,
     z_sorting: u32,
-    height: f32,
 }
 
 struct RoundOccluder {
@@ -45,6 +44,9 @@ struct FireflyConfig {
     light_bands: u32,
     softness: f32,
     z_sorting: u32,
+    // 0 - none, 1 - simple, 2 - topdown
+    normal_mode: u32, 
+    normal_attenuation: f32,
 }
 
 struct SpriteId {
