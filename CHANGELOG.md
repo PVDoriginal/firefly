@@ -1,3 +1,7 @@
+# 0.17.0 
+## Major
+  - Updated Bevy version to 0.17.
+
 # 0.16.2 
 ## Major
   - Added support for normal maps.
