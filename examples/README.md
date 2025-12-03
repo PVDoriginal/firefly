@@ -5,12 +5,18 @@ More examples are coming soon. In the meantime, consider checking the [crates.io
 
 ## Simple 
 Simple example of integrating firefly into your bevy app and spawning a light and some round occluders. You can move the light using the arrow keys.
+
 <img width="791" height="460" alt="image" src="https://github.com/user-attachments/assets/7e0b87d4-0b61-4687-926b-341591a20a38" />
 
 ## Shapes
 Example showcasing a light interacting with occluders of various shapes. It also shows how to disable soft shadows and use light bands.
 
 https://github.com/user-attachments/assets/53649d74-b6c2-49b1-a3ba-29032080865a
+
+## Crates
+Example showcasing normal maps and occlusion z-sorting. You can click and drag on objects to move them around. 
+
+https://github.com/user-attachments/assets/04f9870e-2064-4724-b3f7-e9f5c7791b8c
 
 ## Stress
 A stress test for firefly. It spawns a large amount of lights and occluders. You can press the left and right arrows to zoom in an out. 
