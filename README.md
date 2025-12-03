@@ -94,14 +94,11 @@ Some of the currently planned features are:
 
 Feel free to open an issue if you want to request any specific features or report any bugs!  
 
-
 ## Bevy Compatibility 
 | bevy | bevy_firefly  |
 |------|---------------|
 | 0.16 | 0.16          |
 | 0.17 | 0.17          |
-
-I'm planning to update to a newer bevy version soon, but I'm not currently working on it. If you want me to hurry, feel free to open an issue for it, and I'll try to prioritize it more :) 
 
 ## Alternatives
 You can check out [bevy_light_2d](https://github.com/jgayfer/bevy_light_2d) and [bevy_lit](https://github.com/malbernaz/bevy_lit). They were both a big inspiration when starting out with this crate! 
