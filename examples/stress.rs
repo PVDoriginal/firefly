@@ -13,8 +13,8 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 0.5;
-const OCCLUDER_FREQ: f32 = 0.1;
+const LIGHT_FREQ: f32 = 4.5;
+const OCCLUDER_FREQ: f32 = 0.2;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
@@ -43,7 +43,7 @@ fn main() {
     app.add_systems(Update, change_scale);
 
     app.add_systems(Update, (spawn_lights, move_lights));
-    // app.add_systems(Update, (spawn_occluders, move_occluders));
+    app.add_systems(Update, (spawn_occluders, move_occluders));
 
     app.init_resource::<Timers>();
 
