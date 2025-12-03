@@ -103,12 +103,12 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
             else {
                 // let normal_red = mix(normal, vec4f(0), 0.8);
-                let light_dir = normalize(vec3f(light.pos.x - pos.x, pos.y - light.pos.y, light.height - 0.0)).xzy;
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, light.height - stencil.b, light.z - stencil.g));
                 let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), 0.5);
 
                 normal_multi = max(0f, dot(normal_dir, light_dir));
             }
-        };
+        }; 
 
         res = vec4f(light.color, 0f) * normal_multi;
 

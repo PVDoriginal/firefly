@@ -659,6 +659,7 @@ fn prepare_sprite_image_bind_groups_stencil(
                             &uv_offset_scale,
                             extracted_sprite.id,
                             extracted_sprite.transform.translation().z,
+                            extracted_sprite.height,
                         ));
 
                     current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -705,6 +706,7 @@ fn prepare_sprite_image_bind_groups_stencil(
                                 &uv_offset_scale,
                                 extracted_sprite.id,
                                 extracted_sprite.transform.translation().z,
+                                extracted_sprite.height,
                             ));
 
                         current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -921,6 +923,7 @@ fn prepare_sprite_image_bind_groups_normal(
                             &uv_offset_scale,
                             extracted_sprite.id,
                             extracted_sprite.transform.translation().z,
+                            extracted_sprite.height,
                         ));
 
                     current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -967,6 +970,7 @@ fn prepare_sprite_image_bind_groups_normal(
                                 &uv_offset_scale,
                                 extracted_sprite.id,
                                 extracted_sprite.transform.translation().z,
+                                extracted_sprite.height,
                             ));
 
                         current_batch.as_mut().unwrap().get_mut().range.end += 1;

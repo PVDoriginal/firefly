@@ -33,6 +33,9 @@ impl Plugin for FireflyPlugin {
         app.register_type::<crate::prelude::Occluder2d>();
         app.register_type::<FireflyConfig>();
 
+        app.register_type::<crate::prelude::LightHeight>();
+        app.register_type::<crate::prelude::SpriteHeight>();
+
         // app.add_systems(Startup, stress_test);
 
         load_internal_asset!(

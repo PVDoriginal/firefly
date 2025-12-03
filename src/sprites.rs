@@ -58,6 +58,7 @@ pub(crate) struct ExtractedSprite {
     pub flip_y: bool,
     pub kind: ExtractedSpriteKind,
     pub id: f32,
+    pub height: f32,
 }
 
 pub(crate) enum ExtractedSpriteKind {
@@ -97,12 +98,19 @@ pub(crate) struct SpriteInstance {
     pub id: f32,
     pub i_uv_offset_scale: [f32; 4],
     pub z: f32,
-    pub _padding: [f32; 2],
+    pub height: f32,
+    pub _padding: f32,
 }
 
 impl SpriteInstance {
     #[inline]
-    pub fn from(transform: &Affine3A, uv_offset_scale: &Vec4, id: f32, z: f32) -> Self {
+    pub fn from(
+        transform: &Affine3A,
+        uv_offset_scale: &Vec4,
+        id: f32,
+        z: f32,
+        height: f32,
+    ) -> Self {
         let transpose_model_3x3 = transform.matrix3.transpose();
         Self {
             i_model_transpose: [
@@ -113,7 +121,8 @@ impl SpriteInstance {
             id,
             z,
             i_uv_offset_scale: uv_offset_scale.to_array(),
-            _padding: [0., 0.],
+            height,
+            _padding: 0.,
         }
     }
 }
@@ -189,6 +198,14 @@ pub(crate) struct ImageBindGroups {
 pub struct NormalMap {
     image: Handle<Image>,
 }
+
+/// Optional component you can add to sprites.
+///
+/// Describes the sprite object's 2d height, useful for emulating 3d lighting in top-down 2d games.
+///
+/// This is currently used along with the normal maps. It defaults to 0.   
+#[derive(Component, Default, Reflect)]
+pub struct SpriteHeight(pub f32);
 
 impl NormalMap {
     /// Get the **handle of the normal map image**.

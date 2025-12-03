@@ -15,13 +15,13 @@ use bevy::{
 use crate::{
     LightmapPhase,
     data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, PointLight2d},
+    lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,
     phases::{NormalPhase, Stencil2d},
     prelude::Occluder2d,
     sprites::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
-        SpriteAssetEvents,
+        SpriteAssetEvents, SpriteHeight,
     },
 };
 
@@ -106,6 +106,7 @@ pub fn extract_sprites(
             RenderEntity,
             &ViewVisibility,
             &Sprite,
+            Option<&SpriteHeight>,
             Option<&NormalMap>,
             &GlobalTransform,
             Option<&super::utils::ComputedTextureSlices>,
@@ -115,12 +116,22 @@ pub fn extract_sprites(
     let mut id_counter = 0.;
     extracted_sprites.sprites.clear();
     extracted_slices.slices.clear();
-    for (main_entity, render_entity, view_visibility, sprite, normal_map, transform, slices) in
-        sprite_query.iter()
+    for (
+        main_entity,
+        render_entity,
+        view_visibility,
+        sprite,
+        height,
+        normal_map,
+        transform,
+        slices,
+    ) in sprite_query.iter()
     {
         if !view_visibility.get() {
             continue;
         }
+
+        let height = height.map_or(0., |h| h.0);
 
         id_counter += f32::EPSILON;
 
@@ -143,6 +154,7 @@ pub fn extract_sprites(
                     indices: start..end,
                 },
                 id: id_counter,
+                height,
             });
         } else {
             let atlas_rect = sprite
@@ -177,6 +189,7 @@ pub fn extract_sprites(
                     custom_size: sprite.custom_size,
                 },
                 id: id_counter,
+                height,
             });
         }
     }
@@ -200,16 +213,17 @@ fn extract_lights(
             &RenderEntity,
             &GlobalTransform,
             &PointLight2d,
+            &LightHeight,
             &ViewVisibility,
         )>,
     >,
 ) {
-    for (entity, transform, light, view_visibility) in &lights {
+    for (entity, transform, light, height, view_visibility) in &lights {
         if !view_visibility.get() {
             continue;
         }
 
-        let pos = transform.translation().truncate() - vec2(0.0, light.height);
+        let pos = transform.translation().truncate() - vec2(0.0, height.0);
         commands.entity(entity.id()).insert(ExtractedPointLight {
             pos: pos,
             color: light.color,
@@ -221,7 +235,7 @@ fn extract_lights(
             angle: light.angle,
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
-            height: light.height,
+            height: height.0,
         });
     }
 }

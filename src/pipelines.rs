@@ -403,6 +403,12 @@ impl SpecializedRenderPipeline for SpriteStencilPipeline {
                     offset: 68,
                     shader_location: 5,
                 },
+                // @location(6) height: f32,
+                VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: 72,
+                    shader_location: 6,
+                },
             ],
         };
 
@@ -612,6 +618,12 @@ impl SpecializedRenderPipeline for SpriteNormalMapsPipeline {
                     format: VertexFormat::Float32,
                     offset: 68,
                     shader_location: 5,
+                },
+                // @location(6) height: f32,
+                VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: 72,
+                    shader_location: 6,
                 },
             ],
         };

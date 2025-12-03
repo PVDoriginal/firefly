@@ -44,7 +44,13 @@ use crate::{
 
 /// Point light with adjustable fields.
 #[derive(Component, Clone, Reflect)]
-#[require(SyncToRenderWorld, Transform, VisibilityClass, ViewVisibility)]
+#[require(
+    SyncToRenderWorld,
+    Transform,
+    VisibilityClass,
+    ViewVisibility,
+    LightHeight
+)]
 #[component(on_add = visibility::add_visibility_class::<PointLight2d>)]
 pub struct PointLight2d {
     /// **Color** of the point light. **Alpha is ignored**.
@@ -84,12 +90,15 @@ pub struct PointLight2d {
     ///
     /// **Defaults to true**
     pub cast_shadows: bool,
-
-    /// **Height** fields that's used for certain kinds of normal mapping.
-    ///
-    /// **Should be non-negative**.  
-    pub height: f32,
 }
+
+/// Optional component you can add to lights
+///
+/// Describes the light's 2d height, useful for emulating 3d lighting in top-down 2d games.
+///
+/// This is currently used along with the normal maps. It defaults to 0.   
+#[derive(Component, Default, Reflect)]
+pub struct LightHeight(pub f32);
 
 /// An enum for the **falloff type**.  
 #[derive(Clone, Copy, Reflect)]
@@ -110,7 +119,6 @@ impl Default for PointLight2d {
             falloff: Falloff::InverseSquare,
             angle: 360.0,
             cast_shadows: true,
-            height: 0.,
         }
     }
 }
@@ -219,7 +227,13 @@ pub(crate) struct LightBindGroups {
 pub struct LightRect(pub Rect);
 
 fn mark_visible_lights(
-    mut lights: Query<(Entity, &GlobalTransform, &PointLight2d, &mut ViewVisibility)>,
+    mut lights: Query<(
+        Entity,
+        &GlobalTransform,
+        &PointLight2d,
+        &LightHeight,
+        &mut ViewVisibility,
+    )>,
     mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
     mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     mut light_rect: ResMut<LightRect>,
@@ -234,8 +248,8 @@ fn mark_visible_lights(
     };
 
     light_rect.0 = Rect::default();
-    for (entity, transform, light, mut visibility) in &mut lights {
-        let pos = transform.translation().truncate() - vec2(0.0, light.height);
+    for (entity, transform, light, height, mut visibility) in &mut lights {
+        let pos = transform.translation().truncate() - vec2(0.0, height.0);
 
         if !(Rect {
             min: pos - light.range,

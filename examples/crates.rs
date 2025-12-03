@@ -36,6 +36,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(0., -20., 20.)),
         Occluder2d::rectangle(12., 5.),
+        // component added to simulate height for the normal maps. Could be useful if the object is floating off the ground.
+        // this can safely not be added, and it defaults to 0.
+        SpriteHeight(0.),
     ));
 
     let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
@@ -72,10 +75,12 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Sprite::from_image(asset_server.load("bonfire.png")),
         PointLight2d {
             range: 100.,
-            height: 3.,
             color: Color::srgb(1.0, 0.8, 0.6),
             ..default()
         },
+        // component added to simulate height for the normal maps.
+        // you can see the lamp lighting up the top of the sprites because it has a greater height than the bonfire.
+        LightHeight(3.),
     ));
 
     let mut sprite = Sprite::from_image(asset_server.load("lamp.png"));
@@ -87,15 +92,16 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             r.spawn((
                 PointLight2d {
                     range: 100.,
-                    height: 22.,
                     color: Color::srgb(0.8, 0.8, 1.0),
                     ..default()
                 },
+                LightHeight(22.),
                 Transform::from_translation(vec3(0., 22., 0.)),
             ));
         });
 }
 
+// setting the sprite's z in relation to their y, so that Bevy's sprite renderer sorts them properly.
 fn z_sorting(mut sprites: Query<&mut Transform, With<Sprite>>) {
     for mut transform in &mut sprites {
         transform.translation.z = -transform.translation.y;
