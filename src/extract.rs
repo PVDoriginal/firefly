@@ -9,7 +9,7 @@ use bevy::{
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
     },
-    sprite::SpriteSystem,
+    sprite::{Anchor, SpriteSystem},
 };
 
 use crate::{
@@ -110,6 +110,7 @@ pub fn extract_sprites(
             RenderEntity,
             &ViewVisibility,
             &Sprite,
+            &Anchor,
             Option<&SpriteHeight>,
             Option<&NormalMap>,
             &GlobalTransform,
@@ -125,6 +126,7 @@ pub fn extract_sprites(
         render_entity,
         view_visibility,
         sprite,
+        anchor,
         height,
         normal_map,
         transform,
@@ -143,7 +145,7 @@ pub fn extract_sprites(
             let start = extracted_slices.slices.len();
             extracted_slices
                 .slices
-                .extend(slices.extract_slices(sprite));
+                .extend(slices.extract_slices(sprite, anchor));
             let end = extracted_slices.slices.len();
             extracted_sprites.sprites.push(ExtractedSprite {
                 main_entity,
@@ -186,7 +188,7 @@ pub fn extract_sprites(
                 image_handle_id: sprite.image.id(),
                 normal_handle_id: normal_map.and_then(|x| Some(x.handle().id())),
                 kind: ExtractedSpriteKind::Single {
-                    anchor: sprite.anchor.as_vec(),
+                    anchor: anchor.as_vec(),
                     rect,
                     scaling_mode: sprite.image_mode.scale(),
                     // Pass the custom size

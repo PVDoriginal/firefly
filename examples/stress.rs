@@ -3,8 +3,6 @@ use bevy::{
     prelude::*,
 };
 use bevy_firefly::prelude::*;
-use iyes_perf_ui::PerfUiPlugin;
-use iyes_perf_ui::entries::PerfUiDefaultEntries;
 use rand::{Rng, rng, seq::IndexedRandom};
 
 #[derive(Resource)]
@@ -30,13 +28,14 @@ impl Default for Timers {
 fn main() {
     let mut app = App::new();
 
-    app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin))
-        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-        .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
-        .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
-        .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
+    app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin));
+    // TODO: fix import for bevy 0.17
+    //     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
+    //     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
+    //     .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
+    //     .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
 
-    app.add_plugins(PerfUiPlugin);
+    // app.add_plugins(PerfUiPlugin);
 
     app.add_systems(Startup, setup);
 
@@ -67,7 +66,6 @@ fn setup(mut commands: Commands) {
         },
         Projection::Orthographic(proj),
     ));
-    commands.spawn(PerfUiDefaultEntries::default());
 }
 
 fn change_scale(

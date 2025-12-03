@@ -34,7 +34,7 @@ impl ViewNode for CreateLightmapNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, lightmap_texture): QueryItem<'w, Self::ViewQuery>,
+        (view, lightmap_texture): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let Some(lightmap_phases) = world.get_resource::<ViewBinnedRenderPhases<LightmapPhase>>()
@@ -54,6 +54,7 @@ impl ViewNode for CreateLightmapNode {
                 view: &lightmap_texture.0.default_view,
                 resolve_target: None,
                 ops: default(),
+                depth_slice: None,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
@@ -78,7 +79,11 @@ impl ViewNode for ApplyLightmapNode {
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (config, view_target, light_map_texture): bevy::ecs::query::QueryItem<'w, Self::ViewQuery>,
+        (config, view_target, light_map_texture): bevy::ecs::query::QueryItem<
+            'w,
+            '_,
+            Self::ViewQuery,
+        >,
         world: &'w World,
     ) -> std::result::Result<(), NodeRunError> {
         let pipeline = world.resource::<LightmapApplicationPipeline>();
@@ -110,6 +115,7 @@ impl ViewNode for ApplyLightmapNode {
                 view: post_process.destination,
                 resolve_target: None,
                 ops: default(),
+                depth_slice: None,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
@@ -133,7 +139,7 @@ impl ViewNode for SpriteStencilNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, stencil_texture): QueryItem<'w, Self::ViewQuery>,
+        (view, stencil_texture): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let Some(stencil_phases) = world.get_resource::<ViewSortedRenderPhases<Stencil2d>>() else {
@@ -152,6 +158,7 @@ impl ViewNode for SpriteStencilNode {
                 view: &stencil_texture.0.default_view,
                 resolve_target: None,
                 ops: default(),
+                depth_slice: None,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
@@ -175,7 +182,7 @@ impl ViewNode for SpriteNormalNode {
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, normal_texture): QueryItem<'w, Self::ViewQuery>,
+        (view, normal_texture): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let Some(normal_phases) = world.get_resource::<ViewSortedRenderPhases<NormalPhase>>()
@@ -195,6 +202,7 @@ impl ViewNode for SpriteNormalNode {
                 view: &normal_texture.0.default_view,
                 resolve_target: None,
                 ops: default(),
+                depth_slice: None,
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,

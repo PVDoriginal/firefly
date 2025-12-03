@@ -29,11 +29,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         },
     ));
 
-    let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
-    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 18.0));
-
     commands.spawn((
-        sprite,
+        Sprite::from_image(asset_server.load("crate.png")),
+        Anchor(vec2(0.0, -0.5 + 3.0 / 18.0)),
         NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(0., -20., 20.)),
         Occluder2d::rectangle(12., 5.1),
@@ -42,31 +40,25 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         SpriteHeight(0.),
     ));
 
-    let mut sprite = Sprite::from_image(asset_server.load("crate.png"));
-    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 3.0 / 18.0));
-
     commands.spawn((
-        sprite,
+        Sprite::from_image(asset_server.load("crate.png")),
+        Anchor(vec2(0.0, -0.5 + 3.0 / 18.0)),
         NormalMap::from_file("crate_normal.png", &asset_server),
         Transform::from_translation(vec3(-20., 20., 0.)),
         Occluder2d::rectangle(12., 5.1),
     ));
 
-    let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
-    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 5.0 / 19.0));
-
     commands.spawn((
-        sprite,
+        Sprite::from_image(asset_server.load("vase.png")),
+        Anchor(vec2(0.0, -0.5 + 5.0 / 19.0)),
         NormalMap::from_file("vase_normal.png", &asset_server),
         Transform::from_translation(vec3(0., 20., 0.)),
         Occluder2d::round_rectangle(5.4, 0.5, 3.),
     ));
 
-    let mut sprite = Sprite::from_image(asset_server.load("vase.png"));
-    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 5.0 / 19.0));
-
     commands.spawn((
-        sprite,
+        Sprite::from_image(asset_server.load("vase.png")),
+        Anchor(vec2(0.0, -0.5 + 5.0 / 19.0)),
         NormalMap::from_file("vase_normal.png", &asset_server),
         Transform::from_translation(vec3(10., -20., 0.)),
         Occluder2d::round_rectangle(5.4, 0.5, 3.),
@@ -84,11 +76,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         LightHeight(3.),
     ));
 
-    let mut sprite = Sprite::from_image(asset_server.load("lamp.png"));
-    sprite.anchor = Anchor::Custom(vec2(0.0, -0.5 + 5.0 / 32.0));
-
     commands.spawn((
-        sprite,
+        Sprite::from_image(asset_server.load("lamp.png")),
+        Anchor(vec2(0.0, -0.5 + 5.0 / 32.0)),
         Transform::from_translation(vec3(20., 0., 0.)),
         PointLight2d {
             range: 100.,

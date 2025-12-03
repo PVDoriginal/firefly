@@ -1,6 +1,10 @@
 use std::{any::TypeId, ops::Range};
 
 use bevy::{
+    camera::visibility::{
+        PreviousVisibleEntities, VisibilityClass, VisibilitySystems, VisibleEntities,
+        add_visibility_class, check_visibility,
+    },
     color::palettes::css::WHITE,
     ecs::{
         component::Tick,
@@ -24,9 +28,7 @@ use bevy::{
         render_resource::{BindGroup, BufferUsages, RawBufferVec, ShaderType},
         sync_world::SyncToRenderWorld,
         view::{
-            ExtractedView, PreviousVisibleEntities, RenderVisibleEntities, RetainedViewEntity,
-            ViewUniformOffset, VisibilityClass, VisibilitySystems, VisibleEntities,
-            check_visibility, visibility,
+            ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset, visibility,
         },
     },
 };
@@ -45,7 +47,7 @@ use crate::{
     ViewVisibility,
     LightHeight
 )]
-#[component(on_add = visibility::add_visibility_class::<PointLight2d>)]
+#[component(on_add = add_visibility_class::<PointLight2d>)]
 pub struct PointLight2d {
     /// Color of the point light. Alpha is ignored.
     ///
@@ -341,7 +343,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup
 
     fn render<'w>(
         item: &P,
-        (view, view_uniform_offset): ROQueryItem<'w, Self::ViewQuery>,
+        (view, view_uniform_offset): ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -368,7 +370,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawLightBatch {
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        view: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (light_meta, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,

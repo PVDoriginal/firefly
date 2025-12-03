@@ -1,4 +1,4 @@
-use bevy::{platform::collections::HashSet, prelude::*};
+use bevy::{platform::collections::HashSet, prelude::*, sprite::Anchor};
 
 use crate::sprites::ExtractedSlice;
 
@@ -19,6 +19,7 @@ impl ComputedTextureSlices {
     pub(crate) fn extract_slices<'a>(
         &'a self,
         sprite: &'a Sprite,
+        anchor: &'a Anchor,
     ) -> impl ExactSizeIterator<Item = ExtractedSlice> + 'a {
         let mut flip = Vec2::ONE;
         if sprite.flip_x {
@@ -27,7 +28,7 @@ impl ComputedTextureSlices {
         if sprite.flip_y {
             flip.y *= -1.0;
         }
-        let anchor = sprite.anchor.as_vec()
+        let anchor = anchor.as_vec()
             * sprite
                 .custom_size
                 .unwrap_or(sprite.rect.unwrap_or_default().size());

@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     render::{
         RenderApp,
-        render_graph::{RenderGraphApp, ViewNodeRunner},
+        render_graph::{RenderGraphExt, ViewNodeRunner},
     },
 };
 

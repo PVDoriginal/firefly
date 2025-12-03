@@ -4,9 +4,12 @@ use crate::phases::{NormalPhase, Stencil2d};
 use crate::pipelines::{SpriteNormalMapsPipeline, SpriteStencilPipeline};
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
-use bevy::asset::AssetPath;
+use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
-use bevy::render::RenderDebugFlags;
+use bevy::render::{RenderDebugFlags, RenderSystems};
+use bevy::sprite_render::{
+    Mesh2dPipeline, SpritePipelineKey, SpriteSystem, SpriteSystems, queue_material2d_meshes,
+};
 use bevy::{
     asset::AssetEvents,
     core_pipeline::{
@@ -33,8 +36,6 @@ use bevy::{
         view::{ExtractedView, Msaa, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
 };
-
-use bevy::sprite::{Mesh2dPipeline, SpritePipelineKey, SpriteSystem, queue_material2d_meshes};
 
 use bytemuck::{Pod, Zeroable};
 use fixedbitset::FixedBitSet;
@@ -241,10 +242,10 @@ impl Plugin for SpritesPlugin {
         app.add_systems(
             PostUpdate,
             ((
-                compute_slices_on_asset_event.before(AssetEvents),
+                compute_slices_on_asset_event.before(AssetEventSystems),
                 compute_slices_on_sprite_change,
             )
-                .in_set(SpriteSystem::ComputeSlices),),
+                .in_set(SpriteSystems::ComputeSlices),),
         );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
@@ -266,13 +267,13 @@ impl Plugin for SpritesPlugin {
                 .add_systems(
                     Render,
                     (
-                        sort_phase_system::<Stencil2d>.in_set(RenderSet::PhaseSort),
-                        sort_phase_system::<NormalPhase>.in_set(RenderSet::PhaseSort),
+                        sort_phase_system::<Stencil2d>.in_set(RenderSystems::PhaseSort),
+                        sort_phase_system::<NormalPhase>.in_set(RenderSystems::PhaseSort),
                         queue_sprites
-                            .in_set(RenderSet::Queue)
+                            .in_set(RenderSystems::Queue)
                             .ambiguous_with(queue_material2d_meshes::<ColorMaterial>),
-                        sort_binned_render_phase::<Opaque2d>.in_set(RenderSet::PhaseSort),
-                        sort_binned_render_phase::<AlphaMask2d>.in_set(RenderSet::PhaseSort),
+                        sort_binned_render_phase::<Opaque2d>.in_set(RenderSystems::PhaseSort),
+                        sort_binned_render_phase::<AlphaMask2d>.in_set(RenderSystems::PhaseSort),
                     ),
                 );
         };
@@ -443,7 +444,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteViewBindGroup<I
 
     fn render<'w>(
         _item: &P,
-        (view_uniform, sprite_view_bind_group): ROQueryItem<'w, Self::ViewQuery>,
+        (view_uniform, sprite_view_bind_group): ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         _param: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -460,7 +461,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteStencilTextureB
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        view: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -490,7 +491,7 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteNormalTextureBi
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        view: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -520,7 +521,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteStencilBatch {
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        view: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (sprite_meta, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -556,7 +557,7 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteNormalBatch {
 
     fn render<'w>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
+        view: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (sprite_meta, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,

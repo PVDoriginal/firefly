@@ -1,29 +1,27 @@
 use std::borrow::Cow;
 
 use bevy::{
-    core_pipeline::{
-        fullscreen_vertex_shader::fullscreen_shader_vertex_state,
-        tonemapping::get_lut_bind_group_layout_entries,
-    },
+    core_pipeline::{FullscreenShader, tonemapping::get_lut_bind_group_layout_entries},
     ecs::system::SystemState,
     image::{ImageSampler, TextureFormatPixelInfo},
+    mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
     prelude::*,
     render::{
-        mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
         render_resource::{
             BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
             BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
             FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderDefVal,
-            ShaderStages, SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat,
-            TextureSampleType, TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat, TextureSampleType,
+            TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{DefaultImageSampler, GpuImage},
         view::ViewUniform,
     },
-    sprite::SpritePipelineKey,
+    shader::ShaderDefVal,
+    sprite_render::SpritePipelineKey,
 };
 
 use crate::{
@@ -83,6 +81,8 @@ impl FromWorld for LightmapCreationPipeline {
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let fullscreen_shader = world.resource::<FullscreenShader>();
+        let vertex_state = fullscreen_shader.to_vertex_state();
 
         let pipeline_id =
             world
@@ -90,7 +90,7 @@ impl FromWorld for LightmapCreationPipeline {
                 .queue_render_pipeline(RenderPipelineDescriptor {
                     label: Some(Cow::Borrowed("lightmap creation pipeline")),
                     layout: vec![layout.clone()],
-                    vertex: fullscreen_shader_vertex_state(),
+                    vertex: vertex_state,
                     fragment: Some(FragmentState {
                         shader: CREATE_LIGHTMAP_SHADER,
                         targets: vec![Some(ColorTargetState {
@@ -106,7 +106,7 @@ impl FromWorld for LightmapCreationPipeline {
                             write_mask: ColorWrites::ALL,
                         })],
                         shader_defs: default(),
-                        entry_point: Cow::Borrowed("fragment"),
+                        entry_point: Some(Cow::Borrowed("fragment")),
                     }),
                     push_constant_ranges: default(),
                     primitive: default(),
@@ -141,15 +141,32 @@ impl FromWorld for LightmapApplicationPipeline {
         );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let fullscreen_shader = world.resource::<FullscreenShader>();
+        let vertex_state = fullscreen_shader.to_vertex_state();
 
-        let pipeline_id = new_pipeline(
-            world,
-            Some(Cow::Borrowed("lightmap application pipeline")),
-            layout.clone(),
-            APPLY_LIGHTMAP_SHADER,
-            Cow::Borrowed("fragment"),
-            TextureFormat::bevy_default(),
-        );
+        let pipeline_id =
+            world
+                .resource_mut::<PipelineCache>()
+                .queue_render_pipeline(RenderPipelineDescriptor {
+                    label: Some(Cow::Borrowed("lightmap application pipeline")),
+                    layout: vec![layout.clone()],
+                    vertex: vertex_state,
+                    fragment: Some(FragmentState {
+                        shader: APPLY_LIGHTMAP_SHADER,
+                        targets: vec![Some(ColorTargetState {
+                            format: TextureFormat::bevy_default(),
+                            blend: None,
+                            write_mask: ColorWrites::ALL,
+                        })],
+                        shader_defs: default(),
+                        entry_point: Some(Cow::Borrowed("fragment")),
+                    }),
+                    push_constant_ranges: default(),
+                    primitive: default(),
+                    depth_stencil: default(),
+                    multisample: default(),
+                    zero_initialize_workgroup_memory: default(),
+                });
 
         Self {
             layout,
@@ -157,38 +174,6 @@ impl FromWorld for LightmapApplicationPipeline {
             pipeline_id,
         }
     }
-}
-
-fn new_pipeline(
-    world: &mut World,
-    label: Option<Cow<'static, str>>,
-    layout: BindGroupLayout,
-    shader: Handle<Shader>,
-    entry: Cow<'static, str>,
-    format: TextureFormat,
-) -> CachedRenderPipelineId {
-    world
-        .resource_mut::<PipelineCache>()
-        .queue_render_pipeline(RenderPipelineDescriptor {
-            label,
-            layout: vec![layout.clone()],
-            vertex: fullscreen_shader_vertex_state(),
-            fragment: Some(FragmentState {
-                shader,
-                targets: vec![Some(ColorTargetState {
-                    format,
-                    blend: None,
-                    write_mask: ColorWrites::ALL,
-                })],
-                shader_defs: default(),
-                entry_point: entry,
-            }),
-            push_constant_ranges: default(),
-            primitive: default(),
-            depth_stencil: default(),
-            multisample: default(),
-            zero_initialize_workgroup_memory: default(),
-        })
 }
 
 #[derive(Resource)]
@@ -248,7 +233,7 @@ impl FromWorld for SpriteStencilPipeline {
                 }
             };
 
-            let format_size = image.texture_descriptor.format.pixel_size();
+            let format_size = image.texture_descriptor.format.pixel_size().unwrap();
             render_queue.write_texture(
                 texture.as_image_copy(),
                 image.data.as_ref().expect("Image has no data"),
@@ -373,14 +358,14 @@ impl SpecializedRenderPipeline for SpriteStencilPipeline {
         RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: SPRITE_SHADER,
-                entry_point: "vertex".into(),
+                entry_point: Some("vertex".into()),
                 shader_defs: shader_defs.clone(),
                 buffers: vec![instance_rate_vertex_buffer_layout],
             },
             fragment: Some(FragmentState {
                 shader: SPRITE_SHADER,
                 shader_defs,
-                entry_point: "fragment".into(),
+                entry_point: Some("fragment".into()),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::Rgba32Float, //format,
                     blend: Some(BlendState::ALPHA_BLENDING),
@@ -464,7 +449,7 @@ impl FromWorld for SpriteNormalMapsPipeline {
                 }
             };
 
-            let format_size = image.texture_descriptor.format.pixel_size();
+            let format_size = image.texture_descriptor.format.pixel_size().unwrap();
             render_queue.write_texture(
                 texture.as_image_copy(),
                 image.data.as_ref().expect("Image has no data"),
@@ -589,14 +574,14 @@ impl SpecializedRenderPipeline for SpriteNormalMapsPipeline {
         RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: SPRITE_SHADER,
-                entry_point: "vertex".into(),
+                entry_point: Some("vertex".into()),
                 shader_defs: shader_defs.clone(),
                 buffers: vec![instance_rate_vertex_buffer_layout],
             },
             fragment: Some(FragmentState {
                 shader: SPRITE_SHADER,
                 shader_defs,
-                entry_point: "fragment_normal".into(),
+                entry_point: Some("fragment_normal".into()),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::Rgba32Float,
                     blend: Some(BlendState::ALPHA_BLENDING),
