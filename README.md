@@ -16,15 +16,17 @@ Short video showing off soft shadows and z-sorting:
 
 https://github.com/user-attachments/assets/1984ef2a-0edd-4a40-93cb-a901057a9b74
 
+> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
+
 Here's the same game but with light banding and hard shadows:
 
 https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
 
+> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
+
 And here is a video of the [shapes examples](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs).
 
 https://github.com/user-attachments/assets/387799ba-7834-4fb6-9dbb-52f038c1ab0b
-
-> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
 
 ## Usage 
 To use this crate, simply run `cargo add bevy_firefly` or add firefly to your Cargo.toml file. 
@@ -74,12 +76,12 @@ Some of the existing features are:
   - Round and polygonal occluders
   - Soft shadows
   - Occlusion z-sorting
+  - Normal maps
   - Occlusion sprite masking
   - Transparent & colored occluders
   - Light banding
 
 Some of the currently planned features are: 
-  - Normal maps
   - Occluders casting sprite-based shadows
   - Mulitple lightmaps
   - Light textures
