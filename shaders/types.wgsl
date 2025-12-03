@@ -11,6 +11,7 @@ struct PointLight {
     angle: f32,
     dir: vec2f,
     z: f32,
+    height: f32,
 }
 
 struct Occluder {
@@ -43,6 +44,9 @@ struct FireflyConfig {
     light_bands: u32,
     softness: f32,
     z_sorting: u32,
+    // 0 - none, 1 - simple, 2 - topdown
+    normal_mode: u32, 
+    normal_attenuation: f32,
 }
 
 struct SpriteId {

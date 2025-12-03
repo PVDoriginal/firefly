@@ -1,0 +1,253 @@
+use std::ops::Range;
+
+use bevy::math::FloatOrd;
+use bevy::prelude::*;
+use bevy::render::render_phase::{
+    BinnedPhaseItem, CachedRenderPipelinePhaseItem, DrawFunctionId, PhaseItem,
+    PhaseItemBatchSetKey, PhaseItemExtraIndex, SortedPhaseItem,
+};
+use bevy::render::render_resource::CachedRenderPipelineId;
+use bevy::render::sync_world::MainEntity;
+
+pub(crate) struct LightmapPhase {
+    batch_set_key: LightBatchSetKey,
+    pub entity: (Entity, MainEntity),
+    pub batch_range: Range<u32>,
+    pub extra_index: PhaseItemExtraIndex,
+}
+
+// TODO: rename to StencilPhase
+pub(crate) struct Stencil2d {
+    pub sort_key: FloatOrd,
+    pub entity: (Entity, MainEntity),
+    pub pipeline: CachedRenderPipelineId,
+    pub draw_function: DrawFunctionId,
+    pub batch_range: Range<u32>,
+    pub extra_index: PhaseItemExtraIndex,
+    pub extracted_index: usize,
+    /// Whether the mesh in question is indexed (uses an index buffer in
+    /// addition to its vertex buffer).
+    pub indexed: bool,
+}
+
+pub(crate) struct NormalPhase {
+    pub sort_key: FloatOrd,
+    pub entity: (Entity, MainEntity),
+    pub pipeline: CachedRenderPipelineId,
+    pub draw_function: DrawFunctionId,
+    pub batch_range: Range<u32>,
+    pub extra_index: PhaseItemExtraIndex,
+    pub extracted_index: usize,
+    /// Whether the mesh in question is indexed (uses an index buffer in
+    /// addition to its vertex buffer).
+    pub indexed: bool,
+}
+
+// For more information about writing a phase item, please look at the custom_phase_item example
+impl PhaseItem for LightmapPhase {
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity.0
+    }
+
+    #[inline]
+    fn main_entity(&self) -> MainEntity {
+        self.entity.1
+    }
+
+    #[inline]
+    fn draw_function(&self) -> DrawFunctionId {
+        self.batch_set_key.draw_function
+    }
+
+    #[inline]
+    fn batch_range(&self) -> &Range<u32> {
+        &self.batch_range
+    }
+
+    #[inline]
+    fn batch_range_mut(&mut self) -> &mut Range<u32> {
+        &mut self.batch_range
+    }
+
+    #[inline]
+    fn extra_index(&self) -> PhaseItemExtraIndex {
+        self.extra_index.clone()
+    }
+
+    #[inline]
+    fn batch_range_and_extra_index_mut(&mut self) -> (&mut Range<u32>, &mut PhaseItemExtraIndex) {
+        (&mut self.batch_range, &mut self.extra_index)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct LightBatchSetKey {
+    pub pipeline: CachedRenderPipelineId,
+    pub draw_function: DrawFunctionId,
+}
+
+impl PhaseItemBatchSetKey for LightBatchSetKey {
+    fn indexed(&self) -> bool {
+        false
+    }
+}
+
+impl BinnedPhaseItem for LightmapPhase {
+    type BinKey = ();
+
+    type BatchSetKey = LightBatchSetKey;
+
+    fn new(
+        batch_set_key: Self::BatchSetKey,
+        _bin_key: Self::BinKey,
+        representative_entity: (Entity, MainEntity),
+        batch_range: Range<u32>,
+        extra_index: PhaseItemExtraIndex,
+    ) -> Self {
+        Self {
+            batch_set_key,
+            entity: representative_entity,
+            batch_range,
+            extra_index,
+        }
+    }
+}
+
+impl CachedRenderPipelinePhaseItem for LightmapPhase {
+    fn cached_pipeline(&self) -> CachedRenderPipelineId {
+        self.batch_set_key.pipeline
+    }
+}
+
+impl PhaseItem for Stencil2d {
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity.0
+    }
+
+    #[inline]
+    fn main_entity(&self) -> MainEntity {
+        self.entity.1
+    }
+
+    #[inline]
+    fn draw_function(&self) -> DrawFunctionId {
+        self.draw_function
+    }
+
+    #[inline]
+    fn batch_range(&self) -> &Range<u32> {
+        &self.batch_range
+    }
+
+    #[inline]
+    fn batch_range_mut(&mut self) -> &mut Range<u32> {
+        &mut self.batch_range
+    }
+
+    #[inline]
+    fn extra_index(&self) -> PhaseItemExtraIndex {
+        self.extra_index.clone()
+    }
+
+    #[inline]
+    fn batch_range_and_extra_index_mut(&mut self) -> (&mut Range<u32>, &mut PhaseItemExtraIndex) {
+        (&mut self.batch_range, &mut self.extra_index)
+    }
+}
+
+impl SortedPhaseItem for Stencil2d {
+    type SortKey = FloatOrd;
+
+    #[inline]
+    fn sort_key(&self) -> Self::SortKey {
+        self.sort_key
+    }
+
+    #[inline]
+    fn sort(items: &mut [Self]) {
+        // bevy normally uses radsort instead of the std slice::sort_by_key
+        // radsort is a stable radix sort that performed better than `slice::sort_by_key` or `slice::sort_unstable_by_key`.
+        // Since it is not re-exported by bevy, we just use the std sort for the purpose of the example
+        items.sort_by_key(SortedPhaseItem::sort_key);
+    }
+
+    #[inline]
+    fn indexed(&self) -> bool {
+        self.indexed
+    }
+}
+
+impl CachedRenderPipelinePhaseItem for Stencil2d {
+    #[inline]
+    fn cached_pipeline(&self) -> CachedRenderPipelineId {
+        self.pipeline
+    }
+}
+
+impl PhaseItem for NormalPhase {
+    #[inline]
+    fn entity(&self) -> Entity {
+        self.entity.0
+    }
+
+    #[inline]
+    fn main_entity(&self) -> MainEntity {
+        self.entity.1
+    }
+
+    #[inline]
+    fn draw_function(&self) -> DrawFunctionId {
+        self.draw_function
+    }
+
+    #[inline]
+    fn batch_range(&self) -> &Range<u32> {
+        &self.batch_range
+    }
+
+    #[inline]
+    fn batch_range_mut(&mut self) -> &mut Range<u32> {
+        &mut self.batch_range
+    }
+
+    #[inline]
+    fn extra_index(&self) -> PhaseItemExtraIndex {
+        self.extra_index.clone()
+    }
+
+    #[inline]
+    fn batch_range_and_extra_index_mut(&mut self) -> (&mut Range<u32>, &mut PhaseItemExtraIndex) {
+        (&mut self.batch_range, &mut self.extra_index)
+    }
+}
+
+impl SortedPhaseItem for NormalPhase {
+    type SortKey = FloatOrd;
+
+    #[inline]
+    fn sort_key(&self) -> Self::SortKey {
+        self.sort_key
+    }
+
+    #[inline]
+    fn sort(items: &mut [Self]) {
+        // bevy normally uses radsort instead of the std slice::sort_by_key
+        // radsort is a stable radix sort that performed better than `slice::sort_by_key` or `slice::sort_unstable_by_key`.
+        // Since it is not re-exported by bevy, we just use the std sort for the purpose of the example
+        items.sort_by_key(SortedPhaseItem::sort_key);
+    }
+
+    #[inline]
+    fn indexed(&self) -> bool {
+        self.indexed
+    }
+}
+
+impl CachedRenderPipelinePhaseItem for NormalPhase {
+    #[inline]
+    fn cached_pipeline(&self) -> CachedRenderPipelineId {
+        self.pipeline
+    }
+}

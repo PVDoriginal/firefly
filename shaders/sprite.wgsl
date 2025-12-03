@@ -22,6 +22,7 @@ struct VertexInput {
     @location(3) id: f32,
     @location(4) i_uv_offset_scale: vec4<f32>,
     @location(5) z: f32,
+    @location(6) height: f32,
 }
 
 struct VertexOutput {
@@ -29,6 +30,7 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) id: f32,
     @location(2) z: f32,
+    @location(3) height: f32,
 };
 
 @vertex
@@ -49,6 +51,7 @@ fn vertex(in: VertexInput) -> VertexOutput {
     out.uv = vec2<f32>(vertex_position.xy) * in.i_uv_offset_scale.zw + in.i_uv_offset_scale.xy;
     out.id = in.id;
     out.z = in.z;
+    out.height = in.height;
 
     return out;
 }
@@ -73,11 +76,23 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // else if (sprite_id.id == 17) {
         //     return vec4f(0, 0, 1, 1);
         // } 
-        return vec4f(in.id, in.z, 0, 1);
+        return vec4f(in.id, in.z, in.height, 1);
     }
     else {
         return vec4f(0, 0, 0, 0);
     }
 
     // return color;
+}
+
+@group(1) @binding(2) var<uniform> normal_dummy: u32;
+
+@fragment
+fn fragment_normal(in: VertexOutput) -> @location(0) vec4<f32> {
+    let color = textureLoad(sprite_texture, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_texture))), 0);
+
+    if normal_dummy == 1 {
+        return vec4f(0, 0, 0.1, color.a);
+    }
+    return color;
 }

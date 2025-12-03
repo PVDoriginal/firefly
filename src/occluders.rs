@@ -1,10 +1,7 @@
 use bevy::{
     color::palettes::css::BLACK,
     prelude::*,
-    render::{
-        render_resource::{GpuArrayBuffer, ShaderType},
-        sync_world::SyncToRenderWorld,
-    },
+    render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
 };
 use core::f32;
 
@@ -17,31 +14,36 @@ use core::f32;
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
 #[derive(Component, Clone, Default, Reflect)]
-#[require(SyncToRenderWorld)]
+#[require(SyncToRenderWorld, Transform, ViewVisibility)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
     rect: Rect,
 
-    /// **Color** of the occluder. **Alpha is ignored**.
+    /// Color of the occluder. **Alpha is ignored**.
     pub color: Color,
 
-    /// **Opacity** of the occluder.
+    /// Opacity of the occluder.
     ///
-    /// An occluder of **opacity 0** won't block any light.
-    /// An occluder of **opacity 1** will completely both light (and cast a fully black shadow).
+    /// An occluder of opacity 0 won't block any light.
+    /// An occluder of opacity 1 will completely both light (and cast a fully black shadow).
     ///
-    /// Anything in-between will cast a colored shadow depending on how **opaque** it is.
+    /// Anything in-between will cast a colored shadow depending on how opaque it is.
     pub opacity: f32,
 
-    /// List of entities that this occluder will **not cast shadows over**.
+    /// List of entities that this occluder will not cast shadows over.
     ///
-    /// Note that these can be have a **significant impact on performance**. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
+    /// Note that these can be have a significant impact on performance. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
     pub ignored_sprites: Vec<Entity>,
 
     /// If true, this occluder won't cast shadows over sprites with a higher z value.
     ///
     /// This does nothing if z_sorting is set to false in the [config](crate::prelude::FireflyConfig::z_sorting).
     pub z_sorting: bool,
+
+    /// Offset to the position of the occluder.
+    ///
+    /// **Default**: [Vec3::ZERO].
+    pub offset: Vec3,
 }
 
 impl Occluder2d {
@@ -74,7 +76,7 @@ impl Occluder2d {
         }
     }
 
-    /// **Bounding rect** of the occluder.
+    /// Bounding rect of the occluder.
     pub fn rect(&self) -> Rect {
         self.rect
     }
@@ -100,22 +102,29 @@ impl Occluder2d {
         res
     }
 
-    /// Construct a ne woccluder with the specified [z-sorting](Occluder2d::z_sorting).
+    /// Construct a new occluder with the specified [z-sorting](Occluder2d::z_sorting).
     pub fn with_z_sorting(&self, z_sorting: bool) -> Self {
         let mut res = self.clone();
         res.z_sorting = z_sorting;
         res
     }
 
-    /// Construct a **polygonal occluder** from the given **points**.
+    /// Construct a new occluder with the specified [offset](Occluder2d::offset).
+    pub fn with_offset(&self, offset: Vec3) -> Self {
+        let mut res = self.clone();
+        res.offset = offset;
+        res
+    }
+
+    /// Construct a polygonal occluder from the given points.
     ///
-    /// The points can form a **convex or concave** polygon. However,
-    /// having **self-intersections can cause unexpected behavior**.
+    /// The points can form a convex or concave polygon. However,
+    /// having self-intersections can cause unexpected behavior.
     ///
-    /// The points should be **relative to the entity's translation**.
+    /// The points should be relative to the entity's translation.
     ///
     /// # Failure
-    /// This returns None if the provided list doesn't contain **at least 2 vertices**.
+    /// This returns None if the provided list doesn't contain at least 2 vertices.
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
         normalize_vertices(vertices).and_then(|mut vertices| {
             vertices.push(vertices[0]);
@@ -123,14 +132,14 @@ impl Occluder2d {
         })
     }
 
-    /// Construct a **polyline occluder** from the given **points**.
+    /// Construct a polyline occluder from the given points.
     ///
-    /// Having **self-intersections can cause unexpected behavior**.
+    /// Having self-intersections can cause unexpected behavior.
     ///
-    /// The points should be **relative to the entity's translation**.
+    /// The points should be relative to the entity's translation.
     ///
     /// # Failure
-    /// This returns None if the provided list doesn't contain **at least 2 vertices**.
+    /// This returns None if the provided list doesn't contain at least 2 vertices.
     pub fn polyline(mut vertices: Vec<Vec2>) -> Option<Self> {
         let mut vertices_clone = vertices.clone();
         vertices_clone.reverse();
@@ -140,12 +149,12 @@ impl Occluder2d {
             .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polyline { vertices })))
     }
 
-    /// Construct a **rectangle occluder** from width and height.
+    /// Construct a rectangle occluder from width and height.
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self::round_rectangle(width, height, 0.)
     }
 
-    /// Construct a **round rectangle** occluder from width, height and radius.
+    /// Construct a round rectangle occluder from width, height and radius.
     ///
     /// The resulted occluder is esentially a rectangle with a radius-sized padding around it.
     ///  
@@ -159,22 +168,22 @@ impl Occluder2d {
         })
     }
 
-    /// Construct a **circle occluder**.
+    /// Construct a circle occluder.
     pub fn circle(radius: f32) -> Self {
         Self::round_rectangle(0., 0., radius)
     }
 
-    /// Construct a **vertical capsule occluder**.
+    /// Construct a vertical capsule occluder.
     pub fn vertical_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(0., length, radius)
     }
 
-    /// Construct a **horizontal_capsule occluder**.
+    /// Construct a horizontal_capsule occluder.
     pub fn horizontal_capsule(length: f32, radius: f32) -> Self {
         Self::round_rectangle(length, 0., radius)
     }
 
-    /// Construct a **capsule occluder**. This is **vertical** by default. For a horizontal capsule check [`Occluder2d::horizontal_capsule()`]
+    /// Construct a capsule occluder. This is vertical by default. For a horizontal capsule check [`Occluder2d::horizontal_capsule()`].
     pub fn capsule(length: f32, radius: f32) -> Self {
         Self::vertical_capsule(length, radius)
     }
@@ -400,14 +409,3 @@ pub(crate) fn translate_vertices_iter<'a>(
 ) -> Box<dyn 'a + DoubleEndedIterator<Item = Vec2>> {
     Box::new(vertices.map(move |v| rot * v + pos))
 }
-
-#[derive(Resource, Default)]
-pub(crate) struct OccluderSet(
-    pub  Vec<(
-        GpuArrayBuffer<UniformOccluder>,
-        GpuArrayBuffer<u32>,
-        GpuArrayBuffer<UniformVertex>,
-        GpuArrayBuffer<UniformRoundOccluder>,
-        GpuArrayBuffer<f32>,
-    )>,
-);

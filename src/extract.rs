@@ -1,15 +1,28 @@
 use bevy::{
+    platform::collections::HashSet,
     prelude::*,
     render::{
-        Extract, RenderApp, extract_component::ExtractComponentPlugin, sync_world::RenderEntity,
+        Extract, RenderApp,
+        batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
+        extract_component::ExtractComponentPlugin,
+        render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
+        sync_world::RenderEntity,
+        view::{NoIndirectDrawing, RetainedViewEntity},
     },
+    sprite::SpriteSystem,
 };
 
 use crate::{
-    data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, Falloff, PointLight2d},
-    occluders::{ExtractedOccluder, Occluder2dShape},
+    LightmapPhase,
+    data::{ExtractedWorldData, FireflyConfig, NormalMode},
+    lights::{ExtractedPointLight, LightHeight, PointLight2d},
+    occluders::ExtractedOccluder,
+    phases::{NormalPhase, Stencil2d},
     prelude::Occluder2d,
+    sprites::{
+        ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
+        SpriteAssetEvents, SpriteHeight,
+    },
 };
 
 pub(crate) struct ExtractPlugin;
@@ -20,9 +33,169 @@ impl Plugin for ExtractPlugin {
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
+        render_app.add_systems(
+            ExtractSchedule,
+            (
+                extract_camera_phases,
+                extract_sprites.in_set(SpriteSystem::ExtractSprites),
+                extract_sprite_events,
+                extract_world_data,
+                extract_lights,
+                extract_occluders,
+            ),
+        );
+    }
+}
 
-        render_app.add_systems(ExtractSchedule, extract_lights_occluders);
-        render_app.add_systems(ExtractSchedule, extract_world_data);
+fn extract_camera_phases(
+    mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
+    mut normal_phases: ResMut<ViewSortedRenderPhases<NormalPhase>>,
+    mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
+    cameras: Extract<
+        Query<(Entity, &Camera, &FireflyConfig, Has<NoIndirectDrawing>), With<Camera2d>>,
+    >,
+    mut live_entities: Local<HashSet<RetainedViewEntity>>,
+    gpu_preprocessing_support: Res<GpuPreprocessingSupport>,
+) {
+    live_entities.clear();
+    for (main_entity, camera, config, no_indirect_drawing) in &cameras {
+        if !camera.is_active {
+            continue;
+        }
+        // This is the main camera, so we use the first subview index (0)
+        let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
+
+        stencil_phases.insert_or_clear(retained_view_entity);
+
+        if !matches!(config.normal_mode, NormalMode::None) {
+            normal_phases.insert_or_clear(retained_view_entity);
+        }
+
+        let gpu_preprocessing_mode = gpu_preprocessing_support.min(if !no_indirect_drawing {
+            GpuPreprocessingMode::Culling
+        } else {
+            GpuPreprocessingMode::PreprocessingOnly
+        });
+
+        lightmap_phases.prepare_for_new_frame(retained_view_entity, gpu_preprocessing_mode);
+
+        live_entities.insert(retained_view_entity);
+    }
+
+    // Clear out all dead views.
+    stencil_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+    normal_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+    lightmap_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+}
+
+pub fn extract_sprite_events(
+    mut events: ResMut<SpriteAssetEvents>,
+    mut image_events: Extract<EventReader<AssetEvent<Image>>>,
+) {
+    let SpriteAssetEvents { ref mut images } = *events;
+    images.clear();
+
+    for event in image_events.read() {
+        images.push(*event);
+    }
+}
+
+pub fn extract_sprites(
+    mut extracted_sprites: ResMut<ExtractedSprites>,
+    mut extracted_slices: ResMut<ExtractedSlices>,
+    texture_atlases: Extract<Res<Assets<TextureAtlasLayout>>>,
+    sprite_query: Extract<
+        Query<(
+            Entity,
+            RenderEntity,
+            &ViewVisibility,
+            &Sprite,
+            Option<&SpriteHeight>,
+            Option<&NormalMap>,
+            &GlobalTransform,
+            Option<&super::utils::ComputedTextureSlices>,
+        )>,
+    >,
+) {
+    let mut id_counter = 0.;
+    extracted_sprites.sprites.clear();
+    extracted_slices.slices.clear();
+    for (
+        main_entity,
+        render_entity,
+        view_visibility,
+        sprite,
+        height,
+        normal_map,
+        transform,
+        slices,
+    ) in sprite_query.iter()
+    {
+        if !view_visibility.get() {
+            continue;
+        }
+
+        let height = height.map_or(0., |h| h.0);
+
+        id_counter += f32::EPSILON;
+
+        if let Some(slices) = slices {
+            let start = extracted_slices.slices.len();
+            extracted_slices
+                .slices
+                .extend(slices.extract_slices(sprite));
+            let end = extracted_slices.slices.len();
+            extracted_sprites.sprites.push(ExtractedSprite {
+                main_entity,
+                render_entity,
+
+                transform: *transform,
+                flip_x: sprite.flip_x,
+                flip_y: sprite.flip_y,
+                image_handle_id: sprite.image.id(),
+                normal_handle_id: normal_map.and_then(|x| Some(x.handle().id())),
+                kind: ExtractedSpriteKind::Slices {
+                    indices: start..end,
+                },
+                id: id_counter,
+                height,
+            });
+        } else {
+            let atlas_rect = sprite
+                .texture_atlas
+                .as_ref()
+                .and_then(|s| s.texture_rect(&texture_atlases).map(|r| r.as_rect()));
+            let rect = match (atlas_rect, sprite.rect) {
+                (None, None) => None,
+                (None, Some(sprite_rect)) => Some(sprite_rect),
+                (Some(atlas_rect), None) => Some(atlas_rect),
+                (Some(atlas_rect), Some(mut sprite_rect)) => {
+                    sprite_rect.min += atlas_rect.min;
+                    sprite_rect.max += atlas_rect.min;
+                    Some(sprite_rect)
+                }
+            };
+
+            // PERF: we don't check in this function that the `Image` asset is ready, since it should be in most cases and hashing the handle is expensive
+            extracted_sprites.sprites.push(ExtractedSprite {
+                main_entity,
+                render_entity,
+                transform: *transform,
+                flip_x: sprite.flip_x,
+                flip_y: sprite.flip_y,
+                image_handle_id: sprite.image.id(),
+                normal_handle_id: normal_map.and_then(|x| Some(x.handle().id())),
+                kind: ExtractedSpriteKind::Single {
+                    anchor: sprite.anchor.as_vec(),
+                    rect,
+                    scaling_mode: sprite.image_mode.scale(),
+                    // Pass the custom size
+                    custom_size: sprite.custom_size,
+                },
+                id: id_counter,
+                height,
+            });
+        }
     }
 }
 
@@ -37,71 +210,70 @@ fn extract_world_data(
     }
 }
 
-fn extract_lights_occluders(
+fn extract_lights(
     mut commands: Commands,
-    camera: Extract<Single<(&GlobalTransform, &Projection), With<FireflyConfig>>>,
-    lights: Extract<Query<(&RenderEntity, &GlobalTransform, &PointLight2d)>>,
-    occluders: Extract<Query<(&RenderEntity, &Occluder2d, &GlobalTransform)>>,
+    lights: Extract<
+        Query<(
+            &RenderEntity,
+            &GlobalTransform,
+            &PointLight2d,
+            &LightHeight,
+            &ViewVisibility,
+        )>,
+    >,
 ) {
-    let Projection::Orthographic(projection) = camera.1 else {
-        return;
-    };
-
-    let camera_rect = Rect {
-        min: projection.area.min + camera.0.translation().truncate(),
-        max: projection.area.max + camera.0.translation().truncate(),
-    };
-
-    let mut light_rect = Rect::default();
-    for (entity, transform, light) in &lights {
-        let pos = transform.translation().truncate();
-
-        if (Rect {
-            min: pos - light.range,
-            max: pos + light.range,
-        })
-        .intersect(camera_rect)
-        .is_empty()
-        {
+    for (entity, transform, light, height, view_visibility) in &lights {
+        if !view_visibility.get() {
             continue;
         }
 
+        let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
         commands.entity(entity.id()).insert(ExtractedPointLight {
-            pos,
+            pos: pos,
             color: light.color,
             intensity: light.intensity,
             range: light.range,
-            z: transform.translation().z,
+            z: transform.translation().z + light.offset.z,
             inner_range: light.inner_range,
             falloff: light.falloff,
             angle: light.angle,
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
+            height: height.0,
         });
-
-        light_rect = light_rect.union(camera_rect.union_point(pos).intersect(Rect {
-            min: pos - light.range,
-            max: pos + light.range,
-        }));
     }
+}
 
-    for (render_entity, occluder, global_transform) in &occluders {
-        let mut rect = occluder.rect();
-        rect.min += global_transform.translation().truncate();
-        rect.max += global_transform.translation().truncate();
-
-        if rect.intersect(light_rect).is_empty() {
+fn extract_occluders(
+    mut commands: Commands,
+    occluders: Extract<
+        Query<(
+            &RenderEntity,
+            &Occluder2d,
+            &GlobalTransform,
+            &ViewVisibility,
+        )>,
+    >,
+) {
+    for (render_entity, occluder, global_transform, view_visibility) in &occluders {
+        if !view_visibility.get() {
             continue;
         }
+
+        let pos = global_transform.translation().truncate() + occluder.offset.xy();
+
+        let mut rect = occluder.rect();
+        rect.min += pos;
+        rect.max += pos;
 
         commands
             .entity(render_entity.id())
             .insert(ExtractedOccluder {
-                pos: global_transform.translation().truncate(),
+                pos,
                 rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
                 shape: occluder.shape().clone(),
                 rect,
-                z: global_transform.translation().z,
+                z: global_transform.translation().z + occluder.offset.z,
                 color: occluder.color,
                 opacity: occluder.opacity,
                 ignored_sprites: occluder.ignored_sprites.clone(),

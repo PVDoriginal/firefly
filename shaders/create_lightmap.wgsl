@@ -12,28 +12,28 @@
 var<uniform> view: View;
 
 @group(0) @binding(1)
-var lightmap_texture: texture_2d<f32>;
-
-@group(0) @binding(2)
 var texture_sampler: sampler;
 
-@group(0) @binding(3)
+@group(0) @binding(2)
 var<uniform> light: PointLight;
 
-@group(0) @binding(4)
+@group(0) @binding(3)
 var<storage> occluders: array<Occluder>;
 
-@group(0) @binding(5)
+@group(0) @binding(4)
 var<storage> sequences: array<u32>;
 
-@group(0) @binding(6)
+@group(0) @binding(5)
 var<storage> vertices: array<Vertex>;
 
-@group(0) @binding(7)
+@group(0) @binding(6)
 var<storage> round_occluders: array<RoundOccluder>;
 
-@group(0) @binding(8)
+@group(0) @binding(7)
 var sprite_stencil: texture_2d<f32>;
+
+@group(0) @binding(8)
+var normal_map: texture_2d<f32>;
 
 @group(0) @binding(9)
 var<storage> ids: array<f32>;
@@ -47,10 +47,11 @@ const PIDIV2: f32 = 1.57079632679;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
+    var res = vec4f(0);
+    
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
-    var prev = max(textureSample(lightmap_texture, texture_sampler, in.uv), vec4f(0, 0, 0, 1));
+    let normal = textureSample(normal_map, texture_sampler, in.uv);
     let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
-
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
@@ -60,19 +61,40 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let angle = acos(dot(a, b) / (length(a) * length(b)));
     
     if (dist < light.range && angle <= light.angle / 2.) {
-        var res = vec4f(0);
+        var normal_multi = 1f;
+
+        if config.normal_mode != 0 && normal.a > 0 {
+            let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), config.normal_attenuation);
+
+            if normal.b == 0.0 {
+                normal_multi = 0.0;
+            }
+            else if normal.b == 0.1 {
+                normal_multi = 1.0;
+            }
+            else if config.normal_mode == 1 {
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, light.pos.y - pos.y, light.z - stencil.g));
+                normal_multi = max(0f, dot(normal_dir, light_dir));
+            }
+            else if config.normal_mode == 2 {
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, light.height - stencil.b, light.z - stencil.g));
+                normal_multi = max(0f, dot(normal_dir, light_dir));
+            }
+        }; 
+
+        res = vec4f(light.color, 0f) * normal_multi;
 
         if dist <= light.inner_range {
-            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity);
+            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * normal_multi);
         }
         else {
             let x = (dist - light.inner_range) / (light.range - light.inner_range);
 
             if light.falloff == 0 {
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x));
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x) * normal_multi);
             }
             else if light.falloff == 1 { 
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x));
+                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x) * normal_multi);
             }
         }
 
@@ -139,9 +161,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
         }
         res *= vec4f(shadow, 1);
-        prev = max(prev, res);
     }
-    return prev;
+    return res;
 }
 
 fn is_excluded(occluder: u32, start_id: u32, id: f32) -> bool {
