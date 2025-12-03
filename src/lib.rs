@@ -85,8 +85,8 @@
 //! # Upcoming Features
 //!
 //! Here are some of the features that are still being worked on:
-//! - Normal maps.
 //! - Multiple lightmaps.
+//! - Sprite-based shadows.
 //! - Light textures.
 use bevy::{
     asset::weak_handle,
