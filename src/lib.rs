@@ -1,8 +1,5 @@
 //! **Firefly** is an open-source **2d lighting** crate made for the [Bevy](https://bevy.org/) game engine.
 //!
-//! The main focus of this crate is offering as many complex 2d lighting features (on par with more mature game engines) while
-//! trying to maximize performance and simplify the end-user API as much as possible.
-//!z
 //! Feel free to [create an issue](https://github.com/PVDoriginal/firefly/issues) if you want to request a specific feature or report a bug.
 //!
 //! # Example
@@ -60,7 +57,9 @@
 //!
 //! # Lights
 //!
-//! [PointLight2d](crate::prelude::PointLight2d)
+//! You can create lights by spawning entities with the [PointLight2d](crate::prelude::PointLight2d) component.
+//!
+//! Lights have adjustable [range](crate::prelude::PointLight2d::range), [falloff mode](crate::prelude::PointLight2d::falloff) and a variety of other features.
 //!
 //! # Features
 //!
@@ -74,6 +73,11 @@
 //! only render over sprites with a lower z position than the occluder that cast them. This is extremely useful for certain 2d games, such as top-down games.
 //! Additionally, [Occluders](crate::prelude::Occluder2d) have a [list of entities](crate::prelude::Occluder2d::ignored_sprites) that
 //! they won't cast shadows over.
+//!
+//! - **Normal maps**: You can enable normal maps by changing the [normal mode](crate::prelude::FireflyConfig::normal_mode) field. You can then
+//! add the [NormalMap](crate::prelude::NormalMap) component to sprites. Normal maps need to have the same exact layout as their entity's sprite image.
+//! If [normal mode](crate::prelude::FireflyConfig::normal_mode) is set to [top down](crate::prelude::NormalMode::TopDown),
+//! you can use [LightHeight](crate::prelude::LightHeight) and [SpriteHeight](crate::prelude::SpriteHeight) to emulate 3d directions for the normal maps.  
 //!
 //! - **Light Banding**: You can enable [light bands](crate::prelude::FireflyConfig::light_bands) on [FireflyConfig](crate::prelude::FireflyConfig) to
 //! reduce the lightmap to a certain number of 'bands', creating a stylized retro look.  
@@ -107,7 +111,7 @@ pub(crate) use phases::*;
 
 pub mod prelude {
     pub use crate::app::{FireflyGizmosPlugin, FireflyPlugin};
-    pub use crate::data::FireflyConfig;
+    pub use crate::data::{FireflyConfig, NormalMode};
     pub use crate::lights::{LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
