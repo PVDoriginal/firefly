@@ -1,5 +1,6 @@
 # Firefly
 
+[![Discord](https://img.shields.io/discord/805147867924267018?logo=discord&color=7289DA)](https://discord.com/channels/691052431525675048/1447681362722033816)
 [![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
 [![docs](https://docs.rs/bevy_firefly/badge.svg)](https://docs.rs/bevy_firefly/)
 [![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
@@ -92,7 +93,9 @@ Some of the currently planned features are:
   - Mulitple lightmaps
   - Light textures
 
-Feel free to open an issue if you want to request any specific features or report any bugs!  
+Feel free to open an issue if you want to request any specific features or report any bugs!
+
+Also you can ask any questions over on [discord](https://discord.com/channels/691052431525675048/1447681362722033816)! 
 
 ## Bevy Compatibility 
 | bevy | bevy_firefly  |
