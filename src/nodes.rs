@@ -6,19 +6,15 @@ use bevy::{
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
             BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
-            RenderPipeline,
         },
         renderer::RenderContext,
-        texture::CachedTexture,
         view::{ExtractedView, ViewTarget},
     },
 };
 
 use crate::{
-    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    phases::{NormalPhase, Stencil2d},
-    pipelines::LightmapApplicationPipeline,
-    prepare::BufferedFireflyConfig,
+    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture, phases::SpritePhase,
+    pipelines::LightmapApplicationPipeline, prepare::BufferedFireflyConfig,
 };
 
 #[derive(Default)]
@@ -131,86 +127,55 @@ impl ViewNode for ApplyLightmapNode {
 }
 
 #[derive(Default)]
-pub(crate) struct SpriteStencilNode;
-impl ViewNode for SpriteStencilNode {
-    type ViewQuery = (&'static ExtractedView, Read<SpriteStencilTexture>);
+pub(crate) struct SpriteNode;
+impl ViewNode for SpriteNode {
+    type ViewQuery = (
+        &'static ExtractedView,
+        Read<SpriteStencilTexture>,
+        Read<NormalMapTexture>,
+    );
 
     fn run<'w>(
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, stencil_texture): QueryItem<'w, '_, Self::ViewQuery>,
+        (view, stencil_texture, normal_map_texture): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
-        let Some(stencil_phases) = world.get_resource::<ViewSortedRenderPhases<Stencil2d>>() else {
-            return Ok(());
-        };
-
-        let view_entity = graph.view_entity();
-
-        let Some(stencil_phase) = stencil_phases.get(&view.retained_view_entity) else {
-            return Ok(());
-        };
-
-        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-            label: Some("stencil pass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &stencil_texture.0.default_view,
-                resolve_target: None,
-                ops: default(),
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-
-        if let Err(err) = stencil_phase.render(&mut render_pass, world, view_entity) {
-            error!("Error encountered while rendering the stencil phase {err:?}");
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-pub(crate) struct SpriteNormalNode;
-impl ViewNode for SpriteNormalNode {
-    type ViewQuery = (&'static ExtractedView, Read<NormalMapTexture>);
-
-    fn run<'w>(
-        &self,
-        graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext<'w>,
-        (view, normal_texture): QueryItem<'w, '_, Self::ViewQuery>,
-        world: &'w World,
-    ) -> Result<(), NodeRunError> {
-        let Some(normal_phases) = world.get_resource::<ViewSortedRenderPhases<NormalPhase>>()
+        let Some(sprite_phases) = world.get_resource::<ViewSortedRenderPhases<SpritePhase>>()
         else {
             return Ok(());
         };
 
         let view_entity = graph.view_entity();
 
-        let Some(normal_phase) = normal_phases.get(&view.retained_view_entity) else {
+        let Some(sprite_phase) = sprite_phases.get(&view.retained_view_entity) else {
             return Ok(());
         };
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-            label: Some("normal pass"),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &normal_texture.0.default_view,
-                resolve_target: None,
-                ops: default(),
-                depth_slice: None,
-            })],
+            label: Some("stencil pass"),
+            color_attachments: &[
+                Some(RenderPassColorAttachment {
+                    view: &stencil_texture.0.default_view,
+                    resolve_target: None,
+                    ops: default(),
+                    depth_slice: None,
+                }),
+                Some(RenderPassColorAttachment {
+                    view: &normal_map_texture.0.default_view,
+                    resolve_target: None,
+                    ops: default(),
+                    depth_slice: None,
+                }),
+            ],
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
         });
 
-        if let Err(err) = normal_phase.render(&mut render_pass, world, view_entity) {
-            error!("Error encountered while rendering the normal phase {err:?}");
+        if let Err(err) = sprite_phase.render(&mut render_pass, world, view_entity) {
+            error!("Error encountered while rendering the stencil phase {err:?}");
         }
 
         Ok(())

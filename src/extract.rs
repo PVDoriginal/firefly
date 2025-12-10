@@ -9,15 +9,16 @@ use bevy::{
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
     },
-    sprite::{Anchor, SpriteSystem},
+    sprite::Anchor,
+    sprite_render::SpriteSystems,
 };
 
 use crate::{
     LightmapPhase,
-    data::{ExtractedWorldData, FireflyConfig, NormalMode},
+    data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,
-    phases::{NormalPhase, Stencil2d},
+    phases::SpritePhase,
     prelude::Occluder2d,
     sprites::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
@@ -37,7 +38,7 @@ impl Plugin for ExtractPlugin {
             ExtractSchedule,
             (
                 extract_camera_phases,
-                extract_sprites.in_set(SpriteSystem::ExtractSprites),
+                extract_sprites.in_set(SpriteSystems::ExtractSprites),
                 extract_sprite_events,
                 extract_world_data,
                 extract_lights,
@@ -48,8 +49,7 @@ impl Plugin for ExtractPlugin {
 }
 
 fn extract_camera_phases(
-    mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
-    mut normal_phases: ResMut<ViewSortedRenderPhases<NormalPhase>>,
+    mut sprite_phases: ResMut<ViewSortedRenderPhases<SpritePhase>>,
     mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
     cameras: Extract<
         Query<(Entity, &Camera, &FireflyConfig, Has<NoIndirectDrawing>), With<Camera2d>>,
@@ -65,11 +65,7 @@ fn extract_camera_phases(
         // This is the main camera, so we use the first subview index (0)
         let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
 
-        stencil_phases.insert_or_clear(retained_view_entity);
-
-        if !matches!(config.normal_mode, NormalMode::None) {
-            normal_phases.insert_or_clear(retained_view_entity);
-        }
+        sprite_phases.insert_or_clear(retained_view_entity);
 
         let gpu_preprocessing_mode = gpu_preprocessing_support.min(if !no_indirect_drawing {
             GpuPreprocessingMode::Culling
@@ -83,14 +79,13 @@ fn extract_camera_phases(
     }
 
     // Clear out all dead views.
-    stencil_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
-    normal_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
+    sprite_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
     lightmap_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
 }
 
 pub fn extract_sprite_events(
     mut events: ResMut<SpriteAssetEvents>,
-    mut image_events: Extract<EventReader<AssetEvent<Image>>>,
+    mut image_events: Extract<MessageReader<AssetEvent<Image>>>,
 ) {
     let SpriteAssetEvents { ref mut images } = *events;
     images.clear();

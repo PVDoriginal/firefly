@@ -57,42 +57,35 @@ fn vertex(in: VertexInput) -> VertexOutput {
 }
 
 @group(1) @binding(0) var sprite_texture: texture_2d<f32>;
-@group(1) @binding(1) var sprite_sampler: sampler;
+@group(1) @binding(1) var normal_texture: texture_2d<f32>;
+@group(1) @binding(2) var sprite_sampler: sampler;
+@group(1) @binding(3) var<uniform> normal_dummy: u32;
 
-@fragment
-fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(sprite_texture, sprite_sampler, in.uv);
-
-// #ifdef TONEMAP_IN_SHADER
-//     color = tonemapping::tone_mapping(color, view.color_grading);
-// #endif
-
-    // return 1;
-
-    if color.a > 0.1 {
-        // if (sprite_id.id == 16) {
-        //     return vec4f(0, 1, 0, 1);
-        // } 
-        // else if (sprite_id.id == 17) {
-        //     return vec4f(0, 0, 1, 1);
-        // } 
-        return vec4f(in.id, in.z, in.height, 1);
-    }
-    else {
-        return vec4f(0, 0, 0, 0);
-    }
-
-    // return color;
+struct FragmentOutput {
+    @location(0) stencil: vec4<f32>, 
+    @location(1) normal: vec4<f32>,
 }
 
-@group(1) @binding(2) var<uniform> normal_dummy: u32;
-
 @fragment
-fn fragment_normal(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureLoad(sprite_texture, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_texture))), 0);
+fn fragment(in: VertexOutput) -> FragmentOutput {
+    var res: FragmentOutput;
+
+    var color = textureSample(sprite_texture, sprite_sampler, in.uv);
+    var normal = textureSample(normal_texture, sprite_sampler, in.uv);
+    
+    if color.a > 0.1 {
+        res.stencil = vec4f(in.id, in.z, in.height, 1);
+    }
+    else {
+        res.stencil = vec4f(0, 0, 0, 0);
+    }
 
     if normal_dummy == 1 {
-        return vec4f(0, 0, 0.1, color.a);
+        res.normal = vec4f(0, 0, 0.1, color.a);
     }
-    return color;
+    else {
+        res.normal = normal;
+    }
+
+    return res; 
 }

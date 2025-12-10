@@ -89,7 +89,7 @@
 //! - Sprite-based shadows.
 //! - Light textures.
 use bevy::{
-    asset::weak_handle,
+    asset::uuid_handle,
     prelude::*,
     render::{render_graph::RenderLabel, texture::CachedTexture},
 };
@@ -139,20 +139,11 @@ pub struct CreateLightmapLabel;
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct ApplyLightmapLabel;
 
-/// Render graph label for when the sprite stencil is created.
-///
-/// This is a texture containing data about the sprite's z-values and id's.
 #[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
-pub struct SpriteStencilLabel;
+pub struct SpriteLabel;
 
-/// Render graph label for when the normal map is created.
-///
-/// This is a big texture made from the normal maps of all visible sprites.
-#[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
-pub struct SpriteNormalLabel;
-
-const CREATE_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
-const APPLY_LIGHTMAP_SHADER: Handle<Shader> = weak_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
-const TYPES_SHADER: Handle<Shader> = weak_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
-const UTILS_SHADER: Handle<Shader> = weak_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
-const SPRITE_SHADER: Handle<Shader> = weak_handle!("00f40f01-5069-4f1c-a69c-a6bd5ca3983e");
+const CREATE_LIGHTMAP_SHADER: Handle<Shader> = uuid_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
+const APPLY_LIGHTMAP_SHADER: Handle<Shader> = uuid_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
+const TYPES_SHADER: Handle<Shader> = uuid_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
+const UTILS_SHADER: Handle<Shader> = uuid_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
+const SPRITE_SHADER: Handle<Shader> = uuid_handle!("00f40f01-5069-4f1c-a69c-a6bd5ca3983e");

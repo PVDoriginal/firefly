@@ -1,17 +1,16 @@
 use std::ops::Range;
 
-use crate::phases::{NormalPhase, Stencil2d};
-use crate::pipelines::{SpriteNormalMapsPipeline, SpriteStencilPipeline};
+use crate::phases::SpritePhase;
+use crate::pipelines::SpritePipeline;
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
 use bevy::render::{RenderDebugFlags, RenderSystems};
 use bevy::sprite_render::{
-    Mesh2dPipeline, SpritePipelineKey, SpriteSystem, SpriteSystems, queue_material2d_meshes,
+    Mesh2dPipeline, SpritePipelineKey, SpriteSystems, queue_material2d_meshes,
 };
 use bevy::{
-    asset::AssetEvents,
     core_pipeline::{
         core_2d::{AlphaMask2d, Opaque2d},
         tonemapping::{DebandDither, Tonemapping},
@@ -25,7 +24,7 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
+        Render, RenderApp,
         batching::sort_binned_render_phase,
         render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
@@ -129,27 +128,12 @@ impl SpriteInstance {
 }
 
 #[derive(Resource)]
-pub(crate) struct SpriteStencilMeta {
+pub(crate) struct SpriteMeta {
     pub sprite_index_buffer: RawBufferVec<u32>,
     pub sprite_instance_buffer: RawBufferVec<SpriteInstance>,
 }
 
-#[derive(Resource)]
-pub(crate) struct SpriteNormalMeta {
-    pub sprite_index_buffer: RawBufferVec<u32>,
-    pub sprite_instance_buffer: RawBufferVec<SpriteInstance>,
-}
-
-impl Default for SpriteStencilMeta {
-    fn default() -> Self {
-        Self {
-            sprite_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
-            sprite_instance_buffer: RawBufferVec::<SpriteInstance>::new(BufferUsages::VERTEX),
-        }
-    }
-}
-
-impl Default for SpriteNormalMeta {
+impl Default for SpriteMeta {
     fn default() -> Self {
         Self {
             sprite_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
@@ -164,21 +148,19 @@ pub(crate) struct SpriteViewBindGroup {
 }
 
 #[derive(Resource, Deref, DerefMut, Default)]
-pub(crate) struct SpriteStencilBatches(pub HashMap<(RetainedViewEntity, Entity), SpriteBatch>);
-
-#[derive(Resource, Deref, DerefMut, Default)]
-pub(crate) struct SpriteNormalBatches(pub HashMap<(RetainedViewEntity, Entity), SpriteBatch>);
+pub(crate) struct SpriteBatches(pub HashMap<(RetainedViewEntity, Entity), SpriteBatch>);
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct SpriteBatch {
     pub image_handle_id: AssetId<Image>,
+    pub normal_handle_id: AssetId<Image>,
     pub normal_dummy: bool,
     pub range: Range<u32>,
 }
 
 #[derive(Resource, Default)]
 pub(crate) struct ImageBindGroups {
-    pub values: HashMap<(AssetId<Image>, bool), BindGroup>,
+    pub values: HashMap<(AssetId<Image>, AssetId<Image>, bool), BindGroup>,
 }
 
 /// Component you can add to an entity that also has a Sprite, containing the corresponding sprite's normal map.
@@ -232,10 +214,7 @@ impl NormalMap {
 pub(crate) struct SpritesPlugin;
 impl Plugin for SpritesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(SortedRenderPhasePlugin::<Stencil2d, Mesh2dPipeline>::new(
-            RenderDebugFlags::default(),
-        ));
-        app.add_plugins(SortedRenderPhasePlugin::<NormalPhase, Mesh2dPipeline>::new(
+        app.add_plugins(SortedRenderPhasePlugin::<SpritePhase, Mesh2dPipeline>::new(
             RenderDebugFlags::default(),
         ));
 
@@ -251,24 +230,18 @@ impl Plugin for SpritesPlugin {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .init_resource::<ImageBindGroups>()
-                .init_resource::<SpecializedRenderPipelines<SpriteStencilPipeline>>()
-                .init_resource::<SpecializedRenderPipelines<SpriteNormalMapsPipeline>>()
-                .init_resource::<DrawFunctions<Stencil2d>>()
-                .init_resource::<DrawFunctions<NormalPhase>>()
-                .init_resource::<SpriteStencilMeta>()
-                .init_resource::<SpriteNormalMeta>()
+                .init_resource::<SpecializedRenderPipelines<SpritePipeline>>()
+                .init_resource::<DrawFunctions<SpritePhase>>()
+                .init_resource::<SpriteMeta>()
                 .init_resource::<ExtractedSprites>()
                 .init_resource::<ExtractedSlices>()
                 .init_resource::<SpriteAssetEvents>()
-                .add_render_command::<Stencil2d, DrawSpriteStencil>()
-                .add_render_command::<NormalPhase, DrawSpriteNormal>()
-                .init_resource::<ViewSortedRenderPhases<Stencil2d>>()
-                .init_resource::<ViewSortedRenderPhases<NormalPhase>>()
+                .add_render_command::<SpritePhase, DrawSprite>()
+                .init_resource::<ViewSortedRenderPhases<SpritePhase>>()
                 .add_systems(
                     Render,
                     (
-                        sort_phase_system::<Stencil2d>.in_set(RenderSystems::PhaseSort),
-                        sort_phase_system::<NormalPhase>.in_set(RenderSystems::PhaseSort),
+                        sort_phase_system::<SpritePhase>.in_set(RenderSystems::PhaseSort),
                         queue_sprites
                             .in_set(RenderSystems::Queue)
                             .ambiguous_with(queue_material2d_meshes::<ColorMaterial>),
@@ -282,32 +255,20 @@ impl Plugin for SpritesPlugin {
     fn finish(&self, app: &mut App) {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
-                .init_resource::<SpriteStencilBatches>()
-                .init_resource::<SpriteNormalBatches>()
-                .init_resource::<SpriteStencilPipeline>()
-                .init_resource::<SpriteNormalMapsPipeline>();
+                .init_resource::<SpriteBatches>()
+                .init_resource::<SpritePipeline>();
         }
     }
 }
 
 fn queue_sprites(
     mut view_entities: Local<FixedBitSet>,
-
-    stencil_draw_functions: Res<DrawFunctions<Stencil2d>>,
-    normal_draw_functions: Res<DrawFunctions<NormalPhase>>,
-
-    sprite_pipeline: Res<SpriteStencilPipeline>,
-    normal_pipeline: Res<SpriteNormalMapsPipeline>,
-
-    mut stencil_pipelines: ResMut<SpecializedRenderPipelines<SpriteStencilPipeline>>,
-    mut normal_pipelines: ResMut<SpecializedRenderPipelines<SpriteNormalMapsPipeline>>,
-
+    draw_functions: Res<DrawFunctions<SpritePhase>>,
+    pipeline: Res<SpritePipeline>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<SpritePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     extracted_sprites: Res<ExtractedSprites>,
-
-    mut stencil_phases: ResMut<ViewSortedRenderPhases<Stencil2d>>,
-    mut normal_phases: ResMut<ViewSortedRenderPhases<NormalPhase>>,
-
+    mut phases: ResMut<ViewSortedRenderPhases<SpritePhase>>,
     mut views: Query<(
         &RenderVisibleEntities,
         &ExtractedView,
@@ -316,11 +277,10 @@ fn queue_sprites(
         Option<&DebandDither>,
     )>,
 ) {
-    let draw_stencil_function = stencil_draw_functions.read().id::<DrawSpriteStencil>();
-    let draw_normal_function = normal_draw_functions.read().id::<DrawSpriteNormal>();
+    let draw_function = draw_functions.read().id::<DrawSprite>();
 
     for (visible_entities, view, msaa, tonemapping, dither) in &mut views {
-        let Some(stencil_phase) = stencil_phases.get_mut(&view.retained_view_entity) else {
+        let Some(phase) = phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
@@ -350,10 +310,7 @@ fn queue_sprites(
             }
         }
 
-        let stencil_pipeline =
-            stencil_pipelines.specialize(&pipeline_cache, &sprite_pipeline, view_key);
-        let normal_pipeline =
-            normal_pipelines.specialize(&pipeline_cache, &normal_pipeline, view_key);
+        let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);
 
         view_entities.clear();
         view_entities.extend(
@@ -362,7 +319,7 @@ fn queue_sprites(
                 .map(|(_, e)| e.index() as usize),
         );
 
-        stencil_phase.items.reserve(extracted_sprites.sprites.len());
+        phase.items.reserve(extracted_sprites.sprites.len());
 
         for (index, extracted_sprite) in extracted_sprites.sprites.iter().enumerate() {
             let view_index = extracted_sprite.main_entity.index();
@@ -375,9 +332,9 @@ fn queue_sprites(
             let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
 
             // Add the item to the render phase
-            stencil_phase.add(Stencil2d {
-                draw_function: draw_stencil_function,
-                pipeline: stencil_pipeline,
+            phase.add(SpritePhase {
+                draw_function: draw_function,
+                pipeline: pipeline,
                 entity: (
                     extracted_sprite.render_entity,
                     extracted_sprite.main_entity.into(),
@@ -390,50 +347,14 @@ fn queue_sprites(
                 indexed: true,
             });
         }
-
-        if let Some(normal_phase) = normal_phases.get_mut(&view.retained_view_entity) {
-            normal_phase.items.reserve(extracted_sprites.sprites.len());
-
-            for (index, extracted_sprite) in extracted_sprites.sprites.iter().enumerate() {
-                let view_index = extracted_sprite.main_entity.index();
-
-                if !view_entities.contains(view_index as usize) {
-                    continue;
-                }
-
-                let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
-
-                normal_phase.add(NormalPhase {
-                    draw_function: draw_normal_function,
-                    pipeline: normal_pipeline,
-                    entity: (
-                        extracted_sprite.render_entity,
-                        extracted_sprite.main_entity.into(),
-                    ),
-                    sort_key,
-                    // `batch_range` is calculated in `prepare_sprite_image_bind_groups`z
-                    batch_range: 0..0,
-                    extra_index: PhaseItemExtraIndex::None,
-                    extracted_index: index,
-                    indexed: true,
-                });
-            }
-        }
     }
 }
 
-pub(crate) type DrawSpriteStencil = (
+pub(crate) type DrawSprite = (
     SetItemPipeline,
     SetSpriteViewBindGroup<0>,
-    SetSpriteStencilTextureBindGroup<1>,
-    DrawSpriteStencilBatch,
-);
-
-pub(crate) type DrawSpriteNormal = (
-    SetItemPipeline,
-    SetSpriteViewBindGroup<0>,
-    SetSpriteNormalTextureBindGroup<1>,
-    DrawSpriteNormalBatch,
+    SetSpriteTextureBindGroup<1>,
+    DrawSpriteBatch,
 );
 
 pub(crate) struct SetSpriteViewBindGroup<const I: usize>;
@@ -453,9 +374,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteViewBindGroup<I
         RenderCommandResult::Success
     }
 }
-pub(crate) struct SetSpriteStencilTextureBindGroup<const I: usize>;
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteStencilTextureBindGroup<I> {
-    type Param = (SRes<ImageBindGroups>, SRes<SpriteStencilBatches>);
+pub(crate) struct SetSpriteTextureBindGroup<const I: usize>;
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteTextureBindGroup<I> {
+    type Param = (SRes<ImageBindGroups>, SRes<SpriteBatches>);
     type ViewQuery = Read<ExtractedView>;
     type ItemQuery = ();
 
@@ -475,7 +396,11 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteStencilTextureB
             I,
             image_bind_groups
                 .values
-                .get(&(batch.image_handle_id, batch.normal_dummy))
+                .get(&(
+                    batch.image_handle_id,
+                    batch.normal_handle_id,
+                    batch.normal_dummy,
+                ))
                 .unwrap(),
             &[],
         );
@@ -483,75 +408,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteStencilTextureB
     }
 }
 
-pub(crate) struct SetSpriteNormalTextureBindGroup<const I: usize>;
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteNormalTextureBindGroup<I> {
-    type Param = (SRes<ImageBindGroups>, SRes<SpriteNormalBatches>);
-    type ViewQuery = Read<ExtractedView>;
-    type ItemQuery = ();
-
-    fn render<'w>(
-        item: &P,
-        view: ROQueryItem<'w, '_, Self::ViewQuery>,
-        _entity: Option<()>,
-        (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let image_bind_groups = image_bind_groups.into_inner();
-        let Some(batch) = batches.get(&(view.retained_view_entity, item.entity())) else {
-            return RenderCommandResult::Skip;
-        };
-
-        pass.set_bind_group(
-            I,
-            image_bind_groups
-                .values
-                .get(&(batch.image_handle_id, batch.normal_dummy))
-                .unwrap(),
-            &[],
-        );
-        RenderCommandResult::Success
-    }
-}
-
-pub(crate) struct DrawSpriteStencilBatch;
-impl<P: PhaseItem> RenderCommand<P> for DrawSpriteStencilBatch {
-    type Param = (SRes<SpriteStencilMeta>, SRes<SpriteStencilBatches>);
-    type ViewQuery = Read<ExtractedView>;
-    type ItemQuery = ();
-
-    fn render<'w>(
-        item: &P,
-        view: ROQueryItem<'w, '_, Self::ViewQuery>,
-        _entity: Option<()>,
-        (sprite_meta, batches): SystemParamItem<'w, '_, Self::Param>,
-        pass: &mut TrackedRenderPass<'w>,
-    ) -> RenderCommandResult {
-        let sprite_meta = sprite_meta.into_inner();
-        let Some(batch) = batches.get(&(view.retained_view_entity, item.entity())) else {
-            return RenderCommandResult::Skip;
-        };
-
-        pass.set_index_buffer(
-            sprite_meta.sprite_index_buffer.buffer().unwrap().slice(..),
-            0,
-            IndexFormat::Uint32,
-        );
-        pass.set_vertex_buffer(
-            0,
-            sprite_meta
-                .sprite_instance_buffer
-                .buffer()
-                .unwrap()
-                .slice(..),
-        );
-        pass.draw_indexed(0..6, 0, batch.range.clone());
-        RenderCommandResult::Success
-    }
-}
-
-pub(crate) struct DrawSpriteNormalBatch;
-impl<P: PhaseItem> RenderCommand<P> for DrawSpriteNormalBatch {
-    type Param = (SRes<SpriteNormalMeta>, SRes<SpriteNormalBatches>);
+pub(crate) struct DrawSpriteBatch;
+impl<P: PhaseItem> RenderCommand<P> for DrawSpriteBatch {
+    type Param = (SRes<SpriteMeta>, SRes<SpriteBatches>);
     type ViewQuery = Read<ExtractedView>;
     type ItemQuery = ();
 

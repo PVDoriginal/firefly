@@ -14,7 +14,7 @@ use bevy::{
 use crate::{
     extract::ExtractPlugin,
     lights::LightPlugin,
-    nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNormalNode, SpriteStencilNode},
+    nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
     occluders::{Occluder2dShape, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
     sprites::SpritesPlugin,
@@ -80,16 +80,14 @@ impl Plugin for FireflyPlugin {
                 CreateLightmapLabel,
             )
             .add_render_graph_node::<ViewNodeRunner<ApplyLightmapNode>>(Core2d, ApplyLightmapLabel)
-            .add_render_graph_node::<ViewNodeRunner<SpriteStencilNode>>(Core2d, SpriteStencilLabel)
-            .add_render_graph_node::<ViewNodeRunner<SpriteNormalNode>>(Core2d, SpriteNormalLabel);
+            .add_render_graph_node::<ViewNodeRunner<SpriteNode>>(Core2d, SpriteLabel);
         // render_app.add_render_graph_edges(Core2d, (, CreateLightmapLabel));
 
         render_app.add_render_graph_edges(
             Core2d,
             (
                 Node2d::MainTransparentPass,
-                SpriteStencilLabel,
-                SpriteNormalLabel,
+                SpriteLabel,
                 Node2d::Tonemapping,
                 CreateLightmapLabel,
                 ApplyLightmapLabel,
