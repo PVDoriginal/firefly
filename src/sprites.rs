@@ -214,10 +214,6 @@ impl NormalMap {
 pub(crate) struct SpritesPlugin;
 impl Plugin for SpritesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(SortedRenderPhasePlugin::<SpritePhase, Mesh2dPipeline>::new(
-            RenderDebugFlags::default(),
-        ));
-
         app.add_systems(
             PostUpdate,
             ((
