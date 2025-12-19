@@ -1,5 +1,12 @@
 use bevy::{
-    color::palettes::css::{BLUE, GREEN, PURPLE, RED},
+    color::palettes::{
+        self,
+        css::{BLUE, GREEN, PURPLE, RED},
+    },
+    diagnostic::{
+        DiagnosticPath, EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin,
+        LogDiagnosticsPlugin, LogDiagnosticsState, SystemInformationDiagnosticsPlugin,
+    },
     prelude::*,
 };
 use bevy_firefly::prelude::*;
@@ -29,13 +36,14 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin));
-    // TODO: fix import for bevy 0.17
-    //     .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-    //     .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
-    //     .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
-    //     .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
 
-    // app.add_plugins(PerfUiPlugin);
+    app.add_plugins((
+        LogDiagnosticsPlugin::default(),
+        FrameTimeDiagnosticsPlugin::default(),
+        EntityCountDiagnosticsPlugin::default(),
+        SystemInformationDiagnosticsPlugin,
+        bevy::render::diagnostic::RenderDiagnosticsPlugin,
+    ));
 
     app.add_systems(Startup, setup);
 
@@ -44,7 +52,17 @@ fn main() {
     app.add_systems(Update, (spawn_lights, move_lights));
     app.add_systems(Update, (spawn_occluders, move_occluders));
 
+    app.add_systems(Update, filters_inputs).add_systems(
+        Update,
+        update_commands.run_if(
+            resource_exists_and_changed::<LogDiagnosticsStatus>
+                .or(resource_exists_and_changed::<LogDiagnosticsFilters>),
+        ),
+    );
+
     app.init_resource::<Timers>();
+    app.init_resource::<LogDiagnosticsStatus>();
+    app.init_resource::<LogDiagnosticsFilters>();
 
     app.run();
 }
@@ -190,3 +208,224 @@ fn move_occluders(
         transform.rotate_z(3. * time.delta_secs());
     }
 }
+
+// this is all copied from https://github.com/bevyengine/bevy/tree/latest/examples/diagnostics
+
+const FRAME_TIME_DIAGNOSTICS: [DiagnosticPath; 3] = [
+    FrameTimeDiagnosticsPlugin::FPS,
+    FrameTimeDiagnosticsPlugin::FRAME_COUNT,
+    FrameTimeDiagnosticsPlugin::FRAME_TIME,
+];
+const ENTITY_COUNT_DIAGNOSTICS: [DiagnosticPath; 1] = [EntityCountDiagnosticsPlugin::ENTITY_COUNT];
+const SYSTEM_INFO_DIAGNOSTICS: [DiagnosticPath; 4] = [
+    SystemInformationDiagnosticsPlugin::PROCESS_CPU_USAGE,
+    SystemInformationDiagnosticsPlugin::PROCESS_MEM_USAGE,
+    SystemInformationDiagnosticsPlugin::SYSTEM_CPU_USAGE,
+    SystemInformationDiagnosticsPlugin::SYSTEM_MEM_USAGE,
+];
+
+fn filters_inputs(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut status: ResMut<LogDiagnosticsStatus>,
+    mut filters: ResMut<LogDiagnosticsFilters>,
+    mut log_state: ResMut<LogDiagnosticsState>,
+) {
+    if keys.just_pressed(KeyCode::KeyQ) {
+        *status = match *status {
+            LogDiagnosticsStatus::Enabled => {
+                log_state.disable_filtering();
+                LogDiagnosticsStatus::Disabled
+            }
+            LogDiagnosticsStatus::Disabled => {
+                log_state.enable_filtering();
+                if filters.frame_time {
+                    enable_filters(&mut log_state, FRAME_TIME_DIAGNOSTICS);
+                }
+                if filters.entity_count {
+                    enable_filters(&mut log_state, ENTITY_COUNT_DIAGNOSTICS);
+                }
+                if filters.system_info {
+                    enable_filters(&mut log_state, SYSTEM_INFO_DIAGNOSTICS);
+                }
+                LogDiagnosticsStatus::Enabled
+            }
+        };
+    }
+
+    let enabled = *status == LogDiagnosticsStatus::Enabled;
+    if keys.just_pressed(KeyCode::Digit1) {
+        filters.frame_time = !filters.frame_time;
+        if enabled {
+            if filters.frame_time {
+                enable_filters(&mut log_state, FRAME_TIME_DIAGNOSTICS);
+            } else {
+                disable_filters(&mut log_state, FRAME_TIME_DIAGNOSTICS);
+            }
+        }
+    }
+    if keys.just_pressed(KeyCode::Digit2) {
+        filters.entity_count = !filters.entity_count;
+        if enabled {
+            if filters.entity_count {
+                enable_filters(&mut log_state, ENTITY_COUNT_DIAGNOSTICS);
+            } else {
+                disable_filters(&mut log_state, ENTITY_COUNT_DIAGNOSTICS);
+            }
+        }
+    }
+    if keys.just_pressed(KeyCode::Digit3) {
+        filters.system_info = !filters.system_info;
+        if enabled {
+            if filters.system_info {
+                enable_filters(&mut log_state, SYSTEM_INFO_DIAGNOSTICS);
+            } else {
+                disable_filters(&mut log_state, SYSTEM_INFO_DIAGNOSTICS);
+            }
+        }
+    }
+}
+
+fn enable_filters(
+    log_state: &mut LogDiagnosticsState,
+    diagnostics: impl IntoIterator<Item = DiagnosticPath>,
+) {
+    log_state.extend_filter(diagnostics);
+}
+
+fn disable_filters(
+    log_state: &mut LogDiagnosticsState,
+    diagnostics: impl IntoIterator<Item = DiagnosticPath>,
+) {
+    for diagnostic in diagnostics {
+        log_state.remove_filter(&diagnostic);
+    }
+}
+
+fn update_commands(
+    mut commands: Commands,
+    log_commands: Single<Entity, With<LogDiagnosticsCommands>>,
+    status: Res<LogDiagnosticsStatus>,
+    filters: Res<LogDiagnosticsFilters>,
+) {
+    let enabled = *status == LogDiagnosticsStatus::Enabled;
+    let alpha = if enabled { 1. } else { 0.25 };
+    let enabled_color = |enabled| {
+        if enabled {
+            Color::from(palettes::tailwind::GREEN_400)
+        } else {
+            Color::from(palettes::tailwind::RED_400)
+        }
+    };
+    commands
+        .entity(*log_commands)
+        .despawn_related::<Children>()
+        .insert(children![
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(5),
+                    ..default()
+                },
+                children![
+                    Text::new("[Q] Toggle filtering:"),
+                    (
+                        Text::new(format!("{:?}", *status)),
+                        TextColor(enabled_color(enabled))
+                    )
+                ]
+            ),
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(5),
+                    ..default()
+                },
+                children![
+                    (
+                        Text::new("[1] Frame times:"),
+                        TextColor(Color::WHITE.with_alpha(alpha))
+                    ),
+                    (
+                        Text::new(format!("{:?}", filters.frame_time)),
+                        TextColor(enabled_color(filters.frame_time).with_alpha(alpha))
+                    )
+                ]
+            ),
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(5),
+                    ..default()
+                },
+                children![
+                    (
+                        Text::new("[2] Entity count:"),
+                        TextColor(Color::WHITE.with_alpha(alpha))
+                    ),
+                    (
+                        Text::new(format!("{:?}", filters.entity_count)),
+                        TextColor(enabled_color(filters.entity_count).with_alpha(alpha))
+                    )
+                ]
+            ),
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(5),
+                    ..default()
+                },
+                children![
+                    (
+                        Text::new("[3] System info:"),
+                        TextColor(Color::WHITE.with_alpha(alpha))
+                    ),
+                    (
+                        Text::new(format!("{:?}", filters.system_info)),
+                        TextColor(enabled_color(filters.system_info).with_alpha(alpha))
+                    )
+                ]
+            ),
+            (
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(5),
+                    ..default()
+                },
+                children![
+                    (
+                        Text::new("[4] Render diagnostics:"),
+                        TextColor(Color::WHITE.with_alpha(alpha))
+                    ),
+                    (
+                        Text::new("Private"),
+                        TextColor(enabled_color(false).with_alpha(alpha))
+                    )
+                ]
+            ),
+        ]);
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Resource)]
+enum LogDiagnosticsStatus {
+    /// No filtering, showing all logs
+    #[default]
+    Disabled,
+    /// Filtering enabled, showing only subset of logs
+    Enabled,
+}
+
+#[derive(Default, Resource)]
+struct LogDiagnosticsFilters {
+    frame_time: bool,
+    entity_count: bool,
+    system_info: bool,
+    #[expect(
+        dead_code,
+        reason = "Currently the diagnostic paths referent to RenderDiagnosticPlugin are private"
+    )]
+    render_diagnostics: bool,
+}
+
+#[derive(Component)]
+/// Marks the UI node that has instructions on how to change the filtering
+struct LogDiagnosticsCommands;
