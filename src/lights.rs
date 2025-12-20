@@ -14,28 +14,30 @@ use bevy::{
             lifetimeless::{Read, SRes},
         },
     },
-    math::VectorSpace,
     platform::collections::HashMap,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
+        Render, RenderApp, RenderSystems,
         batching::sort_binned_render_phase,
         render_phase::{
             AddRenderCommand, BinnedRenderPhaseType, DrawFunctions, InputUniformIndex, PhaseItem,
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{BindGroup, BufferUsages, RawBufferVec, ShaderType},
+        render_resource::{BindGroup, GpuArrayBuffer, ShaderType, UniformBuffer},
+        renderer::RenderDevice,
         sync_world::SyncToRenderWorld,
-        view::{
-            ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset, visibility,
-        },
+        view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
 };
 
 use crate::{
-    LightBatchSetKey, data::FireflyConfig, phases::LightmapPhase,
-    pipelines::LightmapCreationPipeline, prelude::Occluder2d,
+    LightBatchSetKey,
+    data::FireflyConfig,
+    occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
+    phases::LightmapPhase,
+    pipelines::LightmapCreationPipeline,
+    prelude::Occluder2d,
 };
 
 /// Point light with adjustable fields.
@@ -171,6 +173,16 @@ pub(crate) struct UniformPointLight {
     pub height: f32,
 }
 
+#[derive(Component)]
+pub(crate) struct LightBuffers {
+    pub light: UniformBuffer<UniformPointLight>,
+    pub occluders: GpuArrayBuffer<UniformOccluder>,
+    pub sequences: GpuArrayBuffer<u32>,
+    pub vertices: GpuArrayBuffer<UniformVertex>,
+    pub rounds: GpuArrayBuffer<UniformRoundOccluder>,
+    pub ids: GpuArrayBuffer<f32>,
+}
+
 pub(crate) struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
@@ -188,33 +200,20 @@ impl Plugin for LightPlugin {
             render_app.init_resource::<LightBindGroups>();
             render_app.init_resource::<DrawFunctions<LightmapPhase>>();
             render_app.init_resource::<ViewBinnedRenderPhases<LightmapPhase>>();
-            render_app.init_resource::<LightBufferMeta>();
             render_app.add_render_command::<LightmapPhase, DrawLightmap>();
 
             render_app.add_systems(
                 Render,
-                sort_binned_render_phase::<LightmapPhase>.in_set(RenderSet::PhaseSort),
+                sort_binned_render_phase::<LightmapPhase>.in_set(RenderSystems::PhaseSort),
             );
 
-            render_app.add_systems(Render, queue_lights.in_set(RenderSet::Queue));
+            render_app.add_systems(Render, queue_lights.in_set(RenderSystems::Queue));
         }
     }
 
     fn finish(&self, app: &mut App) {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.init_resource::<LightBatches>();
-        }
-    }
-}
-
-#[derive(Resource)]
-pub(crate) struct LightBufferMeta {
-    pub light_index_buffer: RawBufferVec<u32>,
-}
-impl Default for LightBufferMeta {
-    fn default() -> Self {
-        Self {
-            light_index_buffer: RawBufferVec::<u32>::new(BufferUsages::INDEX),
         }
     }
 }
@@ -364,29 +363,18 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup
 
 pub(crate) struct DrawLightBatch;
 impl<P: PhaseItem> RenderCommand<P> for DrawLightBatch {
-    type Param = (SRes<LightBufferMeta>, SRes<LightBatches>);
+    type Param = ();
     type ViewQuery = Read<ExtractedView>;
     type ItemQuery = ();
 
     fn render<'w>(
-        item: &P,
-        view: ROQueryItem<'w, '_, Self::ViewQuery>,
+        _: &P,
+        _: ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
-        (light_meta, batches): SystemParamItem<'w, '_, Self::Param>,
+        _: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let light_meta = light_meta.into_inner();
-        let Some(batch) = batches.get(&(view.retained_view_entity, item.entity())) else {
-            return RenderCommandResult::Skip;
-        };
-
-        // pass.set_index_buffer(
-        //     light_meta.light_index_buffer.buffer().unwrap().slice(..),
-        //     0,
-        //     IndexFormat::Uint32,
-        // );
         pass.draw(0..3, 0..1);
-        // pass.draw_indexed(0..3, 0, batch.range.clone());
         RenderCommandResult::Success
     }
 }
