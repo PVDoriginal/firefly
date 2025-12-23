@@ -24,7 +24,9 @@ use bevy::{
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{BindGroup, GpuArrayBuffer, ShaderType, UniformBuffer},
+        render_resource::{
+            BindGroup, BufferVec, GpuArrayBuffer, RawBufferVec, ShaderType, UniformBuffer,
+        },
         renderer::RenderDevice,
         sync_world::SyncToRenderWorld,
         view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
@@ -179,7 +181,7 @@ pub(crate) struct LightBuffers {
     pub occluders: GpuArrayBuffer<UniformOccluder>,
     pub sequences: GpuArrayBuffer<u32>,
     pub vertices: GpuArrayBuffer<UniformVertex>,
-    pub rounds: GpuArrayBuffer<UniformRoundOccluder>,
+    pub rounds: BufferVec<u32>,
     pub ids: GpuArrayBuffer<f32>,
 }
 

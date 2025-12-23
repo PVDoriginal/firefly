@@ -1,7 +1,11 @@
 use bevy::{
     color::palettes::css::BLACK,
     prelude::*,
-    render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
+    render::{
+        render_resource::{BufferUsages, BufferVec, GpuArrayBuffer, ShaderType},
+        renderer::RenderDevice,
+        sync_world::SyncToRenderWorld,
+    },
 };
 use core::f32;
 
@@ -317,7 +321,6 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
 pub(crate) struct UniformOccluder {
     pub n_sequences: u32,
     pub n_vertices: u32,
-    pub round: u32,
     pub n_sprites: u32,
     pub z: f32,
     pub color: Vec3,
@@ -332,6 +335,19 @@ pub(crate) struct UniformRoundOccluder {
     pub width: f32,
     pub height: f32,
     pub radius: f32,
+}
+
+#[derive(Resource)]
+pub(crate) struct OccluderBuffers {
+    pub round_occluders: BufferVec<UniformRoundOccluder>,
+}
+
+impl Default for OccluderBuffers {
+    fn default() -> Self {
+        Self {
+            round_occluders: BufferVec::<UniformRoundOccluder>::new(BufferUsages::STORAGE),
+        }
+    }
 }
 
 #[derive(ShaderType, Clone, Default)]

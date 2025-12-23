@@ -162,3 +162,12 @@ fn intersection_point(a: vec2f, b: vec2f, c: vec2f, d: vec2f) -> vec2f {
         (r1 * (c.y - d.y) - (a.y - b.y) * r2) / denom
     );
 }
+
+fn rect_intersection(r1: vec4f, r2: vec4f) -> bool {
+    return !(
+        r2.x > r1.z ||
+        r2.z < r1.x || 
+        r2.w > r1.y || 
+        r2.y < r1.w
+    );
+}

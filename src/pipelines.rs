@@ -9,12 +9,12 @@ use bevy::{
     render::{
         render_resource::{
             BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
-            BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
+            BlendState, BufferVec, CachedRenderPipelineId, ColorTargetState, ColorWrites,
+            FragmentState, FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat, TextureSampleType,
             TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
-            binding_types::{sampler, texture_2d, uniform_buffer},
+            binding_types::{sampler, storage_buffer_read_only, texture_2d, uniform_buffer},
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{DefaultImageSampler, GpuImage},
@@ -51,31 +51,42 @@ impl FromWorld for LightmapCreationPipeline {
 
         let layout = render_device.create_bind_group_layout(
             "create lightmap layout",
-            &BindGroupLayoutEntries::sequential(
+            &BindGroupLayoutEntries::with_indices(
                 ShaderStages::FRAGMENT,
                 (
                     // view uniform
-                    uniform_buffer::<ViewUniform>(true),
+                    (0, uniform_buffer::<ViewUniform>(true)),
                     // sampler
-                    sampler(SamplerBindingType::Filtering),
+                    (1, sampler(SamplerBindingType::Filtering)),
                     // point light
-                    uniform_buffer::<UniformPointLight>(false),
+                    (2, uniform_buffer::<UniformPointLight>(false)),
                     // occluders
-                    GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
+                    (
+                        3,
+                        GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
+                    ),
                     // sequences
-                    GpuArrayBuffer::<u32>::binding_layout(render_device),
+                    (4, GpuArrayBuffer::<u32>::binding_layout(render_device)),
                     // vertices
-                    GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
+                    (
+                        5,
+                        GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
+                    ),
                     // round occluders
-                    GpuArrayBuffer::<UniformRoundOccluder>::binding_layout(render_device),
+                    (6, storage_buffer_read_only::<UniformRoundOccluder>(false)),
+                    // round occluder indices
+                    (7, storage_buffer_read_only::<u32>(false)),
                     // sprite stencil
-                    texture_2d(TextureSampleType::Float { filterable: false }),
+                    (
+                        8,
+                        texture_2d(TextureSampleType::Float { filterable: false }),
+                    ),
                     // sprite normal map
-                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    (9, texture_2d(TextureSampleType::Float { filterable: true })),
                     // sprite ids
-                    GpuArrayBuffer::<f32>::binding_layout(render_device),
+                    (10, GpuArrayBuffer::<f32>::binding_layout(render_device)),
                     //config,
-                    uniform_buffer::<UniformFireflyConfig>(false),
+                    (11, uniform_buffer::<UniformFireflyConfig>(false)),
                 ),
             ),
         );
@@ -371,15 +382,18 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 shader: SPRITE_SHADER,
                 shader_defs,
                 entry_point: Some("fragment".into()),
-                targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::Rgba32Float, //format,
-                    blend: Some(BlendState::ALPHA_BLENDING),
-                    write_mask: ColorWrites::ALL,
-                }), Some(ColorTargetState {
-                    format: TextureFormat::Rgba32Float,
-                    blend: Some(BlendState::ALPHA_BLENDING),
-                    write_mask: ColorWrites::ALL,
-                })],
+                targets: vec![
+                    Some(ColorTargetState {
+                        format: TextureFormat::Rgba32Float, //format,
+                        blend: Some(BlendState::ALPHA_BLENDING),
+                        write_mask: ColorWrites::ALL,
+                    }),
+                    Some(ColorTargetState {
+                        format: TextureFormat::Rgba32Float,
+                        blend: Some(BlendState::ALPHA_BLENDING),
+                        write_mask: ColorWrites::ALL,
+                    }),
+                ],
             }),
             layout: vec![self.view_layout.clone(), self.material_layout.clone()],
             primitive: PrimitiveState {

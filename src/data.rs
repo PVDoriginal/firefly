@@ -1,7 +1,11 @@
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
-    render::{extract_component::ExtractComponent, render_resource::ShaderType},
+    render::{
+        extract_component::ExtractComponent,
+        render_resource::{BindingResource, Buffer, BufferDescriptor, BufferUsages, ShaderType},
+        renderer::RenderDevice,
+    },
 };
 #[derive(Component, Default, Clone, ExtractComponent, Reflect)]
 pub(crate) struct ExtractedWorldData {
@@ -117,4 +121,25 @@ pub(crate) struct UniformFireflyConfig {
     pub z_sorting: u32,
     pub normal_mode: u32,
     pub normal_attenuation: f32,
+}
+
+#[derive(Resource)]
+pub(crate) struct EmptyBuffer(pub Buffer);
+
+impl FromWorld for EmptyBuffer {
+    fn from_world(world: &mut World) -> Self {
+        let device = world.resource::<RenderDevice>();
+        Self(device.create_buffer(&BufferDescriptor {
+            label: "empty_buffer".into(),
+            size: 64,
+            usage: BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        }))
+    }
+}
+
+impl EmptyBuffer {
+    pub fn binding(&self) -> BindingResource<'_> {
+        BindingResource::Buffer(self.0.as_entire_buffer_binding())
+    }
 }

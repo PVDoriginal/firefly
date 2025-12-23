@@ -5,7 +5,7 @@
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
-    intersection_point
+    intersection_point, rect_intersection
 }
 
 @group(0) @binding(0)
@@ -30,15 +30,18 @@ var<storage> vertices: array<Vertex>;
 var<storage> round_occluders: array<RoundOccluder>;
 
 @group(0) @binding(7)
-var sprite_stencil: texture_2d<f32>;
+var<storage> round_occluder_indices: array<u32>;
 
 @group(0) @binding(8)
-var normal_map: texture_2d<f32>;
+var sprite_stencil: texture_2d<f32>;
 
 @group(0) @binding(9)
-var<storage> ids: array<f32>;
+var normal_map: texture_2d<f32>;
 
 @group(0) @binding(10)
+var<storage> ids: array<f32>;
+
+@group(0) @binding(11)
 var<uniform> config: FireflyConfig;
 
 const PI2: f32 = 6.28318530718;
@@ -104,8 +107,24 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var id_index = 0u;
 
         var shadow = vec3f(1); 
-        var i = 0u; 
 
+        // let light_rect = vec4f(light.pos - light.range, light.pos + light.range);
+        
+        for (var i = 0u; i < arrayLength(&round_occluder_indices) - 1; i += 1) {
+            // let range = max(round_occluders[i].width, round_occluders[i].height) + round_occluders[i].radius;
+            // // let occluder_rect = vec4f(round_occluders[i].pos - range, round_occluders[i].pos + range);
+
+            // // if !rect_intersection(occluder_rect, light_rect) { continue; }
+            // if distance(light.pos, round_occluders[i].pos) > range + light.range { continue; }
+
+            let result = round_check(pos, round_occluder_indices[i]); 
+
+            if result.occluded == true {
+                shadow = shadow_blend(shadow, vec3f(1), 1.0);
+            }
+        } 
+
+        var i = 0u; 
         loop {
             if (i >= arrayLength(&occluders)) {
                 break;
@@ -121,16 +140,16 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 }
             }
 
-            if (occluders[i].round == 1) {
-                let result = round_check(pos, round_index); 
+            // if (occluders[i].round == 1) {
+            //     let result = round_check(pos, round_index); 
 
-                if result.occluded == true {
-                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
-                }
-                else if config.softness > 0 && result.extreme_angle < soft_angle {
-                    shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
-                }
-            }
+            //     if result.occluded == true {
+            //         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
+            //     }
+            //     else if config.softness > 0 && result.extreme_angle < soft_angle {
+            //         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
+            //     }
+            // }
 
             else {
                 for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {

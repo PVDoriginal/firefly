@@ -2,9 +2,9 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    data::{ExtractedWorldData, NormalMode},
+    data::{EmptyBuffer, ExtractedWorldData, NormalMode},
     lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
-    occluders::point_inside_poly,
+    occluders::{OccluderBuffers, point_inside_poly},
     phases::SpritePhase,
     pipelines::{LightmapCreationPipeline, SpritePipeline},
     sprites::{
@@ -23,8 +23,8 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, GpuArrayBuffer, TextureDescriptor, TextureDimension, TextureFormat,
-            TextureUsages, UniformBuffer,
+            BindGroupEntries, BufferUsages, BufferVec, GpuArrayBuffer, RawBufferVec,
+            TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
@@ -69,6 +69,14 @@ impl Plugin for PreparePlugin {
                     .chain(),
             ),
         );
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+        render_app.init_resource::<OccluderBuffers>();
+        render_app.init_resource::<EmptyBuffer>();
     }
 }
 
@@ -184,7 +192,7 @@ fn insert_light_buffers(
                 occluders: GpuArrayBuffer::<UniformOccluder>::new(device),
                 sequences: GpuArrayBuffer::<u32>::new(device),
                 vertices: GpuArrayBuffer::<UniformVertex>::new(device),
-                rounds: GpuArrayBuffer::<UniformRoundOccluder>::new(device),
+                rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
                 ids: GpuArrayBuffer::<f32>::new(device),
             });
         }
@@ -209,6 +217,8 @@ fn prepare_data(
     mut light_bind_groups: ResMut<LightBindGroups>,
     mut batches: ResMut<LightBatches>,
     view_uniforms: Res<ViewUniforms>,
+    mut occluder_buffers: ResMut<OccluderBuffers>,
+    empty_buffer: Res<EmptyBuffer>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -218,6 +228,39 @@ fn prepare_data(
         min: projection.area.min + camera.0.camera_pos,
         max: projection.area.max + camera.0.camera_pos,
     };
+
+    occluder_buffers.round_occluders.clear();
+
+    let mut round_occluder_rects = vec![];
+
+    for occluder in occluders {
+        let Occluder2dShape::RoundRectangle {
+            width,
+            height,
+            radius,
+        } = occluder.shape
+        else {
+            continue;
+        };
+
+        occluder_buffers.round_occluders.push(UniformRoundOccluder {
+            pos: occluder.pos,
+            rot: occluder.rot,
+            width,
+            height,
+            radius,
+        });
+
+        round_occluder_rects.push(Rect {
+            min: occluder.pos - width.max(height) - radius,
+            max: occluder.pos + width.max(height) + radius,
+        });
+    }
+    occluder_buffers.round_occluders.push(default());
+
+    occluder_buffers
+        .round_occluders
+        .write_buffer(&render_device, &render_queue);
 
     batches.clear();
 
@@ -269,7 +312,18 @@ fn prepare_data(
                 buffers.rounds.clear();
                 buffers.ids.clear();
 
+                for (i, occluder) in round_occluder_rects.iter().enumerate() {
+                    if occluder.intersect(light_rect).is_empty() {
+                        continue;
+                    }
+                    buffers.rounds.push(i as u32);
+                }
+
                 for occluder in &occluders {
+                    if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+                        continue;
+                    }
+
                     if !light.cast_shadows {
                         break;
                     }
@@ -299,24 +353,6 @@ fn prepare_data(
 
                     meta.color = occluder.color.to_linear().to_vec3();
                     meta.opacity = occluder.opacity;
-
-                    if let Occluder2dShape::RoundRectangle {
-                        width,
-                        height,
-                        radius,
-                    } = occluder.shape
-                    {
-                        meta.round = 1;
-                        buffers.rounds.push(UniformRoundOccluder {
-                            pos: occluder.pos,
-                            rot: occluder.rot,
-                            width,
-                            height,
-                            radius,
-                        });
-                        buffers.occluders.push(meta);
-                        continue;
-                    }
 
                     let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
                     let vertices_iter = || {
@@ -417,6 +453,7 @@ fn prepare_data(
                             buffers.occluders.binding().unwrap(),
                             buffers.sequences.binding().unwrap(),
                             buffers.vertices.binding().unwrap(),
+                            occluder_buffers.round_occluders.binding().unwrap(),
                             buffers.rounds.binding().unwrap(),
                             &camera.2.0.default_view,
                             &camera.3.0.default_view,

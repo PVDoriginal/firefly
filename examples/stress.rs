@@ -18,8 +18,8 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 0.5;
-const OCCLUDER_FREQ: f32 = 0.2;
+const LIGHT_FREQ: f32 = 1.5;
+const OCCLUDER_FREQ: f32 = 0.05;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
@@ -35,7 +35,17 @@ impl Default for Timers {
 fn main() {
     let mut app = App::new();
 
-    app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin));
+    app.add_plugins((
+        DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                present_mode: bevy::window::PresentMode::Immediate,
+                ..default()
+            }),
+            ..default()
+        }),
+        FireflyPlugin,
+        FireflyGizmosPlugin,
+    ));
 
     app.add_plugins((
         LogDiagnosticsPlugin::default(),
@@ -50,7 +60,7 @@ fn main() {
     app.add_systems(Update, change_scale);
 
     app.add_systems(Update, (spawn_lights, move_lights));
-    // app.add_systems(Update, (spawn_occluders, move_occluders));
+    app.add_systems(Update, (spawn_occluders, move_occluders));
 
     app.add_systems(Update, filters_inputs).add_systems(
         Update,
@@ -151,7 +161,7 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let occluder_type = rng.random_range(0..4);
+        let occluder_type = rng.random_range(0..1);
         let occluder = match occluder_type {
             0 => Occluder2d::round_rectangle(
                 rng.random_range(10.0..40.0),
