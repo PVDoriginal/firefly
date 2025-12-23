@@ -182,7 +182,6 @@ pub(crate) struct LightBuffers {
     pub sequences: GpuArrayBuffer<u32>,
     pub vertices: GpuArrayBuffer<UniformVertex>,
     pub rounds: BufferVec<u32>,
-    pub ids: GpuArrayBuffer<f32>,
 }
 
 pub(crate) struct LightPlugin;

@@ -113,7 +113,6 @@ pub fn extract_sprites(
         )>,
     >,
 ) {
-    let mut id_counter = 0.;
     extracted_sprites.sprites.clear();
     extracted_slices.slices.clear();
     for (
@@ -134,8 +133,6 @@ pub fn extract_sprites(
 
         let height = height.map_or(0., |h| h.0);
 
-        id_counter += f32::EPSILON;
-
         if let Some(slices) = slices {
             let start = extracted_slices.slices.len();
             extracted_slices
@@ -154,7 +151,6 @@ pub fn extract_sprites(
                 kind: ExtractedSpriteKind::Slices {
                     indices: start..end,
                 },
-                id: id_counter,
                 height,
             });
         } else {
@@ -189,7 +185,6 @@ pub fn extract_sprites(
                     // Pass the custom size
                     custom_size: sprite.custom_size,
                 },
-                id: id_counter,
                 height,
             });
         }
@@ -273,7 +268,6 @@ fn extract_occluders(
                 z: global_transform.translation().z + occluder.offset.z,
                 color: occluder.color,
                 opacity: occluder.opacity,
-                ignored_sprites: occluder.ignored_sprites.clone(),
                 z_sorting: occluder.z_sorting,
             });
     }

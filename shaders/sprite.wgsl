@@ -19,18 +19,16 @@ struct VertexInput {
     @location(0) i_model_transpose_col0: vec4<f32>,
     @location(1) i_model_transpose_col1: vec4<f32>,
     @location(2) i_model_transpose_col2: vec4<f32>,
-    @location(3) id: f32,
-    @location(4) i_uv_offset_scale: vec4<f32>,
-    @location(5) z: f32,
-    @location(6) height: f32,
+    @location(3) i_uv_offset_scale: vec4<f32>,
+    @location(4) z: f32,
+    @location(5) height: f32,
 }
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
-    @location(1) id: f32,
-    @location(2) z: f32,
-    @location(3) height: f32,
+    @location(1) z: f32,
+    @location(2) height: f32,
 };
 
 @vertex
@@ -49,7 +47,6 @@ fn vertex(in: VertexInput) -> VertexOutput {
         in.i_model_transpose_col2,
     )) * vec4<f32>(vertex_position, 1.0);
     out.uv = vec2<f32>(vertex_position.xy) * in.i_uv_offset_scale.zw + in.i_uv_offset_scale.xy;
-    out.id = in.id;
     out.z = in.z;
     out.height = in.height;
 
@@ -74,7 +71,7 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     var normal = textureSample(normal_texture, sprite_sampler, in.uv);
     
     if color.a > 0.1 {
-        res.stencil = vec4f(in.id, in.z, in.height, 1);
+        res.stencil = vec4f(0, in.z, in.height, 1);
     }
     else {
         res.stencil = vec4f(0, 0, 0, 0);

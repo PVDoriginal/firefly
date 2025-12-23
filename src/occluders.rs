@@ -202,7 +202,6 @@ pub(crate) struct ExtractedOccluder {
     pub z: f32,
     pub color: Color,
     pub opacity: f32,
-    pub ignored_sprites: Vec<Entity>,
     pub z_sorting: bool,
 }
 
@@ -321,7 +320,6 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
 pub(crate) struct UniformOccluder {
     pub n_sequences: u32,
     pub n_vertices: u32,
-    pub n_sprites: u32,
     pub z: f32,
     pub color: Vec3,
     pub opacity: f32,

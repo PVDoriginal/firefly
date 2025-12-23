@@ -83,10 +83,8 @@ impl FromWorld for LightmapCreationPipeline {
                     ),
                     // sprite normal map
                     (9, texture_2d(TextureSampleType::Float { filterable: true })),
-                    // sprite ids
-                    (10, GpuArrayBuffer::<f32>::binding_layout(render_device)),
                     //config,
-                    (11, uniform_buffer::<UniformFireflyConfig>(false)),
+                    (10, uniform_buffer::<UniformFireflyConfig>(false)),
                 ),
             ),
         );
@@ -344,29 +342,23 @@ impl SpecializedRenderPipeline for SpritePipeline {
                     offset: 32,
                     shader_location: 2,
                 },
-                // @location(3) id: f32,
+                // @location(3) i_uv_offset_scale: vec4<f32>,
                 VertexAttribute {
-                    format: VertexFormat::Float32,
+                    format: VertexFormat::Float32x4,
                     offset: 48,
                     shader_location: 3,
                 },
-                // @location(4) i_uv_offset_scale: vec4<f32>,
+                // @location(4) z: f32,
                 VertexAttribute {
-                    format: VertexFormat::Float32x4,
-                    offset: 52,
+                    format: VertexFormat::Float32,
+                    offset: 64,
                     shader_location: 4,
                 },
-                // @location(5) z: f32,
+                // @location(5) height: f32,
                 VertexAttribute {
                     format: VertexFormat::Float32,
                     offset: 68,
                     shader_location: 5,
-                },
-                // @location(6) height: f32,
-                VertexAttribute {
-                    format: VertexFormat::Float32,
-                    offset: 72,
-                    shader_location: 6,
                 },
             ],
         };

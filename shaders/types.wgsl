@@ -18,7 +18,6 @@ struct Occluder {
     n_sequences: u32,
     n_vertices: u32,
     round: u32,
-    n_sprites: u32,
     z: f32,
     color: vec3f, 
     opacity: f32,
@@ -47,8 +46,4 @@ struct FireflyConfig {
     // 0 - none, 1 - simple, 2 - topdown
     normal_mode: u32, 
     normal_attenuation: f32,
-}
-
-struct SpriteId {
-    id: f32
 }

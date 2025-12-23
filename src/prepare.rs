@@ -193,7 +193,6 @@ fn insert_light_buffers(
                 sequences: GpuArrayBuffer::<u32>::new(device),
                 vertices: GpuArrayBuffer::<UniformVertex>::new(device),
                 rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
-                ids: GpuArrayBuffer::<f32>::new(device),
             });
         }
     }
@@ -310,7 +309,6 @@ fn prepare_data(
                 buffers.sequences.clear();
                 buffers.vertices.clear();
                 buffers.rounds.clear();
-                buffers.ids.clear();
 
                 for (i, occluder) in round_occluder_rects.iter().enumerate() {
                     if occluder.intersect(light_rect).is_empty() {
@@ -333,23 +331,12 @@ fn prepare_data(
                     }
 
                     let mut meta: UniformOccluder = default();
-                    let ids: Vec<_> = sprites
-                        .sprites
-                        .iter()
-                        .filter(|x| occluder.ignored_sprites.contains(&x.main_entity))
-                        .collect();
-
-                    meta.n_sprites = ids.len() as u32;
                     meta.z = occluder.z;
 
                     meta.z_sorting = match occluder.z_sorting {
                         false => 0,
                         true => 1,
                     };
-
-                    for id in &ids {
-                        buffers.ids.push(id.id);
-                    }
 
                     meta.color = occluder.color.to_linear().to_vec3();
                     meta.opacity = occluder.opacity;
@@ -430,7 +417,6 @@ fn prepare_data(
                 buffers.sequences.push(default());
                 buffers.vertices.push(default());
                 buffers.rounds.push(default());
-                buffers.ids.push(default());
 
                 buffers
                     .occluders
@@ -440,7 +426,6 @@ fn prepare_data(
                     .write_buffer(&render_device, &render_queue);
                 buffers.vertices.write_buffer(&render_device, &render_queue);
                 buffers.rounds.write_buffer(&render_device, &render_queue);
-                buffers.ids.write_buffer(&render_device, &render_queue);
 
                 light_bind_groups.values.entry(*entity).insert({
                     render_device.create_bind_group(
@@ -457,7 +442,6 @@ fn prepare_data(
                             buffers.rounds.binding().unwrap(),
                             &camera.2.0.default_view,
                             &camera.3.0.default_view,
-                            buffers.ids.binding().unwrap(),
                             camera.4.0.binding().unwrap(),
                         )),
                     )
@@ -690,7 +674,6 @@ fn prepare_sprite_image_bind_groups(
                         .push(SpriteInstance::from(
                             &transform,
                             &uv_offset_scale,
-                            extracted_sprite.id,
                             extracted_sprite.transform.translation().z,
                             extracted_sprite.height,
                         ));
@@ -737,7 +720,6 @@ fn prepare_sprite_image_bind_groups(
                             .push(SpriteInstance::from(
                                 &transform,
                                 &uv_offset_scale,
-                                extracted_sprite.id,
                                 extracted_sprite.transform.translation().z,
                                 extracted_sprite.height,
                             ));

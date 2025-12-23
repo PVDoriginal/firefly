@@ -39,9 +39,6 @@ var sprite_stencil: texture_2d<f32>;
 var normal_map: texture_2d<f32>;
 
 @group(0) @binding(10)
-var<storage> ids: array<f32>;
-
-@group(0) @binding(11)
 var<uniform> config: FireflyConfig;
 
 const PI2: f32 = 6.28318530718;
@@ -104,7 +101,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var round_index = 0u;
         var start_vertex = 0u;
         var sequence_index = 0u;
-        var id_index = 0u;
 
         var shadow = vec3f(1); 
 
@@ -132,10 +128,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             
             if (stencil.a > 0.1) {
                 if (config.z_sorting == 1 && occluders[i].z_sorting == 1 && stencil.g >= occluders[i].z) {
-                    continue;
-                }
-
-                if (is_excluded(i, id_index, stencil.r)) {
                     continue;
                 }
             }
@@ -170,7 +162,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             continuing {
                 sequence_index += occluders[i].n_sequences;
                 start_vertex += occluders[i].n_vertices;
-                id_index += occluders[i].n_sprites;
 
                 if (occluders[i].round == 1) {
                     round_index += 1;
@@ -182,15 +173,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         res *= vec4f(shadow, 1);
     }
     return res;
-}
-
-fn is_excluded(occluder: u32, start_id: u32, id: f32) -> bool {
-    for (var i = start_id; i < start_id + occluders[occluder].n_sprites; i++) {
-        if (ids[i] == id) {
-            return true;
-        }
-    }
-    return false;
 }
 
 struct OcclusionResult {

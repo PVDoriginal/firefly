@@ -57,7 +57,6 @@ pub(crate) struct ExtractedSprite {
     pub flip_x: bool,
     pub flip_y: bool,
     pub kind: ExtractedSpriteKind,
-    pub id: f32,
     pub height: f32,
 }
 
@@ -95,22 +94,15 @@ pub(crate) struct SpriteAssetEvents {
 pub(crate) struct SpriteInstance {
     // Affine 4x3 transposed to 3x4
     pub i_model_transpose: [Vec4; 3],
-    pub id: f32,
     pub i_uv_offset_scale: [f32; 4],
     pub z: f32,
     pub height: f32,
-    pub _padding: f32,
+    pub _padding: [f32; 2],
 }
 
 impl SpriteInstance {
     #[inline]
-    pub fn from(
-        transform: &Affine3A,
-        uv_offset_scale: &Vec4,
-        id: f32,
-        z: f32,
-        height: f32,
-    ) -> Self {
+    pub fn from(transform: &Affine3A, uv_offset_scale: &Vec4, z: f32, height: f32) -> Self {
         let transpose_model_3x3 = transform.matrix3.transpose();
         Self {
             i_model_transpose: [
@@ -118,11 +110,10 @@ impl SpriteInstance {
                 transpose_model_3x3.y_axis.extend(transform.translation.y),
                 transpose_model_3x3.z_axis.extend(transform.translation.z),
             ],
-            id,
             z,
             i_uv_offset_scale: uv_offset_scale.to_array(),
             height,
-            _padding: 0.,
+            _padding: [0.0, 0.0],
         }
     }
 }
