@@ -150,7 +150,8 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         Occluder2d::capsule(65., 11.),
-        Transform::from_translation(vec3(-127., -102., 0.)),
+        Transform::from_translation(vec3(-127., -102., 0.))
+            .with_rotation(Quat::from_rotation_z(0.5)),
     ));
 
     commands.spawn((
