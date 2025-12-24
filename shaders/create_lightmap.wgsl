@@ -5,7 +5,7 @@
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
-    intersection_point, rect_intersection, rect_line_intersection
+    intersection_point, rect_intersection, rect_line_intersection, intersects_axis_edge, intersects_corner_arc
 }
 
 @group(0) @binding(0)
@@ -117,6 +117,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
             if result.occluded == true {
                 shadow = shadow_blend(shadow, vec3f(1), 1.0);
+            }                    
+            else if config.softness > 0 && result.extreme_angle < soft_angle {
+                shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
             }
         } 
 
@@ -264,119 +267,114 @@ fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
 
 // checks if pixel is blocked by round occluder
 fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
-    let center = round_occluders[occluder].pos;
-    let width = round_occluders[occluder].width / 2; 
-    let height = round_occluders[occluder].height / 2; 
-    let radius = round_occluders[occluder].radius;
+    let occ = round_occluders[occluder];
+    let half_w = occ.width * 0.5;
+    let half_h = occ.height * 0.5;
+    let radius = occ.radius;
+
+    let relative_pos = pos - occ.pos; 
+    let relative_light = light.pos - occ.pos; 
 
     var rot = round_occluders[occluder].rot;
     
-    if (rot > PI2) {
-        rot = rot - PI2 * floor(rot / PI2);
-    }
+    // if (rot > PI2) {
+    //     rot = rot - PI2 * floor(rot / PI2);
+    // }
 
-    let cos_sin = vec2f(cos(rot), sin(rot));
+    let c = cos(occ.rot);
+    let s = sin(occ.rot);
 
-    let rect = round_rect_aabb(center, width, height, radius, cos_sin);
+    let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
+    let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
 
-    // TODO: make this check work with softness. Needs to increase the rect size based on soft angle.
-    if config.softness == 0 && !rect_line_intersection(pos, light.pos, rect) {
-        return OcclusionResult(false, 0.0);
-    }
+    var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
+
+    // if !rect_line_intersection(p_local, l_local, rect) {
+    //     let extreme_angle = get_extreme_angle_unified(p_local, l_local, half_w, half_h, radius); 
+    //     return OcclusionResult(false, extreme_angle);
+    // }
+
     var extreme_angle = 10f;
 
-    if (width > 0) {
-        let top_edge = vec4f(
-            center + rotate(vec2f(-width, height + radius), cos_sin), 
-            center + rotate(vec2f(width, height + radius), cos_sin)
-        );
-
-        if intersect(top_edge.xy, top_edge.zw, pos, light.pos) {
-            return OcclusionResult(true, 0f);
+    if (occ.width > 0) {
+        // top edge
+        if intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false) {
+            return OcclusionResult(true, 0.0);
         }
 
-        let bottom_edge = vec4f(
-            center + rotate(vec2f(-width, -height - radius), cos_sin), 
-            center + rotate(vec2f(width, -height - radius), cos_sin)
-        );
-
-        if intersect(bottom_edge.xy, bottom_edge.zw, pos, light.pos) {
-            return OcclusionResult(true, 0f);
+        // bottom edge
+        if intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false) {
+            return OcclusionResult(true, 0.0);
         }
 
         if config.softness > 0 {
             extreme_angle = min(
                 extreme_angle, 
                 min(
-                    min(get_extreme_angle(pos, top_edge.xy),  get_extreme_angle(pos, top_edge.zw)),
-                    min(get_extreme_angle(pos, bottom_edge.xy), get_extreme_angle(pos, bottom_edge.zw))
+                    min(
+                        get_extreme_angle_local(p_local, l_local, vec2f(-half_w, half_h + radius)),
+                        get_extreme_angle_local(p_local, l_local, vec2f(half_w, half_h + radius))
+                    ),
+                    min(
+                        get_extreme_angle_local(p_local, l_local, vec2f(-half_w, -(half_h + radius))),
+                        get_extreme_angle_local(p_local, l_local, vec2f(half_w, -(half_h + radius)))
+                    )
                 )
             );
         }
     }
 
-    if (height > 0) {
-        let right_edge = vec4f(
-            center + rotate(vec2f(width + radius, height), cos_sin),
-            center + rotate(vec2f(width + radius, -height), cos_sin)
-        );
-
-        if intersect(right_edge.xy, right_edge.zw, pos, light.pos) {
-            return OcclusionResult(true, 0f);
+    if (occ.height > 0) {
+        // right edge
+        if intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true) {
+            return OcclusionResult(true, 0.0);
         }
-        
-        let left_edge = vec4f(
-            center + rotate(vec2f(-width - radius, height), cos_sin), 
-            center + rotate(vec2f(-width - radius, -height), cos_sin)
-        );
 
-        if intersect(left_edge.xy, left_edge.zw, pos, light.pos) {
-            return OcclusionResult(true, 0f);
+        // left edge
+        if intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true) {
+            return OcclusionResult(true, 0.0);
         }
 
         if config.softness > 0 {
             extreme_angle = min(
                 extreme_angle, 
                 min(
-                    min(get_extreme_angle(pos, right_edge.xy),  get_extreme_angle(pos, right_edge.zw)),
-                    min(get_extreme_angle(pos, left_edge.xy), get_extreme_angle(pos, left_edge.zw)),
+                    min(
+                        get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, half_h)),
+                        get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, -half_h))
+                    ),
+                    min(
+                        get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), half_h)),
+                        get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), -half_h))
+                    )
                 )
             );
         }
     }
 
     if (radius > 0) {
-        let top_left = center + rotate(vec2f(-width, height), cos_sin);
-        if intersects_arc(pos, light.pos, top_left, radius, rotate_arctan(PIDIV2, rot), rotate_arctan(PI, rot)) {
-            return OcclusionResult(true, 0f);
+        let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
+        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
+        for(var i = 0u; i < 4u; i++) {
+            if intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]) { return OcclusionResult(true, 0.0); }
         }
 
-        let top_right = center + rotate(vec2f(width, height), cos_sin);
-        if intersects_arc(pos, light.pos, top_right, radius, rotate_arctan(0, rot), rotate_arctan(PIDIV2, rot)) {
-            return OcclusionResult(true, 0f);
-        }
-        
-        let bottom_right = center + rotate(vec2f(width, -height), cos_sin);
-        if intersects_arc(pos, light.pos, bottom_right, radius, rotate_arctan(-PIDIV2, rot), rotate_arctan(0, rot)) {
-            return OcclusionResult(true, 0f);
-        }
-        
-        let bottom_left = center + rotate(vec2f(-width, -height), cos_sin);
-        if intersects_arc(pos, light.pos, bottom_left, radius, rotate_arctan(-PI, rot), rotate_arctan(-PIDIV2, rot)) {
-            return OcclusionResult(true, 0f);
-        }
+        // extreme_angle = min(
+        //     extreme_angle, 
+        //     get_arc_extremes(p_local, l_local, centers[0], radius, 0.0, PIDIV2)
+        // );
 
         if config.softness > 0 {
             extreme_angle = min(
                 extreme_angle, 
                 min(
                     min(
-                        get_arc_extremes(pos, light.pos, top_left, radius, rotate_arctan(PIDIV2, rot), rotate_arctan(PI, rot)),  
-                        get_arc_extremes(pos, light.pos, top_right, radius, rotate_arctan(0, rot), rotate_arctan(PIDIV2, rot)),  
+                        get_arc_extremes(p_local, l_local, centers[0], radius, 0.0, PIDIV2),
+                        get_arc_extremes(p_local, l_local, centers[1], radius, PIDIV2, PI),
                     ),
                     min(
-                        get_arc_extremes(pos, light.pos, bottom_right, radius, rotate_arctan(-PIDIV2, rot), rotate_arctan(0, rot)), 
-                        get_arc_extremes(pos, light.pos, bottom_left, radius, rotate_arctan(-PI, rot), rotate_arctan(-PIDIV2, rot)),  
+                        get_arc_extremes(p_local, l_local, centers[2], radius, -PIDIV2, 0.0),
+                        get_arc_extremes(p_local, l_local, centers[3], radius, -PI, -PIDIV2),
                     )
                 )
             );
@@ -387,11 +385,11 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
 }
 
 fn round_rect_aabb(center: vec2f, width: f32, height: f32, radius: f32, cos_sin: vec2f) -> vec4f {
-    let hw = width * 0.5;
-    let hh = height * 0.5;
+    let half_w = width * 0.5;
+    let half_h = height * 0.5;
 
-    let ex = hw * cos_sin.x + hh * cos_sin.y;
-    let ey = hw * cos_sin.y + hh * cos_sin.x;
+    let ex = half_w * cos_sin.x + half_h * cos_sin.y;
+    let ey = half_w * cos_sin.y + half_h * cos_sin.x;
 
     let min_p = center - vec2f(ex + radius, ey + radius);
     let max_p = center + vec2f(ex + radius, ey + radius);
@@ -399,30 +397,73 @@ fn round_rect_aabb(center: vec2f, width: f32, height: f32, radius: f32, cos_sin:
     return vec4f(min_p.x, min_p.y, max_p.x, max_p.y);
 }
 
+// fn get_arc_extremes(pos: vec2f, p: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> f32 {
+//     let b = sqrt((p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y));
+//     let th = acos(r / b);
+//     let d = atan2(p.y - c.y, p.x - c.x);
+//     let d1 = d + th;
+//     let d2 = d - th;
 
+//     let t1 = vec2f(c.x + r * cos(d1), c.y + r * sin(d1));
+//     let t2 = vec2f(c.x + r * cos(d2), c.y + r * sin(d2));
 
-fn get_arc_extremes(pos: vec2f, p: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> f32 {
-    let b = sqrt((p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y));
-    let th = acos(r / b);
-    let d = atan2(p.y - c.y, p.x - c.x);
+//     let a1 = atan2(t1.y - c.y, t1.x - c.x);
+//     let a2 = atan2(t2.y - c.y, t2.x - c.x);
+
+//     var res = 10f;
+
+//     if (between_arctan(a1, start_angle, end_angle)) {
+//         res = min(res, get_extreme_angle(pos, t1));
+//     }
+
+//     if (between_arctan(a2, start_angle, end_angle)) {
+//         res = min(res, get_extreme_angle(pos, t2));
+//     }
+
+//     return res;
+// }
+
+fn get_arc_extremes(p_local: vec2f, l_local: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> f32 {
+    let diff = p_local - c;
+    let dist_sq = dot(diff, diff);
+    
+    // Pixel is inside the corner radius
+    // if (dist_sq <= r * r) { return 10.0; } 
+
+    let dist = sqrt(dist_sq);
+    let th = acos(r / dist);
+    let d = atan2(diff.y, diff.x);
+    
     let d1 = d + th;
     let d2 = d - th;
 
+    // Tangent points on the circle
     let t1 = vec2f(c.x + r * cos(d1), c.y + r * sin(d1));
     let t2 = vec2f(c.x + r * cos(d2), c.y + r * sin(d2));
 
+    // Angles of tangent points relative to center 'c'
     let a1 = atan2(t1.y - c.y, t1.x - c.x);
     let a2 = atan2(t2.y - c.y, t2.x - c.x);
 
-    var res = 10f;
+    var res = 10.0;
 
     if (between_arctan(a1, start_angle, end_angle)) {
-        res = min(res, get_extreme_angle(pos, t1));
+        res = min(res, get_extreme_angle_local(p_local, l_local, t1));
     }
 
     if (between_arctan(a2, start_angle, end_angle)) {
-        res = min(res, get_extreme_angle(pos, t2));
+        res = min(res, get_extreme_angle_local(p_local, l_local, t2));
     }
 
     return res;
+}
+
+fn get_extreme_angle_local(p: vec2f, l: vec2f, t: vec2f) -> f32 {
+    let light_proj = (t - l) + t;  
+    
+    let a = t - p;
+    let b = t - light_proj;
+    let angle = acos(dot(a, b) / (length(a) * length(b)));
+    
+    return angle;
 }

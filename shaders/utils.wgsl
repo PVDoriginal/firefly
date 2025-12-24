@@ -203,3 +203,67 @@ fn rect_line_intersection(a: vec2f, b: vec2f, rect: vec4f) -> bool {
 
     return t_min <= t_max;
 }
+
+fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, is_vertical: bool) -> bool {
+    let d = l - p;
+    
+    if (is_vertical) {
+        // Vertical edge (fixed x)
+        if (abs(d.x) < 1e-6) { return false; } 
+        let t = (coord - p.x) / d.x;
+        if (t >= 0.0 && t <= 1.0) {
+            let y_hit = p.y + t * d.y;
+            return y_hit >= min_v && y_hit <= max_v;
+        }
+    } else {
+        // Horizontal edge (fixed y)
+        if (abs(d.y) < 1e-6) { return false; }
+        let t = (coord - p.y) / d.y;
+        if (t >= 0.0 && t <= 1.0) {
+            let x_hit = p.x + t * d.x;
+            return x_hit >= min_v && x_hit <= max_v;
+        }
+    }
+    return false;
+}
+
+// Checks intersection between line segment [p1, p2] and a 90-degree arc 
+// c: center of the arc, r: radius, quadrant: a vec2 indicating which corner (+1 or -1)
+fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f) -> bool {
+    let d = p2 - p1;
+    let f = p1 - c;
+
+    // Quadratic equation: at^2 + bt + c = 0
+    let a_quad = dot(d, d);
+    let b_quad = 2.0 * dot(f, d);
+    let c_quad = dot(f, f) - r * r;
+
+    let discriminant = b_quad * b_quad - 4.0 * a_quad * c_quad;
+
+    if (discriminant < 0.0) {
+        return false; // No intersection with the infinite circle
+    }
+
+    let sqrt_d = sqrt(discriminant);
+    let t1 = (-b_quad - sqrt_d) / (2.0 * a_quad);
+    let t2 = (-b_quad + sqrt_d) / (2.0 * a_quad);
+
+    // Check if the intersection points are on the segment (t in [0, 1])
+    // and if they lie within the correct quadrant
+    let ts = vec2f(t1, t2);
+    for (var i = 0; i < 2; i++) {
+        let t = ts[i];
+        if (t >= 0.0 && t <= 1.0) {
+            let hit_point = p1 + t * d;
+            let local_hit = hit_point - c;
+            
+            // Fast Quadrant Check: Instead of atan2, just check the sign of the vector components
+            // If quadrant is vec2(1, 1), we check if local_hit.x > 0 and local_hit.y > 0
+            if (sign(local_hit.x) == quadrant.x && sign(local_hit.y) == quadrant.y) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}

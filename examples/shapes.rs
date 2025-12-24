@@ -26,8 +26,8 @@ fn setup(mut commands: Commands) {
         Projection::Orthographic(projection),
         FireflyConfig {
             ambient_brightness: 0.3,
-            softness: None,
-            light_bands: Some(4),
+            softness: Some(0.5),
+            // light_bands: Some(4),
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
