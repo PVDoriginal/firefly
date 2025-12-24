@@ -19,7 +19,7 @@ struct Timers {
 }
 
 const LIGHT_FREQ: f32 = 1.5;
-const OCCLUDER_FREQ: f32 = 0.05;
+const OCCLUDER_FREQ: f32 = 0.1;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 

@@ -171,3 +171,35 @@ fn rect_intersection(r1: vec4f, r2: vec4f) -> bool {
         r2.y < r1.w
     );
 }
+
+// Liang-Barsky algorithm for line clipping
+fn rect_line_intersection(a: vec2f, b: vec2f, rect: vec4f) -> bool {
+    let d = b - a;
+    
+    var t_min = 0.0f;
+    var t_max = 1.0f;
+
+    if (abs(d.x) < 1e-6) {
+        if (a.x < rect.x || a.x > rect.z) { return false; }
+    } else {
+        let inv_dx = 1.0 / d.x;
+        var t1 = (rect.x - a.x) * inv_dx;
+        var t2 = (rect.z - a.x) * inv_dx;
+        
+        t_min = max(t_min, min(t1, t2));
+        t_max = min(t_max, max(t1, t2));
+    }
+
+    if (abs(d.y) < 1e-6) {
+        if (a.y < rect.y || a.y > rect.w) { return false; }
+    } else {
+        let inv_dy = 1.0 / d.y;
+        var t1 = (rect.y - a.y) * inv_dy;
+        var t2 = (rect.w - a.y) * inv_dy;
+        
+        t_min = max(t_min, min(t1, t2));
+        t_max = min(t_max, max(t1, t2));
+    }
+
+    return t_min <= t_max;
+}

@@ -5,7 +5,7 @@
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
-    intersection_point, rect_intersection
+    intersection_point, rect_intersection, rect_line_intersection
 }
 
 @group(0) @binding(0)
@@ -277,6 +277,12 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
 
     let cos_sin = vec2f(cos(rot), sin(rot));
 
+    let rect = round_rect_aabb(center, width, height, radius, cos_sin);
+
+    // TODO: make this check work with softness. Needs to increase the rect size based on soft angle.
+    if config.softness == 0 && !rect_line_intersection(pos, light.pos, rect) {
+        return OcclusionResult(false, 0.0);
+    }
     var extreme_angle = 10f;
 
     if (width > 0) {
@@ -379,6 +385,21 @@ fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
 
     return OcclusionResult(false, extreme_angle);
 }
+
+fn round_rect_aabb(center: vec2f, width: f32, height: f32, radius: f32, cos_sin: vec2f) -> vec4f {
+    let hw = width * 0.5;
+    let hh = height * 0.5;
+
+    let ex = hw * cos_sin.x + hh * cos_sin.y;
+    let ey = hw * cos_sin.y + hh * cos_sin.x;
+
+    let min_p = center - vec2f(ex + radius, ey + radius);
+    let max_p = center + vec2f(ex + radius, ey + radius);
+
+    return vec4f(min_p.x, min_p.y, max_p.x, max_p.y);
+}
+
+
 
 fn get_arc_extremes(pos: vec2f, p: vec2f, c: vec2f, r: f32, start_angle: f32, end_angle: f32) -> f32 {
     let b = sqrt((p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y));
