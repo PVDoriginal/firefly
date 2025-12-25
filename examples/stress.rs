@@ -23,6 +23,8 @@ const OCCLUDER_FREQ: f32 = 0.1;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
+const MOVE_FREQ: f32 = 0.5;
+
 impl Default for Timers {
     fn default() -> Self {
         Timers {
@@ -142,16 +144,23 @@ fn move_lights(
     time: Res<Time>,
     mut commands: Commands,
 ) {
+    let mut rng = rng();
     for (id, mut transform, light) in &mut lights {
-        transform.translation.y -= time.delta_secs() * 900.0;
+        let r = rng.random_range(0.0..1.0);
+
+        if r <= MOVE_FREQ {
+            transform.translation.y -= time.delta_secs() * 900.0;
+
+            if transform.translation.y + light.range < -HEIGHT / 2.0 {
+                commands.entity(id).despawn();
+            }
+        }
+
         gizmos.circle_2d(
             Isometry2d::from_translation(transform.translation.truncate()),
             5.,
             light.color,
         );
-        if transform.translation.y + light.range < -HEIGHT / 2.0 {
-            commands.entity(id).despawn();
-        }
     }
 }
 
@@ -208,14 +217,19 @@ fn move_occluders(
     time: Res<Time>,
     mut commands: Commands,
 ) {
+    let mut rng = rng();
     for (id, mut transform) in &mut occluders {
-        transform.translation.y += time.delta_secs() * 1000.0;
+        let r = rng.random_range(0.0..1.0);
 
-        if transform.translation.y > HEIGHT / 2.0 + 60. {
-            commands.entity(id).despawn();
+        if r <= MOVE_FREQ {
+            transform.translation.y += time.delta_secs() * 1000.0;
+
+            if transform.translation.y > HEIGHT / 2.0 + 60. {
+                commands.entity(id).despawn();
+            }
+
+            transform.rotate_z(3. * time.delta_secs());
         }
-
-        transform.rotate_z(3. * time.delta_secs());
     }
 }
 

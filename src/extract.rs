@@ -16,7 +16,7 @@ use bevy::{
 use crate::{
     LightmapPhase,
     data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, LightHeight, PointLight2d},
+    lights::{ExtractedPointLight, LightHeight, LightIndex, PointLight2d},
     occluders::ExtractedOccluder,
     phases::SpritePhase,
     prelude::Occluder2d,
@@ -211,10 +211,11 @@ fn extract_lights(
             &PointLight2d,
             &LightHeight,
             &ViewVisibility,
+            &LightIndex,
         )>,
     >,
 ) {
-    for (entity, transform, light, height, view_visibility) in &lights {
+    for (entity, transform, light, height, view_visibility, index) in &lights {
         if !view_visibility.get() {
             continue;
         }
@@ -232,6 +233,7 @@ fn extract_lights(
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
             height: height.0,
+            index: index.0,
         });
     }
 }

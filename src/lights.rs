@@ -153,6 +153,7 @@ pub(crate) struct ExtractedPointLight {
     pub dir: Vec2,
     pub z: f32,
     pub height: f32,
+    pub index: u32,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -208,12 +209,14 @@ impl LightIndices {
 }
 
 #[derive(Component)]
+#[require(SyncToRenderWorld)]
 pub(crate) struct LightIndex(pub u32);
 
 pub(crate) struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LightRect>();
+        app.init_resource::<LightIndices>();
 
         app.add_systems(Update, assign_light_indices);
         app.add_observer(discard_light_index);
@@ -227,7 +230,6 @@ impl Plugin for LightPlugin {
         );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app.init_resource::<LightIndices>();
             render_app.init_resource::<LightBindGroups>();
             render_app.init_resource::<DrawFunctions<LightmapPhase>>();
             render_app.init_resource::<ViewBinnedRenderPhases<LightmapPhase>>();
