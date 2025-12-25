@@ -23,8 +23,9 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, BufferUsages, BufferVec, GpuArrayBuffer, RawBufferVec,
-            TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
+            BindGroupEntries, BufferUsages, BufferVec, DynamicStorageBuffer, GpuArrayBuffer,
+            RawBufferVec, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+            UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
