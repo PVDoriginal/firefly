@@ -1,4 +1,4 @@
-use std::{any::TypeId, ops::Range};
+use std::{any::TypeId, collections::VecDeque, ops::Range};
 
 use bevy::{
     camera::visibility::{
@@ -184,10 +184,39 @@ pub(crate) struct LightBuffers {
     pub rounds: BufferVec<u32>,
 }
 
+/// This resource handles giving lights indices and redistributing unused indices
+#[derive(Resource, Default)]
+pub(crate) struct LightIndices {
+    next_index: u32,
+    discarded: VecDeque<u32>,
+}
+
+impl LightIndices {
+    pub fn take_index(&mut self) -> u32 {
+        let index = match self.discarded.pop_back() {
+            Some(index) => index,
+            None => self.next_index,
+        };
+
+        self.next_index += 1;
+        index
+    }
+
+    pub fn return_index(&mut self, index: u32) {
+        self.discarded.push_front(index);
+    }
+}
+
+#[derive(Component)]
+pub(crate) struct LightIndex(pub u32);
+
 pub(crate) struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LightRect>();
+
+        app.add_systems(Update, assign_light_indices);
+        app.add_observer(discard_light_index);
 
         app.add_systems(
             PostUpdate,
@@ -198,9 +227,11 @@ impl Plugin for LightPlugin {
         );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+            render_app.init_resource::<LightIndices>();
             render_app.init_resource::<LightBindGroups>();
             render_app.init_resource::<DrawFunctions<LightmapPhase>>();
             render_app.init_resource::<ViewBinnedRenderPhases<LightmapPhase>>();
+
             render_app.add_render_command::<LightmapPhase, DrawLightmap>();
 
             render_app.add_systems(
@@ -217,6 +248,30 @@ impl Plugin for LightPlugin {
             render_app.init_resource::<LightBatches>();
         }
     }
+}
+
+fn assign_light_indices(
+    lights: Populated<Entity, Added<PointLight2d>>,
+    mut indices: ResMut<LightIndices>,
+    mut commands: Commands,
+) {
+    for light in lights {
+        commands
+            .entity(light)
+            .insert(LightIndex(indices.take_index()));
+    }
+}
+
+fn discard_light_index(
+    trigger: On<Remove, PointLight2d>,
+    lights: Query<&LightIndex>,
+    mut indices: ResMut<LightIndices>,
+) {
+    if let Ok(light) = lights.get(trigger.entity) {
+        indices.return_index(light.0);
+        return;
+    }
+    warn!("Can't find light index for entity: {}", trigger.entity);
 }
 
 #[derive(Resource, Deref, DerefMut, Default)]
