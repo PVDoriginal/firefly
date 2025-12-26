@@ -1,12 +1,18 @@
+use std::{collections::VecDeque, time::Duration};
+
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
     render::{
         extract_component::ExtractComponent,
-        render_resource::{BindingResource, Buffer, BufferDescriptor, BufferUsages, ShaderType},
-        renderer::RenderDevice,
+        render_resource::{
+            BindingResource, Buffer, BufferDescriptor, BufferUsages, BufferVec, ShaderType,
+            encase::private::WriteInto,
+        },
+        renderer::{RenderDevice, RenderQueue},
     },
 };
+use bytemuck::NoUninit;
 #[derive(Component, Default, Clone, ExtractComponent, Reflect)]
 pub(crate) struct ExtractedWorldData {
     pub camera_pos: Vec2,
@@ -123,23 +129,120 @@ pub(crate) struct UniformFireflyConfig {
     pub normal_attenuation: f32,
 }
 
-#[derive(Resource)]
-pub(crate) struct EmptyBuffer(pub Buffer);
+const BUFFER_TIMEOUT: f32 = 0.2;
 
-impl FromWorld for EmptyBuffer {
-    fn from_world(world: &mut World) -> Self {
+/// This Resource handles when and where entities go in the buffer that's then passed to the GPU.
+/// It gives and frees indicies, and decides when to refragment the whole buffer.
+///
+/// This is used by lights and occluders.
+#[derive(Resource)]
+pub struct BufferManager<T: ShaderType + WriteInto + Default + NoUninit> {
+    buffer: BufferVec<T>,
+    timeouts: Vec<Timer>,
+    next_index: usize,
+    free_indices: VecDeque<usize>,
+    write_min: usize,
+    write_max: usize,
+    rewrite: bool,
+}
+
+impl<T: ShaderType + WriteInto + Default + NoUninit> FromWorld for BufferManager<T> {
+    fn from_world(world: &mut bevy::prelude::World) -> BufferManager<T> {
         let device = world.resource::<RenderDevice>();
-        Self(device.create_buffer(&BufferDescriptor {
-            label: "empty_buffer".into(),
-            size: 64,
-            usage: BufferUsages::STORAGE,
-            mapped_at_creation: false,
-        }))
+        let queue = world.resource::<RenderQueue>();
+
+        Self::new(device, queue)
     }
 }
 
-impl EmptyBuffer {
-    pub fn binding(&self) -> BindingResource<'_> {
-        BindingResource::Buffer(self.0.as_entire_buffer_binding())
+impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
+    fn new_index(&mut self) -> usize {
+        self.free_indices
+            .pop_back()
+            .unwrap_or_else(|| self.next_index)
+    }
+
+    fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
+        let mut res = Self {
+            buffer: BufferVec::<T>::new(BufferUsages::STORAGE),
+            timeouts: default(),
+            next_index: default(),
+            free_indices: default(),
+            write_min: default(),
+            write_max: default(),
+            rewrite: false,
+        };
+
+        // empty value is added so the buffer can be written to VRAM from the start
+        res.buffer.push(default());
+        res.buffer.write_buffer(device, queue);
+
+        res
+    }
+
+    /// Called by an entity to pass it's value to the buffer and get back it's index.
+    ///
+    /// Value can be None, meaning the entity is still active but it's data didn't change.
+    ///
+    /// Index can be None, meaning the entity didn't have an index already assigned.
+    pub fn set_value(&mut self, value: &T, index: Option<usize>) -> usize {
+        let index = match index {
+            None => self.new_index(),
+            Some(i) => {
+                if i < self.next_index {
+                    i
+                } else {
+                    self.new_index()
+                }
+            }
+        };
+
+        if index < self.next_index {
+            self.timeouts[index as usize] = Timer::from_seconds(BUFFER_TIMEOUT, TimerMode::Once);
+
+            let mut view = self.buffer.buffer().unwrap().get_mapped_range_mut(
+                (index + 1) as u64 * T::min_size().get()..(index + 2) as u64 * T::min_size().get(),
+            );
+
+            for chunk in view.chunks_exact_mut(T::min_size().get() as usize) {
+                chunk.clone_from_slice(bytemuck::bytes_of(value));
+            }
+        } else {
+            self.next_index += 1;
+            self.buffer.push(*value);
+            self.timeouts
+                .push(Timer::from_seconds(BUFFER_TIMEOUT, TimerMode::Once));
+            self.rewrite = true;
+        }
+
+        self.write_min = self.write_min.min(index + 1);
+        self.write_min = self.write_max.max(index + 1);
+
+        index
+    }
+
+    /// Flush the changes at the end of a render frame.
+    ///
+    /// This times out entities that haven't been active in a while, and efficiently passes all current changes to the GPU.
+    pub fn flush(&mut self, delta: Duration, device: &RenderDevice, queue: &RenderQueue) {
+        if self.rewrite {
+            self.buffer.write_buffer(device, queue);
+            self.rewrite = false;
+        } else {
+            self.buffer
+                .write_buffer_range(queue, self.write_min as usize..self.write_max as usize + 1)
+                .expect("couldn't write to buffer");
+
+            for (i, timeout) in self.timeouts.iter_mut().enumerate() {
+                if timeout.tick(delta).just_finished() {
+                    self.free_indices.push_front(i);
+                }
+            }
+
+            // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized.
+            if self.free_indices.len() > self.next_index as usize / 2 {
+                *self = Self::new(device, queue);
+            }
+        }
     }
 }

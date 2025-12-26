@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    data::{EmptyBuffer, ExtractedWorldData, NormalMode},
+    data::{ExtractedWorldData, NormalMode},
     lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
     occluders::{OccluderBuffers, point_inside_poly},
     phases::SpritePhase,
@@ -77,7 +77,6 @@ impl Plugin for PreparePlugin {
             return;
         };
         render_app.init_resource::<OccluderBuffers>();
-        render_app.init_resource::<EmptyBuffer>();
     }
 }
 
@@ -218,7 +217,6 @@ fn prepare_data(
     mut batches: ResMut<LightBatches>,
     view_uniforms: Res<ViewUniforms>,
     mut occluder_buffers: ResMut<OccluderBuffers>,
-    empty_buffer: Res<EmptyBuffer>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
