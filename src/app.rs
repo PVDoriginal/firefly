@@ -1,4 +1,7 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    time::Duration,
+};
 
 use bevy::{
     asset::load_internal_asset,
@@ -15,12 +18,65 @@ use crate::{
     extract::ExtractPlugin,
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
-    occluders::{Occluder2dShape, translate_vertices},
+    occluders::{Occluder2dShape, OccluderPlugin, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
     sprites::SpritesPlugin,
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
+
+#[derive(Component)]
+pub(crate) enum VisibilityTime {
+    Visible(bool),
+    NotVisibleFor(Timer),
+}
+
+impl VisibilityTime {
+    pub fn step(&mut self, visible: bool, delta: Duration) {
+        if visible {
+            *self = match self {
+                Self::NotVisibleFor(_) => Self::Visible(true),
+                _ => Self::Visible(false),
+            }
+        } else {
+            *self = match self {
+                Self::Visible(_) => Self::NotVisibleFor(Timer::from_seconds(1.0, TimerMode::Once)),
+                Self::NotVisibleFor(t) => Self::NotVisibleFor({
+                    let mut t = t.clone();
+                    t.tick(delta);
+                    t
+                }),
+            }
+        }
+    }
+}
+
+impl Default for VisibilityTime {
+    fn default() -> Self {
+        Self::NotVisibleFor(Timer::default())
+    }
+}
+
+#[derive(Component)]
+pub(crate) struct LastVisible(pub Timer);
+
+#[derive(Component, Default)]
+pub(crate) struct BecameNotVisible;
+
+impl Default for LastVisible {
+    fn default() -> Self {
+        Self(Timer::from_seconds(2.0, TimerMode::Once))
+    }
+}
+
+#[derive(Component, Default)]
+pub(crate) struct OldVisibility(pub bool);
+
+#[derive(Component, Default)]
+pub(crate) struct ChangedForm(pub bool);
+
+#[derive(Component, Default)]
+pub(crate) struct ChangedFunction(pub bool);
 
 /// Plugin necessary to use Firefly.
 ///
@@ -68,7 +124,7 @@ impl Plugin for FireflyPlugin {
         );
 
         app.add_plugins((PreparePlugin, ExtractPlugin));
-        app.add_plugins((LightPlugin, SpritesPlugin));
+        app.add_plugins((LightPlugin, OccluderPlugin, SpritesPlugin));
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;

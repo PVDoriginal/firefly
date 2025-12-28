@@ -1,4 +1,5 @@
 use bevy::{
+    camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
     prelude::*,
     render::{
@@ -7,7 +8,13 @@ use bevy::{
         sync_world::SyncToRenderWorld,
     },
 };
+use bytemuck::NoUninit;
 use core::f32;
+
+use crate::{
+    app::{ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime},
+    data::BufferManager,
+};
 
 /// An occluder that blocks light.
 ///
@@ -18,7 +25,16 @@ use core::f32;
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
 #[derive(Component, Clone, Default, Reflect)]
-#[require(SyncToRenderWorld, Transform, ViewVisibility)]
+#[require(
+    SyncToRenderWorld,
+    Transform,
+    VisibilityClass,
+    ViewVisibility,
+    VisibilityTime,
+    ChangedForm,
+    ChangedFunction
+)]
+#[component(on_add = add_visibility_class::<Occluder2d>)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
     rect: Rect,
@@ -194,6 +210,7 @@ impl Occluder2d {
 }
 
 #[derive(Component, Clone, Debug)]
+#[require(OccluderIndex)]
 pub(crate) struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
@@ -203,6 +220,8 @@ pub(crate) struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub z_sorting: bool,
+    pub changed_form: bool,
+    pub changed_function: bool,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -316,6 +335,49 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
     inside
 }
 
+pub struct OccluderPlugin;
+
+impl Plugin for OccluderPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(PreUpdate, occluders_reset_change_detection);
+        app.add_systems(Update, occluder_change_detection);
+    }
+}
+
+fn occluders_reset_change_detection(
+    mut occluders: Query<(&mut ChangedForm, &mut ChangedFunction)>,
+) {
+    for (mut form, mut function) in &mut occluders {
+        form.0 = false;
+        function.0 = false;
+    }
+}
+
+fn occluder_change_detection(
+    mut occluders_form: Query<&mut ChangedForm, Or<(Added<Occluder2d>, Changed<Transform>)>>,
+    mut occluders_function: Query<&mut ChangedFunction, Changed<Occluder2d>>,
+) {
+    for mut changed_form in &mut occluders_form {
+        changed_form.0 = true;
+    }
+
+    for mut changed_function in &mut occluders_function {
+        changed_function.0 = false;
+    }
+}
+
+fn handle_occluder_despawn(
+    trigger: On<Remove, Occluder2d>,
+    occluders: Query<&OccluderIndex, With<Occluder2d>>,
+    mut buffer_manager: ResMut<BufferManager<UniformRoundOccluder>>,
+) {
+    if let Ok(index) = occluders.get(trigger.entity)
+        && let Some(index) = index.0
+    {
+        buffer_manager.free_index(index);
+    }
+}
+
 #[derive(ShaderType, Clone, Default)]
 pub(crate) struct UniformOccluder {
     pub n_sequences: u32,
@@ -326,26 +388,15 @@ pub(crate) struct UniformOccluder {
     pub z_sorting: u32,
 }
 
-#[derive(ShaderType, Clone, Default)]
+#[repr(C)]
+#[derive(ShaderType, Clone, Copy, Default, NoUninit)]
 pub(crate) struct UniformRoundOccluder {
     pub pos: Vec2,
     pub rot: f32,
     pub width: f32,
     pub height: f32,
     pub radius: f32,
-}
-
-#[derive(Resource)]
-pub(crate) struct OccluderBuffers {
-    pub round_occluders: BufferVec<UniformRoundOccluder>,
-}
-
-impl Default for OccluderBuffers {
-    fn default() -> Self {
-        Self {
-            round_occluders: BufferVec::<UniformRoundOccluder>::new(BufferUsages::STORAGE),
-        }
-    }
+    pub _padding: Vec2,
 }
 
 #[derive(ShaderType, Clone, Default)]
@@ -423,3 +474,6 @@ pub(crate) fn translate_vertices_iter<'a>(
 ) -> Box<dyn 'a + DoubleEndedIterator<Item = Vec2>> {
     Box::new(vertices.map(move |v| rot * v + pos))
 }
+
+#[derive(Component, Default)]
+pub struct OccluderIndex(pub Option<usize>);

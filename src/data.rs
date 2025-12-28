@@ -1,18 +1,21 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, time::Duration, usize};
 
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
     render::{
         extract_component::ExtractComponent,
+        extract_resource::ExtractResource,
         render_resource::{
-            BindingResource, Buffer, BufferDescriptor, BufferUsages, BufferVec, ShaderType,
-            encase::private::WriteInto,
+            BindingResource, Buffer, BufferBinding, BufferDescriptor, BufferUsages, BufferVec,
+            RawBufferVec, ShaderType, encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
     },
 };
 use bytemuck::NoUninit;
+
+use crate::occluders::OccluderIndex;
 #[derive(Component, Default, Clone, ExtractComponent, Reflect)]
 pub(crate) struct ExtractedWorldData {
     pub camera_pos: Vec2,
@@ -137,13 +140,11 @@ const BUFFER_TIMEOUT: f32 = 0.2;
 /// This is used by lights and occluders.
 #[derive(Resource)]
 pub struct BufferManager<T: ShaderType + WriteInto + Default + NoUninit> {
-    buffer: BufferVec<T>,
-    timeouts: Vec<Timer>,
+    buffer: RawBufferVec<T>,
     next_index: usize,
     free_indices: VecDeque<usize>,
     write_min: usize,
     write_max: usize,
-    rewrite: bool,
 }
 
 impl<T: ShaderType + WriteInto + Default + NoUninit> FromWorld for BufferManager<T> {
@@ -157,20 +158,19 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> FromWorld for BufferManager
 
 impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     fn new_index(&mut self) -> usize {
-        self.free_indices
-            .pop_back()
-            .unwrap_or_else(|| self.next_index)
+        self.free_indices.pop_back().unwrap_or_else(|| {
+            self.next_index += 1;
+            self.next_index - 1
+        })
     }
 
     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
         let mut res = Self {
-            buffer: BufferVec::<T>::new(BufferUsages::STORAGE),
-            timeouts: default(),
+            buffer: RawBufferVec::<T>::new(BufferUsages::STORAGE),
             next_index: default(),
             free_indices: default(),
-            write_min: default(),
-            write_max: default(),
-            rewrite: false,
+            write_min: usize::MAX,
+            write_max: usize::MIN,
         };
 
         // empty value is added so the buffer can be written to VRAM from the start
@@ -180,11 +180,15 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         res
     }
 
+    pub fn binding(&self) -> BindingResource<'_> {
+        self.buffer.binding().unwrap()
+    }
+
     /// Called by an entity to pass it's value to the buffer and get back it's index.
     ///
-    /// Value can be None, meaning the entity is still active but it's data didn't change.
-    ///
     /// Index can be None, meaning the entity didn't have an index already assigned.
+    ///
+    /// Any entity that calls this method will be automatically marked active for this frame.
     pub fn set_value(&mut self, value: &T, index: Option<usize>) -> usize {
         let index = match index {
             None => self.new_index(),
@@ -197,26 +201,14 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
             }
         };
 
-        if index < self.next_index {
-            self.timeouts[index as usize] = Timer::from_seconds(BUFFER_TIMEOUT, TimerMode::Once);
-
-            let mut view = self.buffer.buffer().unwrap().get_mapped_range_mut(
-                (index + 1) as u64 * T::min_size().get()..(index + 2) as u64 * T::min_size().get(),
-            );
-
-            for chunk in view.chunks_exact_mut(T::min_size().get() as usize) {
-                chunk.clone_from_slice(bytemuck::bytes_of(value));
-            }
-        } else {
-            self.next_index += 1;
+        if index + 1 >= self.buffer.len() {
             self.buffer.push(*value);
-            self.timeouts
-                .push(Timer::from_seconds(BUFFER_TIMEOUT, TimerMode::Once));
-            self.rewrite = true;
+        } else {
+            self.buffer.set(index as u32 + 1, *value);
         }
 
         self.write_min = self.write_min.min(index + 1);
-        self.write_min = self.write_max.max(index + 1);
+        self.write_max = self.write_max.max(index + 1);
 
         index
     }
@@ -224,25 +216,43 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     /// Flush the changes at the end of a render frame.
     ///
     /// This times out entities that haven't been active in a while, and efficiently passes all current changes to the GPU.
-    pub fn flush(&mut self, delta: Duration, device: &RenderDevice, queue: &RenderQueue) {
-        if self.rewrite {
-            self.buffer.write_buffer(device, queue);
-            self.rewrite = false;
-        } else {
-            self.buffer
-                .write_buffer_range(queue, self.write_min as usize..self.write_max as usize + 1)
-                .expect("couldn't write to buffer");
-
-            for (i, timeout) in self.timeouts.iter_mut().enumerate() {
-                if timeout.tick(delta).just_finished() {
-                    self.free_indices.push_front(i);
-                }
-            }
-
-            // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized.
-            if self.free_indices.len() > self.next_index as usize / 2 {
-                *self = Self::new(device, queue);
+    pub fn flush(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+        if self.write_min != usize::MAX {
+            if self.write_max >= self.buffer.capacity() {
+                self.buffer.reserve(
+                    ((self.write_max + 1) as f32 / 1024.0).ceil() as usize * 1024,
+                    device,
+                );
+                self.buffer.write_buffer(device, queue);
+            } else {
+                self.buffer
+                    .write_buffer_range(queue, self.write_min as usize..self.write_max as usize + 1)
+                    .expect("couldn't write to buffer");
             }
         }
+
+        info!(
+            "Finished writing! Buffer length: {}, Element size: {}, Buffer size: {}, Buffer capacity: {}, Unoccupied: {}",
+            self.buffer.len(),
+            T::min_size().get(),
+            self.buffer.buffer().unwrap().size(),
+            self.buffer.capacity(),
+            self.free_indices.len(),
+        );
+
+        // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
+        if self.free_indices.len() > self.buffer.capacity() as usize / 2 {
+            *self = Self::new(device, queue);
+        }
+
+        self.write_min = usize::MAX;
+        self.write_max = usize::MIN;
+    }
+
+    pub fn free_index(&mut self, index: usize) {
+        if index >= self.buffer.len() {
+            return;
+        }
+        self.free_indices.push_front(index);
     }
 }

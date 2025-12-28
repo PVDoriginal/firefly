@@ -106,14 +106,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         // let light_rect = vec4f(light.pos - light.range, light.pos + light.range);
         
-        for (var i = 0u; i < arrayLength(&round_occluder_indices) - 1; i += 1) {
-            // let range = max(round_occluders[i].width, round_occluders[i].height) + round_occluders[i].radius;
-            // // let occluder_rect = vec4f(round_occluders[i].pos - range, round_occluders[i].pos + range);
-
-            // // if !rect_intersection(occluder_rect, light_rect) { continue; }
-            // if distance(light.pos, round_occluders[i].pos) > range + light.range { continue; }
-
-            let result = round_check(pos, round_occluder_indices[i]); 
+        for (var i = 0u; i < light.n_rounds; i += 1) {
+            let result = round_check(pos, round_occluder_indices[i] + 1); 
 
             if result.occluded == true {
                 shadow = shadow_blend(shadow, vec3f(1), 1.0);
@@ -134,17 +128,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     continue;
                 }
             }
-
-            // if (occluders[i].round == 1) {
-            //     let result = round_check(pos, round_index); 
-
-            //     if result.occluded == true {
-            //         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
-            //     }
-            //     else if config.softness > 0 && result.extreme_angle < soft_angle {
-            //         shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
-            //     }
-            // }
 
             else {
                 for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {

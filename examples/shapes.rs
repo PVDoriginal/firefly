@@ -11,7 +11,7 @@ fn main() {
 
     app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin));
     app.add_systems(Startup, setup);
-    app.add_systems(Update, move_light);
+    app.add_systems(Update, (move_light, move_camera, despawn_debug));
 
     app.run();
 }
@@ -181,4 +181,36 @@ fn move_light(
     gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
 
     light.translation = cursor_position.extend(0.);
+}
+
+const CAMERA_SPEED: f32 = 60.0;
+fn move_camera(
+    mut camera: Single<&mut Transform, With<FireflyConfig>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+) {
+    if keys.pressed(KeyCode::KeyA) {
+        camera.translation.x -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyD) {
+        camera.translation.x += time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyS) {
+        camera.translation.y -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyW) {
+        camera.translation.y += time.delta_secs() * CAMERA_SPEED;
+    }
+}
+
+fn despawn_debug(
+    occluders: Query<Entity, With<Occluder2d>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+) {
+    if keys.pressed(KeyCode::Enter) {
+        if let Some(entity) = occluders.iter().last() {
+            commands.entity(entity).despawn();
+        }
+    }
 }

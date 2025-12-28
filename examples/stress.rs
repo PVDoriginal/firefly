@@ -59,7 +59,7 @@ fn main() {
 
     app.add_systems(Startup, setup);
 
-    app.add_systems(Update, change_scale);
+    app.add_systems(Update, (change_scale, move_camera));
 
     app.add_systems(Update, (spawn_lights, move_lights));
     app.add_systems(Update, (spawn_occluders, move_occluders));
@@ -112,6 +112,26 @@ fn change_scale(
     }
     if keys.pressed(KeyCode::ArrowRight) {
         projection.scale = (projection.scale - 30. * time.delta_secs()).max(0.5);
+    }
+}
+
+const CAMERA_SPEED: f32 = 4000.0;
+fn move_camera(
+    mut camera: Single<&mut Transform, With<FireflyConfig>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+) {
+    if keys.pressed(KeyCode::KeyA) {
+        camera.translation.x -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyD) {
+        camera.translation.x += time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyS) {
+        camera.translation.y -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyW) {
+        camera.translation.y += time.delta_secs() * CAMERA_SPEED;
     }
 }
 

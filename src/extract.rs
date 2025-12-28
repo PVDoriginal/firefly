@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     platform::collections::HashSet,
     prelude::*,
@@ -5,6 +7,7 @@ use bevy::{
         Extract, RenderApp,
         batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
         extract_component::ExtractComponentPlugin,
+        extract_resource::ExtractResourcePlugin,
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
@@ -15,9 +18,12 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
+    app::{
+        BecameNotVisible, ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime,
+    },
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, LightIndex, PointLight2d},
-    occluders::ExtractedOccluder,
+    occluders::{ExtractedOccluder, OccluderIndex},
     phases::SpritePhase,
     prelude::Occluder2d,
     sprites::{
@@ -240,19 +246,45 @@ fn extract_lights(
 
 fn extract_occluders(
     mut commands: Commands,
+    mut previous_len: Local<usize>,
     occluders: Extract<
         Query<(
-            &RenderEntity,
+            RenderEntity,
             &Occluder2d,
             &GlobalTransform,
-            &ViewVisibility,
+            &VisibilityTime,
+            &ChangedForm,
+            &ChangedFunction,
         )>,
     >,
 ) {
-    for (render_entity, occluder, global_transform, view_visibility) in &occluders {
-        if !view_visibility.get() {
+    let mut values = Vec::with_capacity(*previous_len);
+
+    for (
+        render_entity,
+        occluder,
+        global_transform,
+        visibility_time,
+        changed_form,
+        changed_function,
+    ) in &occluders
+    {
+        if let VisibilityTime::NotVisibleFor(d) = visibility_time {
+            if d.just_finished() {
+                commands.entity(render_entity).insert(BecameNotVisible);
+            }
             continue;
         }
+
+        let VisibilityTime::Visible(just_became_visible) = visibility_time else {
+            return;
+        };
+
+        let (form, function) = if *just_became_visible {
+            (true, true)
+        } else {
+            (changed_form.0, changed_function.0)
+        };
 
         let pos = global_transform.translation().truncate() + occluder.offset.xy();
 
@@ -260,17 +292,22 @@ fn extract_occluders(
         rect.min += pos;
         rect.max += pos;
 
-        commands
-            .entity(render_entity.id())
-            .insert(ExtractedOccluder {
-                pos,
-                rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
-                shape: occluder.shape().clone(),
-                rect,
-                z: global_transform.translation().z + occluder.offset.z,
-                color: occluder.color,
-                opacity: occluder.opacity,
-                z_sorting: occluder.z_sorting,
-            });
+        let extracted_occluder = ExtractedOccluder {
+            pos,
+            rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
+            shape: occluder.shape().clone(),
+            rect,
+            z: global_transform.translation().z + occluder.offset.z,
+            color: occluder.color,
+            opacity: occluder.opacity,
+            z_sorting: occluder.z_sorting,
+            changed_form: form,
+            changed_function: function,
+        };
+
+        values.push((render_entity, extracted_occluder));
     }
+
+    *previous_len = values.len();
+    commands.try_insert_batch(values);
 }

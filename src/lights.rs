@@ -35,6 +35,7 @@ use bevy::{
 
 use crate::{
     LightBatchSetKey,
+    app::{LastVisible, OldVisibility, VisibilityTime},
     data::FireflyConfig,
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
     phases::LightmapPhase,
@@ -174,6 +175,7 @@ pub(crate) struct UniformPointLight {
     pub dir: Vec2,
     pub z: f32,
     pub height: f32,
+    pub n_rounds: u32,
 }
 
 #[derive(Component)]
@@ -314,7 +316,7 @@ fn mark_visible_lights(
         max: projection.area.max + camera.0.translation().truncate(),
     };
 
-    light_rect.0 = Rect::default();
+    light_rect.0 = Rect::EMPTY;
     for (entity, transform, light, height, mut visibility) in &mut lights {
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
 
@@ -333,29 +335,48 @@ fn mark_visible_lights(
 
                 previous_visible_entities.remove(&entity);
             }
-        }
 
-        light_rect.0 = light_rect
-            .0
-            .union(camera_rect.union_point(pos).intersect(Rect {
-                min: pos - light.range,
-                max: pos + light.range,
-            }));
+            light_rect.0 = light_rect
+                .0
+                .union(camera_rect.union_point(pos).intersect(Rect {
+                    min: pos - light.range,
+                    max: pos + light.range,
+                }));
+        }
     }
 }
 
 fn mark_visible_occluders(
-    mut occluders: Query<(&Occluder2d, &GlobalTransform, &mut ViewVisibility)>,
+    mut camera: Single<&mut VisibleEntities, With<FireflyConfig>>,
+    mut occluders: Query<(
+        Entity,
+        &Occluder2d,
+        &GlobalTransform,
+        &mut ViewVisibility,
+        &mut VisibilityTime,
+    )>,
+    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     light_rect: Res<LightRect>,
+    time: Res<Time>,
 ) {
-    for (occluder, global_transform, mut visibility) in &mut occluders {
+    for (entity, occluder, global_transform, mut visibility, mut visibility_time) in &mut occluders
+    {
         let mut rect = occluder.rect();
         rect.min += global_transform.translation().truncate() + occluder.offset.xy();
         rect.max += global_transform.translation().truncate() + occluder.offset.xy();
 
         if !rect.intersect(light_rect.0).is_empty() {
-            visibility.set();
+            if !**visibility {
+                visibility.set();
+
+                let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());
+                visible_occluders.push(entity);
+
+                previous_visible_entities.remove(&entity);
+            }
         }
+
+        visibility_time.step(visibility.get(), time.delta());
     }
 }
 

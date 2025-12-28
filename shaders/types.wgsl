@@ -12,6 +12,7 @@ struct PointLight {
     dir: vec2f,
     z: f32,
     height: f32,
+    n_rounds: u32,
 }
 
 struct Occluder {
@@ -30,6 +31,7 @@ struct RoundOccluder {
     width: f32,
     height: f32, 
     radius: f32,
+    padding: vec2f,
 }
 
 struct Vertex {
