@@ -2,8 +2,8 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    app::BecameNotVisible,
-    data::{BufferManager, ExtractedWorldData, NormalMode},
+    buffers::BufferManager,
+    data::{ExtractedWorldData, NormalMode},
     lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
     occluders::{OccluderIndex, point_inside_poly},
     phases::SpritePhase,
@@ -20,13 +20,12 @@ use bevy::{
     math::Affine3A,
     prelude::*,
     render::{
-        Render, RenderApp, RenderStartup, RenderSystems,
+        Render, RenderApp, RenderSystems,
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, BufferUsages, BufferVec, DynamicStorageBuffer, GpuArrayBuffer,
-            RawBufferVec, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-            UniformBuffer,
+            BindGroupEntries, BufferUsages, BufferVec, GpuArrayBuffer, TextureDescriptor,
+            TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
@@ -54,8 +53,6 @@ impl Plugin for PreparePlugin {
             return;
         };
 
-        render_app.add_systems(RenderStartup, spawn_observers);
-
         render_app.add_systems(
             Render,
             (insert_light_buffers, prepare_data)
@@ -67,14 +64,6 @@ impl Plugin for PreparePlugin {
 
         render_app.add_systems(
             Render,
-            (free_occluders, prepare_occluders)
-                .chain()
-                .in_set(RenderSystems::Prepare)
-                .before(prepare_data),
-        );
-
-        render_app.add_systems(
-            Render,
             (
                 prepare_sprite_view_bind_groups.in_set(RenderSystems::PrepareBindGroups),
                 (prepare_sprite_image_bind_groups.in_set(RenderSystems::PrepareBindGroups),)
@@ -82,17 +71,6 @@ impl Plugin for PreparePlugin {
             ),
         );
     }
-
-    fn finish(&self, app: &mut App) {
-        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-        render_app.init_resource::<BufferManager<UniformRoundOccluder>>();
-    }
-}
-
-fn spawn_observers(mut commands: Commands) {
-    commands.spawn(Observer::new(on_occluder_removed));
 }
 
 fn prepare_config(
@@ -213,74 +191,7 @@ fn insert_light_buffers(
     }
 }
 
-fn on_occluder_removed(
-    trigger: On<Remove, ExtractedOccluder>,
-    mut occluders: Query<(&ExtractedOccluder, &mut OccluderIndex), With<ExtractedOccluder>>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
-) {
-    if let Ok((occluder, mut index)) = occluders.get_mut(trigger.entity) {
-        if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-            return;
-        }
-
-        if let Some(old_index) = index.0 {
-            manager.free_index(old_index);
-            index.0 = None;
-        }
-    }
-}
-
-fn free_occluders(
-    mut occluders: Query<(Entity, &ExtractedOccluder, &mut OccluderIndex), With<BecameNotVisible>>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
-    mut commands: Commands,
-) {
-    for (id, occluder, mut index) in &mut occluders {
-        if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-            continue;
-        }
-
-        if let Some(old_index) = index.0 {
-            manager.free_index(old_index);
-            index.0 = None;
-        }
-
-        commands.entity(id).remove::<ExtractedOccluder>();
-        commands.entity(id).remove::<BecameNotVisible>();
-    }
-}
-
-fn prepare_occluders(
-    render_device: Res<RenderDevice>,
-    render_queue: Res<RenderQueue>,
-    mut occluders: Query<(Entity, &ExtractedOccluder, &mut OccluderIndex)>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
-) {
-    for (id, occluder, mut index) in &mut occluders {
-        if let Occluder2dShape::RoundRectangle {
-            width,
-            height,
-            radius,
-        } = occluder.shape
-        {
-            warn!("uhm what");
-            let value = UniformRoundOccluder {
-                pos: occluder.pos,
-                rot: occluder.rot,
-                width,
-                height,
-                radius,
-                _padding: default(),
-            };
-
-            let new_index = manager.set_value(&value, index.0);
-            index.0 = Some(new_index);
-        }
-    }
-    manager.flush(&render_device, &render_queue);
-}
-
-fn prepare_data(
+pub(crate) fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut lights: Query<(Entity, &ExtractedPointLight, &mut LightBuffers)>,

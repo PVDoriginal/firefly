@@ -11,10 +11,7 @@ use bevy::{
 use bytemuck::NoUninit;
 use core::f32;
 
-use crate::{
-    app::{ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime},
-    data::BufferManager,
-};
+use crate::app::{ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime};
 
 /// An occluder that blocks light.
 ///
@@ -363,18 +360,6 @@ fn occluder_change_detection(
 
     for mut changed_function in &mut occluders_function {
         changed_function.0 = false;
-    }
-}
-
-fn handle_occluder_despawn(
-    trigger: On<Remove, Occluder2d>,
-    occluders: Query<&OccluderIndex, With<Occluder2d>>,
-    mut buffer_manager: ResMut<BufferManager<UniformRoundOccluder>>,
-) {
-    if let Ok(index) = occluders.get(trigger.entity)
-        && let Some(index) = index.0
-    {
-        buffer_manager.free_index(index);
     }
 }
 
