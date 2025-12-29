@@ -7,7 +7,7 @@ use bevy::{
 use bytemuck::NoUninit;
 use core::f32;
 
-use crate::app::{ChangedForm, ChangedFunction};
+use crate::change::{ChangedForm, ChangedFunction};
 use crate::visibility::VisibilityTimer;
 
 /// An occluder that blocks light.
@@ -337,32 +337,7 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
 pub struct OccluderPlugin;
 
 impl Plugin for OccluderPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, occluders_reset_change_detection);
-        app.add_systems(Update, occluder_change_detection);
-    }
-}
-
-fn occluders_reset_change_detection(
-    mut occluders: Query<(&mut ChangedForm, &mut ChangedFunction)>,
-) {
-    for (mut form, mut function) in &mut occluders {
-        form.0 = false;
-        function.0 = false;
-    }
-}
-
-fn occluder_change_detection(
-    mut occluders_form: Query<&mut ChangedForm, Or<(Added<Occluder2d>, Changed<Transform>)>>,
-    mut occluders_function: Query<&mut ChangedFunction, Changed<Occluder2d>>,
-) {
-    for mut changed_form in &mut occluders_form {
-        changed_form.0 = true;
-    }
-
-    for mut changed_function in &mut occluders_function {
-        changed_function.0 = false;
-    }
+    fn build(&self, app: &mut App) {}
 }
 
 /// Data that is transferred to the GPU to be read inside shaders.

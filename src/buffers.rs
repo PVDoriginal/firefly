@@ -99,6 +99,10 @@ fn prepare_occluders(
     mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
 ) {
     for (occluder, mut index) in &mut occluders {
+        if !occluder.changed_form && !index.0.is_none() {
+            continue;
+        }
+
         if let Occluder2dShape::RoundRectangle {
             width,
             height,
@@ -215,14 +219,14 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
             }
         }
 
-        info!(
-            "Finished writing! Buffer length: {}, Element size: {}, Buffer size: {}, Buffer capacity: {}, Unoccupied: {}",
-            self.buffer.len(),
-            T::min_size().get(),
-            self.buffer.buffer().unwrap().size(),
-            self.buffer.capacity(),
-            self.free_indices.len(),
-        );
+        // info!(
+        //     "Finished writing! Buffer length: {}, Element size: {}, Buffer size: {}, Buffer capacity: {}, Unoccupied: {}",
+        //     self.buffer.len(),
+        //     T::min_size().get(),
+        //     self.buffer.buffer().unwrap().size(),
+        //     self.buffer.capacity(),
+        //     self.free_indices.len(),
+        // );
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
         if self.free_indices.len() > self.buffer.capacity() as usize / 2 {

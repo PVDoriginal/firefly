@@ -96,6 +96,7 @@ use bevy::{
 
 pub mod app;
 pub mod buffers;
+pub mod change;
 pub mod data;
 pub mod lights;
 pub mod occluders;

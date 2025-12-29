@@ -15,7 +15,7 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
-    app::{ChangedForm, ChangedFunction},
+    change::{ChangedForm, ChangedFunction},
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,

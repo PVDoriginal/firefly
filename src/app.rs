@@ -15,6 +15,7 @@ use bevy::{
 
 use crate::{
     buffers::BuffersPlugin,
+    change::ChangePlugin,
     extract::ExtractPlugin,
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
@@ -25,12 +26,6 @@ use crate::{
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
-
-#[derive(Component, Default)]
-pub(crate) struct ChangedForm(pub bool);
-
-#[derive(Component, Default)]
-pub(crate) struct ChangedFunction(pub bool);
 
 /// Plugin necessary to use Firefly.
 ///
@@ -75,6 +70,7 @@ impl Plugin for FireflyPlugin {
             ExtractPlugin,
             BuffersPlugin,
             VisibilityPlugin,
+            ChangePlugin,
         ));
         app.add_plugins((LightPlugin, OccluderPlugin, SpritesPlugin));
 
