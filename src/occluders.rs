@@ -7,7 +7,8 @@ use bevy::{
 use bytemuck::NoUninit;
 use core::f32;
 
-use crate::app::{ChangedForm, ChangedFunction, VisibilityTimer};
+use crate::app::{ChangedForm, ChangedFunction};
+use crate::visibility::VisibilityTimer;
 
 /// An occluder that blocks light.
 ///

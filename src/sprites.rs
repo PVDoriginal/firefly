@@ -6,10 +6,8 @@ use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_chang
 
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
-use bevy::render::{RenderDebugFlags, RenderSystems};
-use bevy::sprite_render::{
-    Mesh2dPipeline, SpritePipelineKey, SpriteSystems, queue_material2d_meshes,
-};
+use bevy::render::RenderSystems;
+use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
 use bevy::{
     core_pipeline::{
         core_2d::{AlphaMask2d, Opaque2d},
@@ -28,8 +26,8 @@ use bevy::{
         batching::sort_binned_render_phase,
         render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
-            RenderCommandResult, SetItemPipeline, SortedRenderPhasePlugin, TrackedRenderPass,
-            ViewSortedRenderPhases, sort_phase_system,
+            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
+            sort_phase_system,
         },
         render_resource::*,
         view::{ExtractedView, Msaa, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},

@@ -99,6 +99,7 @@ pub mod buffers;
 pub mod data;
 pub mod lights;
 pub mod occluders;
+pub mod visibility;
 
 mod extract;
 mod nodes;

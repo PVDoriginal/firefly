@@ -196,7 +196,6 @@ pub(crate) fn prepare_data(
     render_queue: Res<RenderQueue>,
     mut lights: Query<(Entity, &ExtractedPointLight, &mut LightBuffers)>,
     occluders: Query<(&ExtractedOccluder, &OccluderIndex)>,
-    sprites: Res<ExtractedSprites>,
     camera: Single<(
         &ExtractedWorldData,
         &Projection,
@@ -210,7 +209,6 @@ pub(crate) fn prepare_data(
     mut batches: ResMut<LightBatches>,
     view_uniforms: Res<ViewUniforms>,
     round_occluders: Res<BufferManager<UniformRoundOccluder>>,
-    mut comamnds: Commands,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -221,50 +219,11 @@ pub(crate) fn prepare_data(
         max: projection.area.max + camera.0.camera_pos,
     };
 
-    // occluder_buffers.round_occluders.clear();
-
-    // let mut round_occluder_rects = vec![];
-
-    // for occluder in occluders {
-    //     let Occluder2dShape::RoundRectangle {
-    //         width,
-    //         height,
-    //         radius,
-    //     } = occluder.shape
-    //     else {
-    //         continue;
-    //     };
-
-    //     occluder_buffers.round_occluders.push(UniformRoundOccluder {
-    //         pos: occluder.pos,
-    //         rot: occluder.rot,
-    //         width,
-    //         height,
-    //         radius,
-    //         _padding: default(),
-    //     });
-
-    //     round_occluder_rects.push(Rect {
-    //         min: occluder.pos - width.max(height) - radius,
-    //         max: occluder.pos + width.max(height) + radius,
-    //     });
-    // }
-    // occluder_buffers.round_occluders.push(default());
-
-    // occluder_buffers
-    //     .round_occluders
-    //     .write_buffer(&render_device, &render_queue);
-
     batches.clear();
-
-    // Index buffer indices
-    let mut index = 0;
 
     let light_bind_groups = &mut *light_bind_groups;
 
     for (retained_view, transparent_phase) in phases.iter_mut() {
-        let mut batch_item_index = index;
-
         let mut index = 0;
 
         for item_index in 0..transparent_phase.non_mesh_items.len() {
@@ -526,8 +485,8 @@ fn prepare_sprite_image_bind_groups(
         let mut batch_item_index = 0;
         let mut batch_image_size = Vec2::ZERO;
         let mut batch_image_handle = AssetId::invalid();
-        let mut batch_normal_handle = AssetId::invalid();
-        let mut is_dummy = false;
+        let mut batch_normal_handle;
+        let mut is_dummy;
 
         // Iterate through the phase items and detect when successive sprites that can be batched.
         // Spawn an entity with a `SpriteBatch` component for each possible batch.

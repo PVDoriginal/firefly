@@ -1,21 +1,11 @@
-use std::{collections::VecDeque, time::Duration, usize};
+use std::usize;
 
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
-    render::{
-        extract_component::ExtractComponent,
-        extract_resource::ExtractResource,
-        render_resource::{
-            BindingResource, Buffer, BufferBinding, BufferDescriptor, BufferUsages, BufferVec,
-            RawBufferVec, ShaderType, encase::private::WriteInto,
-        },
-        renderer::{RenderDevice, RenderQueue},
-    },
+    render::{extract_component::ExtractComponent, render_resource::ShaderType},
 };
-use bytemuck::NoUninit;
 
-use crate::occluders::OccluderIndex;
 #[derive(Component, Default, Clone, ExtractComponent, Reflect)]
 pub(crate) struct ExtractedWorldData {
     pub camera_pos: Vec2,

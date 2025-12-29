@@ -1,10 +1,7 @@
-use std::{any::TypeId, collections::VecDeque, ops::Range};
+use std::{collections::VecDeque, ops::Range};
 
 use bevy::{
-    camera::visibility::{
-        PreviousVisibleEntities, VisibilityClass, VisibilitySystems, VisibleEntities,
-        add_visibility_class, check_visibility,
-    },
+    camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::WHITE,
     ecs::{
         component::Tick,
@@ -24,10 +21,7 @@ use bevy::{
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{
-            BindGroup, BufferVec, GpuArrayBuffer, RawBufferVec, ShaderType, UniformBuffer,
-        },
-        renderer::RenderDevice,
+        render_resource::{BindGroup, BufferVec, GpuArrayBuffer, ShaderType, UniformBuffer},
         sync_world::SyncToRenderWorld,
         view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
@@ -35,12 +29,9 @@ use bevy::{
 
 use crate::{
     LightBatchSetKey,
-    app::VisibilityTimer,
-    data::FireflyConfig,
-    occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
+    occluders::{UniformOccluder, UniformVertex},
     phases::LightmapPhase,
     pipelines::LightmapCreationPipeline,
-    prelude::Occluder2d,
 };
 
 /// Point light with adjustable fields.
@@ -154,7 +145,6 @@ pub(crate) struct ExtractedPointLight {
     pub dir: Vec2,
     pub z: f32,
     pub height: f32,
-    pub index: u32,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -217,19 +207,10 @@ pub(crate) struct LightIndex(pub u32);
 pub(crate) struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LightRect>();
         app.init_resource::<LightIndices>();
 
         app.add_systems(Update, assign_light_indices);
         app.add_observer(discard_light_index);
-
-        app.add_systems(
-            PostUpdate,
-            (mark_visible_lights, mark_visible_occluders)
-                .chain()
-                .in_set(VisibilitySystems::CheckVisibility)
-                .after(check_visibility),
-        );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.init_resource::<LightBindGroups>();
@@ -290,96 +271,6 @@ pub(crate) struct LightBatch {
 #[derive(Resource, Default)]
 pub(crate) struct LightBindGroups {
     pub values: HashMap<Entity, BindGroup>,
-}
-
-#[derive(Resource, Default)]
-pub struct LightRect(pub Rect);
-
-fn mark_visible_lights(
-    mut lights: Query<(
-        Entity,
-        &GlobalTransform,
-        &PointLight2d,
-        &LightHeight,
-        &mut ViewVisibility,
-    )>,
-    mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
-    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
-    mut light_rect: ResMut<LightRect>,
-) {
-    let Projection::Orthographic(projection) = camera.2 else {
-        return;
-    };
-
-    let camera_rect = Rect {
-        min: projection.area.min + camera.0.translation().truncate(),
-        max: projection.area.max + camera.0.translation().truncate(),
-    };
-
-    light_rect.0 = Rect::EMPTY;
-    for (entity, transform, light, height, mut visibility) in &mut lights {
-        let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
-
-        if !(Rect {
-            min: pos - light.range,
-            max: pos + light.range,
-        })
-        .intersect(camera_rect)
-        .is_empty()
-        {
-            if !**visibility {
-                visibility.set();
-
-                let visible_lights = camera.1.get_mut(TypeId::of::<PointLight2d>());
-                visible_lights.push(entity);
-
-                previous_visible_entities.remove(&entity);
-            }
-
-            light_rect.0 = light_rect
-                .0
-                .union(camera_rect.union_point(pos).intersect(Rect {
-                    min: pos - light.range,
-                    max: pos + light.range,
-                }));
-        }
-    }
-}
-
-fn mark_visible_occluders(
-    mut camera: Single<&mut VisibleEntities, With<FireflyConfig>>,
-    mut occluders: Query<(
-        Entity,
-        &Occluder2d,
-        &GlobalTransform,
-        &mut ViewVisibility,
-        &mut VisibilityTimer,
-    )>,
-    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
-    light_rect: Res<LightRect>,
-    time: Res<Time>,
-) {
-    for (entity, occluder, global_transform, mut visibility, mut visibility_timer) in &mut occluders
-    {
-        let mut rect = occluder.rect();
-        rect.min += global_transform.translation().truncate() + occluder.offset.xy();
-        rect.max += global_transform.translation().truncate() + occluder.offset.xy();
-
-        if !rect.intersect(light_rect.0).is_empty() {
-            if !**visibility {
-                visibility.set();
-
-                let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());
-                visible_occluders.push(entity);
-
-                previous_visible_entities.remove(&entity);
-
-                *visibility_timer = default();
-            }
-        }
-
-        visibility_timer.0.tick(time.delta());
-    }
 }
 
 fn queue_lights(

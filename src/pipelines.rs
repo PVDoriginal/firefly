@@ -9,8 +9,8 @@ use bevy::{
     render::{
         render_resource::{
             BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
-            BlendState, BufferVec, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            FragmentState, FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
+            BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
+            FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat, TextureSampleType,
             TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,

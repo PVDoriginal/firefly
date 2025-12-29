@@ -15,8 +15,8 @@ use bevy::{
 use bytemuck::NoUninit;
 
 use crate::{
-    app::NotVisible,
     occluders::{ExtractedOccluder, Occluder2dShape, OccluderIndex, UniformRoundOccluder},
+    visibility::NotVisible,
 };
 
 /// Plugin that adds systems and observers for managing GPU buffers. This is added automatically through [`FireflyPlugin`](crate::prelude::FireflyPlugin)

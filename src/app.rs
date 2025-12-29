@@ -21,26 +21,10 @@ use crate::{
     occluders::{Occluder2dShape, OccluderPlugin, translate_vertices},
     pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
     sprites::SpritesPlugin,
+    visibility::VisibilityPlugin,
     *,
 };
 use crate::{prelude::*, prepare::PreparePlugin};
-
-/// Timer that starts ticking down when an entity no longer affects
-/// what the player sees. When it finished, the [`NotVisible`] component
-/// is added to the corresponding Render World entity.
-#[derive(Component)]
-pub struct VisibilityTimer(pub Timer);
-
-/// Component added to Render World entities when they are no longer visible
-/// in the Main World. Visibility is based on [`VisibilityTimer`].
-#[derive(Component, Default)]
-pub struct NotVisible;
-
-impl Default for VisibilityTimer {
-    fn default() -> Self {
-        Self(Timer::from_seconds(2.0, TimerMode::Once))
-    }
-}
 
 #[derive(Component, Default)]
 pub(crate) struct ChangedForm(pub bool);
@@ -86,7 +70,12 @@ impl Plugin for FireflyPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugins((PreparePlugin, ExtractPlugin, BuffersPlugin));
+        app.add_plugins((
+            PreparePlugin,
+            ExtractPlugin,
+            BuffersPlugin,
+            VisibilityPlugin,
+        ));
         app.add_plugins((LightPlugin, OccluderPlugin, SpritesPlugin));
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {

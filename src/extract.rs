@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::{
     platform::collections::HashSet,
     prelude::*,
@@ -7,7 +5,6 @@ use bevy::{
         Extract, RenderApp,
         batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
         extract_component::ExtractComponentPlugin,
-        extract_resource::ExtractResourcePlugin,
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
@@ -18,16 +15,17 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
-    app::{ChangedForm, ChangedFunction, NotVisible, VisibilityTimer},
+    app::{ChangedForm, ChangedFunction},
     data::{ExtractedWorldData, FireflyConfig},
-    lights::{ExtractedPointLight, LightHeight, LightIndex, PointLight2d},
-    occluders::{ExtractedOccluder, OccluderIndex},
+    lights::{ExtractedPointLight, LightHeight, PointLight2d},
+    occluders::ExtractedOccluder,
     phases::SpritePhase,
     prelude::Occluder2d,
     sprites::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
         SpriteAssetEvents, SpriteHeight,
     },
+    visibility::{NotVisible, VisibilityTimer},
 };
 
 pub(crate) struct ExtractPlugin;
@@ -55,14 +53,12 @@ impl Plugin for ExtractPlugin {
 fn extract_camera_phases(
     mut sprite_phases: ResMut<ViewSortedRenderPhases<SpritePhase>>,
     mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
-    cameras: Extract<
-        Query<(Entity, &Camera, &FireflyConfig, Has<NoIndirectDrawing>), With<Camera2d>>,
-    >,
+    cameras: Extract<Query<(Entity, &Camera, Has<NoIndirectDrawing>), With<Camera2d>>>,
     mut live_entities: Local<HashSet<RetainedViewEntity>>,
     gpu_preprocessing_support: Res<GpuPreprocessingSupport>,
 ) {
     live_entities.clear();
-    for (main_entity, camera, config, no_indirect_drawing) in &cameras {
+    for (main_entity, camera, no_indirect_drawing) in &cameras {
         if !camera.is_active {
             continue;
         }
@@ -215,11 +211,10 @@ fn extract_lights(
             &PointLight2d,
             &LightHeight,
             &ViewVisibility,
-            &LightIndex,
         )>,
     >,
 ) {
-    for (entity, transform, light, height, view_visibility, index) in &lights {
+    for (entity, transform, light, height, view_visibility) in &lights {
         if !view_visibility.get() {
             continue;
         }
@@ -237,7 +232,6 @@ fn extract_lights(
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
             height: height.0,
-            index: index.0,
         });
     }
 }
