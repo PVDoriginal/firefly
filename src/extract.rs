@@ -18,9 +18,7 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
-    app::{
-        BecameNotVisible, ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime,
-    },
+    app::{ChangedForm, ChangedFunction, NotVisible, VisibilityTimer},
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, LightIndex, PointLight2d},
     occluders::{ExtractedOccluder, OccluderIndex},
@@ -252,7 +250,8 @@ fn extract_occluders(
             RenderEntity,
             &Occluder2d,
             &GlobalTransform,
-            &VisibilityTime,
+            &ViewVisibility,
+            &VisibilityTimer,
             &ChangedForm,
             &ChangedFunction,
         )>,
@@ -264,27 +263,18 @@ fn extract_occluders(
         render_entity,
         occluder,
         global_transform,
-        visibility_time,
+        visibility,
+        visibility_timer,
         changed_form,
         changed_function,
     ) in &occluders
     {
-        if let VisibilityTime::NotVisibleFor(d) = visibility_time {
-            if d.just_finished() {
-                commands.entity(render_entity).insert(BecameNotVisible);
+        if !visibility.get() {
+            if visibility_timer.0.just_finished() {
+                commands.entity(render_entity).insert(NotVisible);
             }
             continue;
         }
-
-        let VisibilityTime::Visible(just_became_visible) = visibility_time else {
-            return;
-        };
-
-        let (form, function) = if *just_became_visible {
-            (true, true)
-        } else {
-            (changed_form.0, changed_function.0)
-        };
 
         let pos = global_transform.translation().truncate() + occluder.offset.xy();
 
@@ -301,8 +291,8 @@ fn extract_occluders(
             color: occluder.color,
             opacity: occluder.opacity,
             z_sorting: occluder.z_sorting,
-            changed_form: form,
-            changed_function: function,
+            changed_form: changed_form.0,
+            changed_function: changed_function.0,
         };
 
         values.push((render_entity, extracted_occluder));

@@ -1,9 +1,6 @@
 //! Module containing core plugins and logic to be added to a bevy app.
 
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    time::Duration,
-};
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     asset::load_internal_asset,
@@ -17,6 +14,7 @@ use bevy::{
 };
 
 use crate::{
+    buffers::BuffersPlugin,
     extract::ExtractPlugin,
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
@@ -27,52 +25,22 @@ use crate::{
 };
 use crate::{prelude::*, prepare::PreparePlugin};
 
+/// Timer that starts ticking down when an entity no longer affects
+/// what the player sees. When it finished, the [`NotVisible`] component
+/// is added to the corresponding Render World entity.
 #[derive(Component)]
-pub(crate) enum VisibilityTime {
-    Visible(bool),
-    NotVisibleFor(Timer),
-}
+pub struct VisibilityTimer(pub Timer);
 
-impl VisibilityTime {
-    pub fn step(&mut self, visible: bool, delta: Duration) {
-        if visible {
-            *self = match self {
-                Self::NotVisibleFor(_) => Self::Visible(true),
-                _ => Self::Visible(false),
-            }
-        } else {
-            *self = match self {
-                Self::Visible(_) => Self::NotVisibleFor(Timer::from_seconds(1.0, TimerMode::Once)),
-                Self::NotVisibleFor(t) => Self::NotVisibleFor({
-                    let mut t = t.clone();
-                    t.tick(delta);
-                    t
-                }),
-            }
-        }
-    }
-}
-
-impl Default for VisibilityTime {
-    fn default() -> Self {
-        Self::NotVisibleFor(Timer::default())
-    }
-}
-
-#[derive(Component)]
-pub(crate) struct LastVisible(pub Timer);
-
+/// Component added to Render World entities when they are no longer visible
+/// in the Main World. Visibility is based on [`VisibilityTimer`].
 #[derive(Component, Default)]
-pub(crate) struct BecameNotVisible;
+pub struct NotVisible;
 
-impl Default for LastVisible {
+impl Default for VisibilityTimer {
     fn default() -> Self {
         Self(Timer::from_seconds(2.0, TimerMode::Once))
     }
 }
-
-#[derive(Component, Default)]
-pub(crate) struct OldVisibility(pub bool);
 
 #[derive(Component, Default)]
 pub(crate) struct ChangedForm(pub bool);
@@ -118,7 +86,7 @@ impl Plugin for FireflyPlugin {
             Shader::from_wgsl
         );
 
-        app.add_plugins((PreparePlugin, ExtractPlugin));
+        app.add_plugins((PreparePlugin, ExtractPlugin, BuffersPlugin));
         app.add_plugins((LightPlugin, OccluderPlugin, SpritesPlugin));
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {

@@ -15,14 +15,14 @@ use bevy::{
 use bytemuck::NoUninit;
 
 use crate::{
-    app::BecameNotVisible,
+    app::NotVisible,
     occluders::{ExtractedOccluder, Occluder2dShape, OccluderIndex, UniformRoundOccluder},
 };
 
 /// Plugin that adds systems and observers for managing GPU buffers. This is added automatically through [`FireflyPlugin`](crate::prelude::FireflyPlugin)
-pub struct BufferPlugin;
+pub struct BuffersPlugin;
 
-impl Plugin for BufferPlugin {
+impl Plugin for BuffersPlugin {
     fn build(&self, app: &mut App) {
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -31,8 +31,7 @@ impl Plugin for BufferPlugin {
         render_app.add_systems(RenderStartup, spawn_observers);
         render_app.add_systems(
             Render,
-            (free_occluders, prepare_occluders)
-                .chain()
+            prepare_occluders
                 .in_set(RenderSystems::Prepare)
                 .before(crate::prepare::prepare_data),
         );
@@ -47,6 +46,12 @@ impl Plugin for BufferPlugin {
     }
 }
 
+fn spawn_observers(mut commands: Commands) {
+    commands.spawn(Observer::new(on_occluder_removed));
+    commands.spawn(Observer::new(on_occluder_not_visible));
+}
+
+// handles buffer when the occluder gets despawned or the component is removed
 fn on_occluder_removed(
     trigger: On<Remove, ExtractedOccluder>,
     mut occluders: Query<(&ExtractedOccluder, &mut OccluderIndex), With<ExtractedOccluder>>,
@@ -64,18 +69,16 @@ fn on_occluder_removed(
     }
 }
 
-fn spawn_observers(mut commands: Commands) {
-    commands.spawn(Observer::new(on_occluder_removed));
-}
-
-fn free_occluders(
-    mut occluders: Query<(Entity, &ExtractedOccluder, &mut OccluderIndex), With<BecameNotVisible>>,
+// handles buffer when occluder is not visible anymore
+fn on_occluder_not_visible(
+    trigger: On<Add, NotVisible>,
+    mut occluders: Query<(Entity, &ExtractedOccluder, &mut OccluderIndex), With<NotVisible>>,
     mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
     mut commands: Commands,
 ) {
-    for (id, occluder, mut index) in &mut occluders {
+    if let Ok((id, occluder, mut index)) = occluders.get_mut(trigger.entity) {
         if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-            continue;
+            return;
         }
 
         if let Some(old_index) = index.0 {
@@ -84,10 +87,11 @@ fn free_occluders(
         }
 
         commands.entity(id).remove::<ExtractedOccluder>();
-        commands.entity(id).remove::<BecameNotVisible>();
+        commands.entity(id).remove::<NotVisible>();
     }
 }
 
+// adds occluders to buffers for use in prepare system
 fn prepare_occluders(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,

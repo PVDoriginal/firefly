@@ -2,16 +2,12 @@ use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
     prelude::*,
-    render::{
-        render_resource::{BufferUsages, BufferVec, GpuArrayBuffer, ShaderType},
-        renderer::RenderDevice,
-        sync_world::SyncToRenderWorld,
-    },
+    render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
 };
 use bytemuck::NoUninit;
 use core::f32;
 
-use crate::app::{ChangedForm, ChangedFunction, LastVisible, OldVisibility, VisibilityTime};
+use crate::app::{ChangedForm, ChangedFunction, VisibilityTimer};
 
 /// An occluder that blocks light.
 ///
@@ -27,7 +23,7 @@ use crate::app::{ChangedForm, ChangedFunction, LastVisible, OldVisibility, Visib
     Transform,
     VisibilityClass,
     ViewVisibility,
-    VisibilityTime,
+    VisibilityTimer,
     ChangedForm,
     ChangedFunction
 )]

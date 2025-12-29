@@ -35,7 +35,7 @@ use bevy::{
 
 use crate::{
     LightBatchSetKey,
-    app::{LastVisible, OldVisibility, VisibilityTime},
+    app::VisibilityTimer,
     data::FireflyConfig,
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
     phases::LightmapPhase,
@@ -353,13 +353,13 @@ fn mark_visible_occluders(
         &Occluder2d,
         &GlobalTransform,
         &mut ViewVisibility,
-        &mut VisibilityTime,
+        &mut VisibilityTimer,
     )>,
     mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     light_rect: Res<LightRect>,
     time: Res<Time>,
 ) {
-    for (entity, occluder, global_transform, mut visibility, mut visibility_time) in &mut occluders
+    for (entity, occluder, global_transform, mut visibility, mut visibility_timer) in &mut occluders
     {
         let mut rect = occluder.rect();
         rect.min += global_transform.translation().truncate() + occluder.offset.xy();
@@ -373,10 +373,12 @@ fn mark_visible_occluders(
                 visible_occluders.push(entity);
 
                 previous_visible_entities.remove(&entity);
+
+                *visibility_timer = default();
             }
         }
 
-        visibility_time.step(visibility.get(), time.delta());
+        visibility_timer.0.tick(time.delta());
     }
 }
 
