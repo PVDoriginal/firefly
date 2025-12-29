@@ -20,7 +20,7 @@ use bevy::{
     math::Affine3A,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSystems,
+        Render, RenderApp, RenderStartup, RenderSystems,
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
@@ -53,6 +53,8 @@ impl Plugin for PreparePlugin {
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
+
+        render_app.add_systems(RenderStartup, spawn_observers);
 
         render_app.add_systems(
             Render,
@@ -87,6 +89,10 @@ impl Plugin for PreparePlugin {
         };
         render_app.init_resource::<BufferManager<UniformRoundOccluder>>();
     }
+}
+
+fn spawn_observers(mut commands: Commands) {
+    commands.spawn(Observer::new(on_occluder_removed));
 }
 
 fn prepare_config(
@@ -203,6 +209,23 @@ fn insert_light_buffers(
                 vertices: GpuArrayBuffer::<UniformVertex>::new(device),
                 rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
             });
+        }
+    }
+}
+
+fn on_occluder_removed(
+    trigger: On<Remove, ExtractedOccluder>,
+    mut occluders: Query<(&ExtractedOccluder, &mut OccluderIndex), With<ExtractedOccluder>>,
+    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
+) {
+    if let Ok((occluder, mut index)) = occluders.get_mut(trigger.entity) {
+        if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+            return;
+        }
+
+        if let Some(old_index) = index.0 {
+            manager.free_index(old_index);
+            index.0 = None;
         }
     }
 }
