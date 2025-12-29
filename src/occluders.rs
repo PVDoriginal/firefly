@@ -206,9 +206,10 @@ impl Occluder2d {
     }
 }
 
+/// Component with data extracted to the Render World from Occluders.
 #[derive(Component, Clone, Debug)]
 #[require(OccluderIndex)]
-pub(crate) struct ExtractedOccluder {
+pub struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
     pub shape: Occluder2dShape,
@@ -228,9 +229,11 @@ impl PartialEq for ExtractedOccluder {
 }
 
 impl ExtractedOccluder {
+    /// Get the occluder's vertices. This will be an empty Vec if the occluder has no vertices.
     pub fn vertices(&self) -> Vec<Vec2> {
         self.shape.vertices(self.pos, Rot2::radians(self.rot))
     }
+    /// Get an iterator of the occluder's vertices. This will panic if the occluder has no vertices.
     pub fn vertices_iter<'a>(&'a self) -> Box<dyn 'a + DoubleEndedIterator<Item = Vec2>> {
         self.shape
             .vertices_iter(self.pos, Rot2::radians(self.rot))
@@ -332,6 +335,8 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
     inside
 }
 
+/// Plugin that adds general main-world behavior relating to occluders. This is mainly responsible for
+/// change and visibility detection. It is added automatically by the [`FireflyPlugin`](crate::prelude::FireflyPlugin).   
 pub struct OccluderPlugin;
 
 impl Plugin for OccluderPlugin {
@@ -363,8 +368,9 @@ fn occluder_change_detection(
     }
 }
 
+/// Data that is transferred to the GPU to be read inside shaders.
 #[derive(ShaderType, Clone, Default)]
-pub(crate) struct UniformOccluder {
+pub struct UniformOccluder {
     pub n_sequences: u32,
     pub n_vertices: u32,
     pub z: f32,
@@ -373,9 +379,10 @@ pub(crate) struct UniformOccluder {
     pub z_sorting: u32,
 }
 
+/// Data that is transferred to the GPU to be read inside shaders.
 #[repr(C)]
 #[derive(ShaderType, Clone, Copy, Default, NoUninit)]
-pub(crate) struct UniformRoundOccluder {
+pub struct UniformRoundOccluder {
     pub pos: Vec2,
     pub rot: f32,
     pub width: f32,
@@ -390,6 +397,8 @@ pub(crate) struct UniformVertex {
     pub pos: Vec2,
 }
 
+/// The internal shape of an [`Occluder`](crate::prelude::Occluder2d). This is intended to be generated automatically through
+/// the occluder's constructor methods and not added by hand.   
 #[derive(Reflect, Clone, Debug, PartialEq)]
 pub enum Occluder2dShape {
     Polygon {
