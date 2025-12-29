@@ -1,3 +1,5 @@
+//! Module containing core plugins and logic to be added to a bevy app.
+
 use std::{
     f32::consts::{FRAC_PI_2, PI},
     time::Duration,
@@ -85,13 +87,6 @@ pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<crate::prelude::PointLight2d>();
-        app.register_type::<crate::prelude::Occluder2d>();
-        app.register_type::<FireflyConfig>();
-
-        app.register_type::<crate::prelude::LightHeight>();
-        app.register_type::<crate::prelude::SpriteHeight>();
-
         load_internal_asset!(
             app,
             CREATE_LIGHTMAP_SHADER,
