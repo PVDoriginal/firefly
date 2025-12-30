@@ -2,13 +2,19 @@ use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
     prelude::*,
-    render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
+    render::{
+        render_resource::{RawBufferVec, ShaderType},
+        sync_world::SyncToRenderWorld,
+    },
 };
-use bytemuck::NoUninit;
+use bytemuck::{NoUninit, Pod, Zeroable};
 use core::f32;
 
-use crate::change::{ChangedForm, ChangedFunction};
 use crate::visibility::VisibilityTimer;
+use crate::{
+    buffers::BufferIndex,
+    change::{ChangedForm, ChangedFunction},
+};
 
 /// An occluder that blocks light.
 ///
@@ -205,7 +211,7 @@ impl Occluder2d {
 
 /// Component with data extracted to the Render World from Occluders.
 #[derive(Component, Clone, Debug)]
-#[require(OccluderIndex)]
+#[require(RoundOccluderIndex)]
 pub struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
@@ -363,7 +369,8 @@ pub struct UniformRoundOccluder {
     pub _padding: Vec2,
 }
 
-#[derive(ShaderType, Clone, Default)]
+#[repr(C)]
+#[derive(ShaderType, Clone, Copy, Zeroable, Pod, Default)]
 pub(crate) struct UniformVertex {
     pub angle: f32,
     pub pos: Vec2,
@@ -441,5 +448,5 @@ pub(crate) fn translate_vertices_iter<'a>(
     Box::new(vertices.map(move |v| rot * v + pos))
 }
 
-#[derive(Component, Default)]
-pub struct OccluderIndex(pub Option<usize>);
+#[derive(Component, Clone, Copy, Default)]
+pub struct RoundOccluderIndex(pub Option<BufferIndex>);

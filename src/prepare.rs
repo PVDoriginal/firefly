@@ -5,7 +5,7 @@ use crate::{
     buffers::BufferManager,
     data::{ExtractedWorldData, NormalMode},
     lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
-    occluders::{OccluderIndex, point_inside_poly},
+    occluders::{RoundOccluderIndex, point_inside_poly},
     phases::SpritePhase,
     pipelines::{LightmapCreationPipeline, SpritePipeline},
     sprites::{
@@ -195,7 +195,7 @@ pub(crate) fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut lights: Query<(Entity, &ExtractedPointLight, &mut LightBuffers)>,
-    occluders: Query<(&ExtractedOccluder, &OccluderIndex)>,
+    occluders: Query<(&ExtractedOccluder, &RoundOccluderIndex)>,
     camera: Single<(
         &ExtractedWorldData,
         &Projection,
@@ -273,7 +273,7 @@ pub(crate) fn prepare_data(
                     }
 
                     if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-                        buffers.rounds.push(occluder_index.0.unwrap() as u32);
+                        buffers.rounds.push(occluder_index.0.unwrap().index as u32);
                         uniform_light.n_rounds += 1;
                         continue;
                     }

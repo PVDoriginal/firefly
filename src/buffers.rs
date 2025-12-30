@@ -1,21 +1,25 @@
 //! This module contains structs and functions that create and manage render-world entities and GPU buffers.
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, f32::consts::PI};
 
 use bevy::{
     prelude::*,
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
         render_resource::{
-            BindingResource, BufferUsages, RawBufferVec, ShaderType, encase::private::WriteInto,
+            BindingResource, BufferUsages, BufferVec, RawBufferVec, ShaderType,
+            encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
     },
 };
-use bytemuck::NoUninit;
+use bytemuck::{NoUninit, Pod, Zeroable};
 
 use crate::{
-    occluders::{ExtractedOccluder, Occluder2dShape, OccluderIndex, UniformRoundOccluder},
+    occluders::{
+        ExtractedOccluder, Occluder2dShape, RoundOccluderIndex, UniformOccluder,
+        UniformRoundOccluder, UniformVertex,
+    },
     visibility::NotVisible,
 };
 
@@ -54,7 +58,7 @@ fn spawn_observers(mut commands: Commands) {
 // handles buffer when the occluder gets despawned or the component is removed
 fn on_occluder_removed(
     trigger: On<Remove, ExtractedOccluder>,
-    mut occluders: Query<(&ExtractedOccluder, &mut OccluderIndex), With<ExtractedOccluder>>,
+    mut occluders: Query<(&ExtractedOccluder, &mut RoundOccluderIndex), With<ExtractedOccluder>>,
     mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
 ) {
     if let Ok((occluder, mut index)) = occluders.get_mut(trigger.entity) {
@@ -72,7 +76,7 @@ fn on_occluder_removed(
 // handles buffer when occluder is not visible anymore
 fn on_occluder_not_visible(
     trigger: On<Add, NotVisible>,
-    mut occluders: Query<(Entity, &ExtractedOccluder, &mut OccluderIndex), With<NotVisible>>,
+    mut occluders: Query<(Entity, &ExtractedOccluder, &mut RoundOccluderIndex), With<NotVisible>>,
     mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
     mut commands: Commands,
 ) {
@@ -95,7 +99,7 @@ fn on_occluder_not_visible(
 fn prepare_occluders(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut occluders: Query<(&ExtractedOccluder, &mut OccluderIndex)>,
+    mut occluders: Query<(&ExtractedOccluder, &mut RoundOccluderIndex)>,
     mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
 ) {
     for (occluder, mut index) in &mut occluders {
@@ -134,6 +138,7 @@ pub struct BufferManager<T: ShaderType + WriteInto + Default + NoUninit> {
     free_indices: VecDeque<usize>,
     write_min: usize,
     write_max: usize,
+    current_generation: u32,
 }
 
 impl<T: ShaderType + WriteInto + Default + NoUninit> FromWorld for BufferManager<T> {
@@ -160,6 +165,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
             free_indices: default(),
             write_min: usize::MAX,
             write_max: usize::MIN,
+            current_generation: 0,
         };
 
         // empty value is added so the buffer can be written to VRAM from the start
@@ -179,12 +185,12 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     /// It is an entity's responsibility to store the received index and use it in subsequent calls.
     ///
     /// If an entity didn't have any changes, it shouldn't call this.
-    pub fn set_value(&mut self, value: &T, index: Option<usize>) -> usize {
+    pub fn set_value(&mut self, value: &T, index: Option<BufferIndex>) -> BufferIndex {
         let index = match index {
             None => self.new_index(),
-            Some(i) => {
-                if i < self.next_index {
-                    i
+            Some(BufferIndex { index, generation }) => {
+                if index < self.next_index && generation == self.current_generation {
+                    index
                 } else {
                     self.new_index()
                 }
@@ -200,7 +206,10 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         self.write_min = self.write_min.min(index + 1);
         self.write_max = self.write_max.max(index + 1);
 
-        index
+        BufferIndex {
+            index,
+            generation: self.current_generation,
+        }
     }
 
     /// Flush the changes at the end of a render frame. This writes all changes to the GPU.
@@ -230,7 +239,9 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
         if self.free_indices.len() > self.buffer.capacity() as usize / 2 {
+            let old_generation = self.current_generation;
             *self = Self::new(device, queue);
+            self.current_generation = old_generation + 1;
         }
 
         self.write_min = usize::MAX;
@@ -241,10 +252,134 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     /// has to call this method to free it's Buffer slot.
     ///
     /// The index / slot will be automatically redistributed to another entity when needed.
-    pub fn free_index(&mut self, index: usize) {
-        if index >= self.buffer.len() {
+    pub fn free_index(&mut self, index: BufferIndex) {
+        if index.generation != self.current_generation {
+            return;
+        };
+
+        if index.index >= self.buffer.len() {
             return;
         }
-        self.free_indices.push_front(index);
+
+        self.free_indices.push_front(index.index);
     }
+}
+
+/// The amount of bins that each [`Bins`] will have.
+pub const N_BINS: usize = 256;
+
+/// The amount of occluder per bin.
+pub const N_OCCLUDERS: usize = 64;
+
+/// A component that each light has, containing sets of bins of occluders for
+/// faster shader iteration.
+#[derive(Component)]
+pub struct BinBuffer {
+    buffer: RawBufferVec<[[OccluderPointer; N_OCCLUDERS]; N_BINS]>,
+    counts: [(usize, usize); N_BINS],
+}
+
+impl Default for BinBuffer {
+    fn default() -> Self {
+        Self {
+            buffer: RawBufferVec::<[[OccluderPointer; N_OCCLUDERS]; N_BINS]>::new(
+                BufferUsages::STORAGE,
+            ),
+            counts: [(0, 0); N_BINS],
+        }
+    }
+}
+
+impl BinBuffer {
+    const PI2: f32 = PI * 2.0;
+    const N_BINS: f32 = N_BINS as f32;
+
+    fn push_empty(&mut self) {
+        self.buffer.push([[default(); N_OCCLUDERS]; N_BINS]);
+    }
+
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+        self.push_empty();
+    }
+
+    pub fn add_occluder(&mut self, occluder: OccluderPointer, min_angle: f32, max_angle: f32) {
+        let min_bin = ((min_angle / Self::PI2) * Self::N_BINS).floor() as usize;
+        let max_bin = ((max_angle / Self::PI2) * Self::N_BINS).ceil() as usize;
+
+        for bin in min_bin..max_bin {
+            if self.counts[bin].0 >= self.buffer.len() {
+                self.push_empty();
+            }
+
+            let values = self.buffer.values_mut();
+            values[self.counts[bin].0][bin][self.counts[bin].1] = occluder;
+
+            if self.counts[bin].1 + 1 == N_OCCLUDERS {
+                self.counts[bin] = (self.counts[bin].0 + 1, 0);
+            } else {
+                self.counts[bin].1 += 1;
+            }
+        }
+    }
+}
+
+/// Compact struct pointing to an occluder.
+#[repr(C)]
+#[derive(Default, Pod, Zeroable, Clone, Copy)]
+pub struct OccluderPointer {
+    pub index: u32,
+    pub min_v: u32,
+    pub max_v: u32,
+    pub distance: f32,
+}
+
+// Index - ( 00  |      ..     )
+//          type   actual index
+
+// type: 0 - end of buffer
+//       1 - round occluder
+//       2 - polygonal occluder
+
+// pub struct VertexBuffer {
+//     vertices: BufferVec<Vec2>,
+//     next_index: usize,
+//     min_index: usize,
+//     empty_slots: u32,
+// }
+
+// impl FromWorld for VertexBuffer {
+//     fn from_world(world: &mut World) -> Self {
+//         let device = world.resource::<RenderDevice>();
+//         let queue = world.resource::<RenderQueue>();
+
+//         Self::new(device, queue)
+//     }
+// }
+
+// impl VertexBuffer {
+//     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
+//         let mut res = Self {
+//             vertices: BufferVec::<UniformVertex>::new(BufferUsages::STORAGE),
+//             next_index: 0,
+//             min_index: usize::MAX,
+//             empty_slots: 0,
+//         };
+
+//         // empty value is added so the buffer can be written to VRAM from the start
+//         res.vertices.push(default());
+//         res.vertices.write_buffer(device, queue);
+
+//         res
+//     }
+
+//     pub fn add_vertices(&mut self, occluder: &ExtractedOccluder) -> usize {
+//         for vertex in occluder.vertices_iter() {}
+//     }
+// }
+
+#[derive(Clone, Copy)]
+pub struct BufferIndex {
+    pub index: usize,
+    pub generation: u32,
 }
