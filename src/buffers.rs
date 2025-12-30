@@ -7,7 +7,7 @@ use bevy::{
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
         render_resource::{
-            BindingResource, BufferUsages, BufferVec, RawBufferVec, ShaderType,
+            BindingResource, BufferUsages, BufferVec, RawBufferVec, ShaderType, UniformBuffer,
             encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
@@ -17,7 +17,7 @@ use bytemuck::{NoUninit, Pod, Zeroable};
 
 use crate::{
     occluders::{
-        ExtractedOccluder, Occluder2dShape, RoundOccluderIndex, UniformOccluder,
+        ExtractedOccluder, Occluder2dShape, PolyOccluderIndex, RoundOccluderIndex, UniformOccluder,
         UniformRoundOccluder, UniformVertex,
     },
     visibility::NotVisible,
@@ -47,6 +47,8 @@ impl Plugin for BuffersPlugin {
         };
 
         render_app.init_resource::<BufferManager<UniformRoundOccluder>>();
+        render_app.init_resource::<BufferManager<UniformOccluder>>();
+        render_app.init_resource::<VertexBuffer>();
     }
 }
 
@@ -58,17 +60,33 @@ fn spawn_observers(mut commands: Commands) {
 // handles buffer when the occluder gets despawned or the component is removed
 fn on_occluder_removed(
     trigger: On<Remove, ExtractedOccluder>,
-    mut occluders: Query<(&ExtractedOccluder, &mut RoundOccluderIndex), With<ExtractedOccluder>>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut occluders: Query<
+        (
+            &ExtractedOccluder,
+            &mut RoundOccluderIndex,
+            &mut PolyOccluderIndex,
+        ),
+        With<ExtractedOccluder>,
+    >,
+    mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
-    if let Ok((occluder, mut index)) = occluders.get_mut(trigger.entity) {
-        if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-            return;
-        }
-
-        if let Some(old_index) = index.0 {
-            manager.free_index(old_index);
-            index.0 = None;
+    if let Ok((occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
+        if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+            if let Some(old_index) = round_index.0 {
+                round_manager.free_index(old_index);
+                round_index.0 = None;
+            }
+        } else {
+            if let Some(old_index) = poly_index.occluder {
+                poly_manager.free_index(old_index);
+                poly_index.occluder = None;
+            }
+            if let Some(old_index) = poly_index.vertices {
+                vertex_buffer.free_indices(occluder.shape.n_vertices(), old_index.generation);
+                poly_index.vertices = None;
+            }
         }
     }
 }
@@ -76,18 +94,35 @@ fn on_occluder_removed(
 // handles buffer when occluder is not visible anymore
 fn on_occluder_not_visible(
     trigger: On<Add, NotVisible>,
-    mut occluders: Query<(Entity, &ExtractedOccluder, &mut RoundOccluderIndex), With<NotVisible>>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut occluders: Query<
+        (
+            Entity,
+            &ExtractedOccluder,
+            &mut RoundOccluderIndex,
+            &mut PolyOccluderIndex,
+        ),
+        With<NotVisible>,
+    >,
+    mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut vertex_buffer: ResMut<VertexBuffer>,
     mut commands: Commands,
 ) {
-    if let Ok((id, occluder, mut index)) = occluders.get_mut(trigger.entity) {
-        if !matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-            return;
-        }
-
-        if let Some(old_index) = index.0 {
-            manager.free_index(old_index);
-            index.0 = None;
+    if let Ok((id, occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
+        if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+            if let Some(old_index) = round_index.0 {
+                round_manager.free_index(old_index);
+                round_index.0 = None;
+            }
+        } else {
+            if let Some(old_index) = poly_index.occluder {
+                poly_manager.free_index(old_index);
+                poly_index.occluder = None;
+            }
+            if let Some(old_index) = poly_index.vertices {
+                vertex_buffer.free_indices(occluder.shape.n_vertices(), old_index.generation);
+                poly_index.vertices = None;
+            }
         }
 
         commands.entity(id).remove::<ExtractedOccluder>();
@@ -99,13 +134,17 @@ fn on_occluder_not_visible(
 fn prepare_occluders(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut occluders: Query<(&ExtractedOccluder, &mut RoundOccluderIndex)>,
-    mut manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut occluders: Query<(
+        &ExtractedOccluder,
+        &mut RoundOccluderIndex,
+        &mut PolyOccluderIndex,
+    )>,
+    mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
-    for (occluder, mut index) in &mut occluders {
-        if !occluder.changed_form && !index.0.is_none() {
-            continue;
-        }
+    for (occluder, mut round_index, mut poly_index) in &mut occluders {
+        let changed = occluder.changes.translation || occluder.changes.shape;
 
         if let Occluder2dShape::RoundRectangle {
             width,
@@ -122,11 +161,38 @@ fn prepare_occluders(
                 _padding: default(),
             };
 
-            let new_index = manager.set_value(&value, index.0);
-            index.0 = Some(new_index);
+            let new_index = round_manager.set_value(&value, round_index.0, changed);
+            round_index.0 = Some(new_index);
+        } else {
+            let value = UniformOccluder {
+                n_sequences: 0,
+                n_vertices: occluder.shape.n_vertices(),
+                z: occluder.z,
+                color: occluder.color.to_linear().to_vec3(),
+                opacity: occluder.opacity,
+                z_sorting: match occluder.z_sorting {
+                    true => 1,
+                    false => 0,
+                },
+            };
+
+            let new_index = poly_manager.set_value(&value, poly_index.occluder, changed);
+            poly_index.occluder = Some(new_index);
+
+            let new_index = vertex_buffer.write_vertices(
+                occluder,
+                poly_index.vertices,
+                &render_device,
+                &render_queue,
+                changed,
+            );
+            poly_index.vertices = Some(new_index);
         }
     }
-    manager.flush(&render_device, &render_queue);
+
+    round_manager.flush(&render_device, &render_queue);
+    poly_manager.flush(&render_device, &render_queue);
+    vertex_buffer.pass(&render_device, &render_queue);
 }
 
 /// This resource is a wrapper around [`RawBufferVec`] that reserves and distributes VRAM slots to
@@ -185,7 +251,19 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     /// It is an entity's responsibility to store the received index and use it in subsequent calls.
     ///
     /// If an entity didn't have any changes, it shouldn't call this.
-    pub fn set_value(&mut self, value: &T, index: Option<BufferIndex>) -> BufferIndex {
+    pub fn set_value(
+        &mut self,
+        value: &T,
+        index: Option<BufferIndex>,
+        changed: bool,
+    ) -> BufferIndex {
+        if !changed
+            && let Some(index) = index
+            && index.generation == self.current_generation
+        {
+            return index;
+        }
+
         let index = match index {
             None => self.new_index(),
             Some(BufferIndex { index, generation }) => {
@@ -238,7 +316,9 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         // );
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
-        if self.free_indices.len() > self.buffer.capacity() as usize / 2 {
+        if self.free_indices.len() > 500
+            && self.free_indices.len() > self.buffer.capacity() as usize / 2
+        {
             let old_generation = self.current_generation;
             *self = Self::new(device, queue);
             self.current_generation = old_generation + 1;
@@ -271,8 +351,7 @@ pub const N_BINS: usize = 256;
 /// The amount of occluder per bin.
 pub const N_OCCLUDERS: usize = 64;
 
-/// A component that each light has, containing sets of bins of occluders for
-/// faster shader iteration.
+/// A component that each light has, containing sets of bins of occluders for faster iteration.
 #[derive(Component)]
 pub struct BinBuffer {
     buffer: RawBufferVec<[[OccluderPointer; N_OCCLUDERS]; N_BINS]>,
@@ -341,42 +420,131 @@ pub struct OccluderPointer {
 //       1 - round occluder
 //       2 - polygonal occluder
 
-// pub struct VertexBuffer {
-//     vertices: BufferVec<Vec2>,
-//     next_index: usize,
-//     min_index: usize,
-//     empty_slots: u32,
-// }
+#[derive(Resource)]
+pub struct VertexBuffer {
+    vertices: RawBufferVec<Vec2>,
+    next_index: usize,
+    min_index: usize,
+    max_index: usize,
+    empty_slots: u32,
+    current_generation: u32,
+}
 
-// impl FromWorld for VertexBuffer {
-//     fn from_world(world: &mut World) -> Self {
-//         let device = world.resource::<RenderDevice>();
-//         let queue = world.resource::<RenderQueue>();
+impl FromWorld for VertexBuffer {
+    fn from_world(world: &mut World) -> Self {
+        let device = world.resource::<RenderDevice>();
+        let queue = world.resource::<RenderQueue>();
 
-//         Self::new(device, queue)
-//     }
-// }
+        Self::new(device, queue)
+    }
+}
 
-// impl VertexBuffer {
-//     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
-//         let mut res = Self {
-//             vertices: BufferVec::<UniformVertex>::new(BufferUsages::STORAGE),
-//             next_index: 0,
-//             min_index: usize::MAX,
-//             empty_slots: 0,
-//         };
+impl VertexBuffer {
+    fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
+        let mut res = Self {
+            vertices: RawBufferVec::<Vec2>::new(BufferUsages::STORAGE),
+            next_index: 0,
+            min_index: usize::MAX,
+            max_index: usize::MIN,
+            empty_slots: 0,
+            current_generation: 0,
+        };
 
-//         // empty value is added so the buffer can be written to VRAM from the start
-//         res.vertices.push(default());
-//         res.vertices.write_buffer(device, queue);
+        // empty value is added so the buffer can be written to VRAM from the start
+        res.vertices.push(default());
+        res.vertices.push(default());
+        res.vertices.write_buffer(device, queue);
 
-//         res
-//     }
+        res
+    }
 
-//     pub fn add_vertices(&mut self, occluder: &ExtractedOccluder) -> usize {
-//         for vertex in occluder.vertices_iter() {}
-//     }
-// }
+    pub fn write_vertices(
+        &mut self,
+        occluder: &ExtractedOccluder,
+        index: Option<BufferIndex>,
+        device: &RenderDevice,
+        queue: &RenderQueue,
+        changed: bool,
+    ) -> BufferIndex {
+        if !changed
+            && let Some(index) = index
+            && index.generation == self.current_generation
+        {
+            return index;
+        }
+
+        let index = match index {
+            None => self.next_index,
+            Some(BufferIndex { index, generation }) => {
+                if index < self.next_index && generation == self.current_generation {
+                    index
+                } else {
+                    self.next_index
+                }
+            }
+        };
+
+        let mut last_index = index;
+
+        // change existent vertices
+        if index < self.next_index {
+            for vertex in occluder.vertices_iter() {
+                self.vertices.set(last_index as u32, vertex);
+                last_index += 1;
+            }
+        } else {
+            for vertex in occluder.vertices_iter() {
+                self.vertices.push(vertex);
+                last_index += 1;
+            }
+        }
+
+        if last_index % 2 == 1 {
+            self.vertices.push(default());
+            last_index += 1;
+        }
+
+        if last_index >= self.vertices.capacity() {
+            self.vertices.reserve(
+                ((last_index + 1) as f32 / 4096.0).ceil() as usize * 4096,
+                device,
+            );
+            self.vertices.write_buffer(device, queue);
+        } else {
+            self.vertices
+                .write_buffer_range(queue, index..last_index)
+                .expect("couldn't write range");
+        }
+
+        info!(
+            "Vertex buffer capacity: {}, length: {}, empty slots: {}",
+            self.vertices.capacity(),
+            self.vertices.len(),
+            self.empty_slots
+        );
+
+        BufferIndex {
+            index,
+            generation: self.current_generation,
+        }
+    }
+
+    pub fn pass(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+        if self.empty_slots > 500 && self.empty_slots > self.vertices.capacity() as u32 / 2 {
+            let old_generation = self.current_generation;
+            *self = Self::new(device, queue);
+            self.current_generation = old_generation + 1;
+        }
+    }
+
+    pub fn free_indices(&mut self, n_indices: u32, generation: u32) {
+        if generation != self.current_generation {
+            return;
+        }
+
+        self.empty_slots += n_indices;
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct BufferIndex {

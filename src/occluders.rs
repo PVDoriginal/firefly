@@ -11,10 +11,7 @@ use bytemuck::{NoUninit, Pod, Zeroable};
 use core::f32;
 
 use crate::visibility::VisibilityTimer;
-use crate::{
-    buffers::BufferIndex,
-    change::{ChangedForm, ChangedFunction},
-};
+use crate::{buffers::BufferIndex, change::Changes};
 
 /// An occluder that blocks light.
 ///
@@ -31,8 +28,7 @@ use crate::{
     VisibilityClass,
     ViewVisibility,
     VisibilityTimer,
-    ChangedForm,
-    ChangedFunction
+    Changes
 )]
 #[component(on_add = add_visibility_class::<Occluder2d>)]
 pub struct Occluder2d {
@@ -210,8 +206,8 @@ impl Occluder2d {
 }
 
 /// Component with data extracted to the Render World from Occluders.
-#[derive(Component, Clone, Debug)]
-#[require(RoundOccluderIndex)]
+#[derive(Component, Clone)]
+#[require(RoundOccluderIndex, PolyOccluderIndex)]
 pub struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
@@ -221,8 +217,7 @@ pub struct ExtractedOccluder {
     pub color: Color,
     pub opacity: f32,
     pub z_sorting: bool,
-    pub changed_form: bool,
-    pub changed_function: bool,
+    pub changes: Changes,
 }
 
 impl PartialEq for ExtractedOccluder {
@@ -347,7 +342,8 @@ impl Plugin for OccluderPlugin {
 }
 
 /// Data that is transferred to the GPU to be read inside shaders.
-#[derive(ShaderType, Clone, Default)]
+#[repr(C)]
+#[derive(ShaderType, Clone, Copy, Default, NoUninit)]
 pub struct UniformOccluder {
     pub n_sequences: u32,
     pub n_vertices: u32,
@@ -404,6 +400,14 @@ impl Default for Occluder2dShape {
 }
 
 impl Occluder2dShape {
+    pub(crate) fn n_vertices(&self) -> u32 {
+        match &self {
+            Self::Polygon { vertices } => vertices.len() as u32,
+            Self::Polyline { vertices } => vertices.len() as u32,
+            Self::RoundRectangle { .. } => 0,
+        }
+    }
+
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
             Self::Polygon { vertices, .. } => {
@@ -450,3 +454,9 @@ pub(crate) fn translate_vertices_iter<'a>(
 
 #[derive(Component, Clone, Copy, Default)]
 pub struct RoundOccluderIndex(pub Option<BufferIndex>);
+
+#[derive(Component, Clone, Copy, Default)]
+pub struct PolyOccluderIndex {
+    pub occluder: Option<BufferIndex>,
+    pub vertices: Option<BufferIndex>,
+}

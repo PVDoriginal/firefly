@@ -15,7 +15,7 @@ use bevy::{
 
 use crate::{
     LightmapPhase,
-    change::{ChangedForm, ChangedFunction},
+    change::Changes,
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,
@@ -246,22 +246,14 @@ fn extract_occluders(
             &GlobalTransform,
             &ViewVisibility,
             &VisibilityTimer,
-            &ChangedForm,
-            &ChangedFunction,
+            &Changes,
         )>,
     >,
 ) {
     let mut values = Vec::with_capacity(*previous_len);
 
-    for (
-        render_entity,
-        occluder,
-        global_transform,
-        visibility,
-        visibility_timer,
-        changed_form,
-        changed_function,
-    ) in &occluders
+    for (render_entity, occluder, global_transform, visibility, visibility_timer, changes) in
+        &occluders
     {
         if !visibility.get() {
             if visibility_timer.0.just_finished() {
@@ -285,8 +277,7 @@ fn extract_occluders(
             color: occluder.color,
             opacity: occluder.opacity,
             z_sorting: occluder.z_sorting,
-            changed_form: changed_form.0,
-            changed_function: changed_function.0,
+            changes: changes.clone(),
         };
 
         values.push((render_entity, extracted_occluder));
