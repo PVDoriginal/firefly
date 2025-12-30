@@ -2,10 +2,12 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    buffers::BufferManager,
+    buffers::{BufferManager, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
-    lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
-    occluders::{RoundOccluderIndex, point_inside_poly},
+    lights::{
+        Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers, PolyOccluderPointer,
+    },
+    occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly},
     phases::SpritePhase,
     pipelines::{LightmapCreationPipeline, SpritePipeline},
     sprites::{
@@ -174,17 +176,13 @@ fn prepare_lightmap(
 
 fn insert_light_buffers(
     lights: Query<(Entity, Has<LightBuffers>), With<ExtractedPointLight>>,
-    render_device: Res<RenderDevice>,
     mut commands: Commands,
 ) {
-    let device = &render_device;
     for (light, has_buffers) in lights {
         if !has_buffers {
             commands.entity(light).insert(LightBuffers {
                 light: UniformBuffer::<UniformPointLight>::from(UniformPointLight::default()),
-                occluders: GpuArrayBuffer::<UniformOccluder>::new(device),
-                sequences: GpuArrayBuffer::<u32>::new(device),
-                vertices: GpuArrayBuffer::<UniformVertex>::new(device),
+                occluders: BufferVec::<PolyOccluderPointer>::new(BufferUsages::STORAGE),
                 rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
             });
         }
@@ -195,7 +193,7 @@ pub(crate) fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut lights: Query<(Entity, &ExtractedPointLight, &mut LightBuffers)>,
-    occluders: Query<(&ExtractedOccluder, &RoundOccluderIndex)>,
+    occluders: Query<(&ExtractedOccluder, &RoundOccluderIndex, &PolyOccluderIndex)>,
     camera: Single<(
         &ExtractedWorldData,
         &Projection,
@@ -209,6 +207,8 @@ pub(crate) fn prepare_data(
     mut batches: ResMut<LightBatches>,
     view_uniforms: Res<ViewUniforms>,
     round_occluders: Res<BufferManager<UniformRoundOccluder>>,
+    poly_occluders: Res<BufferManager<UniformOccluder>>,
+    vertices: Res<VertexBuffer>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -256,8 +256,7 @@ pub(crate) fn prepare_data(
                 });
 
                 buffers.occluders.clear();
-                buffers.sequences.clear();
-                buffers.vertices.clear();
+                buffers.occluders.clear();
                 buffers.rounds.clear();
 
                 // for (i, occluder) in round_occluder_rects.iter().enumerate() {
@@ -267,103 +266,108 @@ pub(crate) fn prepare_data(
                 //     buffers.rounds.push(i as u32);
                 // }
 
-                for (occluder, occluder_index) in &occluders {
+                for (occluder, round_index, poly_index) in &occluders {
                     if !light.cast_shadows || occluder.rect.intersect(light_rect).is_empty() {
                         continue;
                     }
 
                     if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-                        buffers.rounds.push(occluder_index.0.unwrap().index as u32);
+                        buffers.rounds.push(round_index.0.unwrap().index as u32);
                         uniform_light.n_rounds += 1;
                         continue;
                     }
 
-                    let mut meta: UniformOccluder = default();
-                    meta.z = occluder.z;
-
-                    meta.z_sorting = match occluder.z_sorting {
-                        false => 0,
-                        true => 1,
+                    let Some(occluder_index) = poly_index.occluder else {
+                        continue;
                     };
 
-                    meta.color = occluder.color.to_linear().to_vec3();
-                    meta.opacity = occluder.opacity;
+                    let angle = |a: Vec2| (a.y - light.pos.y).atan2(a.x - light.pos.x);
 
-                    let angle = |a: Vec2, b: Vec2| (a.y - b.y).atan2(a.x - b.x);
-                    let vertices_iter = || {
-                        Box::new(occluder.vertices_iter().map(|pos| UniformVertex {
-                            angle: angle(pos, light.pos),
-                            pos,
-                        }))
-                    };
+                    let vertices = occluder.vertices();
 
                     let light_inside_occluder =
                         matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                             && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
 
-                    let mut push_slice = |slice: &Vec<UniformVertex>| {
-                        buffers.sequences.push(slice.len() as u32);
-                        for vertex in slice {
-                            buffers.vertices.push(vertex.clone());
+                    let mut push_vertices = |vertices: Vec<(usize, &Vec2, f32)>| {
+                        let mut last: Option<(u32, &Vec2, f32)> = None;
+                        let mut slice: (Option<u32>, Option<u32>) = (None, None);
+
+                        for (i, vertex, angle) in vertices {
+                            if let Some(last) = last {
+                                let loops = (angle - last.2).abs() > PI;
+
+                                // if the next vertex is decreasing
+                                if (!loops && angle < last.2) || (loops && angle > last.2) {
+                                    if let Some(b) = slice.1
+                                        && let Some(a) = slice.0
+                                    {
+                                        buffers.occluders.push(PolyOccluderPointer {
+                                            index: occluder_index.index as u32,
+                                            min_v: a,
+                                            max_v: b,
+                                        });
+                                    }
+                                    slice = (Some(i as u32), None);
+                                }
+                                // if the next vertex is increasing, simple case
+                                else if !loops && angle > last.2 {
+                                    slice.1 = Some(i as u32);
+                                }
+                                // if the next vertex is increasing and loops over
+                                else {
+                                    slice.1 = Some(i as u32);
+
+                                    if let Some(b) = slice.1
+                                        && let Some(a) = slice.0
+                                    {
+                                        buffers.occluders.push(PolyOccluderPointer {
+                                            index: occluder_index.index as u32,
+                                            min_v: a,
+                                            max_v: b,
+                                        });
+                                    }
+
+                                    slice = (Some(last.0 as u32), Some(i as u32));
+                                }
+                            } else {
+                                slice.0 = Some(i as u32);
+                            }
+
+                            last = Some((i as u32, vertex, angle));
                         }
-                        meta.n_vertices += slice.len() as u32;
-                        meta.n_sequences += 1;
+
+                        if let Some(b) = slice.1
+                            && let Some(a) = slice.0
+                        {
+                            buffers.occluders.push(PolyOccluderPointer {
+                                index: occluder_index.index as u32,
+                                min_v: a,
+                                max_v: b,
+                            });
+                        }
                     };
 
-                    let mut push_vertices =
-                        |vertices: Box<dyn DoubleEndedIterator<Item = UniformVertex>>| {
-                            let mut slice: Vec<UniformVertex> = default();
-
-                            for vertex in vertices {
-                                if let Some(last) = slice.last() {
-                                    let loops = (vertex.angle - last.angle).abs() > PI;
-
-                                    // if the next vertex is decreasing
-                                    if (!loops && vertex.angle < last.angle)
-                                        || (loops && vertex.angle > last.angle)
-                                    {
-                                        if slice.len() > 1 {
-                                            push_slice(&slice);
-                                        }
-                                        slice = vec![vertex.clone()];
-                                    }
-                                    // if the next vertex is increasing, simple case
-                                    else if !loops && vertex.angle > last.angle {
-                                        slice.push(vertex.clone());
-                                    }
-                                    // if the next vertex is increasing and loops over
-                                    else {
-                                        let mut old_vertex = last.clone();
-                                        let mut new_vertex = vertex.clone();
-                                        new_vertex.angle += 2. * PI;
-                                        slice.push(new_vertex.clone());
-
-                                        push_slice(&slice);
-
-                                        old_vertex.angle -= 2. * PI;
-                                        slice = vec![old_vertex, vertex.clone()];
-                                    }
-                                } else {
-                                    slice.push(vertex.clone());
-                                }
-                            }
-
-                            if slice.len() > 1 {
-                                push_slice(&slice);
-                            }
-                        };
-
                     if !light_inside_occluder {
-                        push_vertices(vertices_iter());
+                        push_vertices(
+                            vertices
+                                .iter()
+                                .enumerate()
+                                .map(|(i, v)| (i, v, angle(*v)))
+                                .collect(),
+                        );
                     } else {
-                        push_vertices(Box::new(vertices_iter().rev()));
+                        push_vertices(
+                            vertices
+                                .iter()
+                                .enumerate()
+                                .map(|(i, v)| (i, v, angle(*v)))
+                                .rev()
+                                .collect(),
+                        );
                     }
-
-                    buffers.occluders.push(meta);
                 }
                 buffers.occluders.push(default());
-                buffers.sequences.push(default());
-                buffers.vertices.push(default());
                 buffers.rounds.push(default());
 
                 buffers.light.set(uniform_light);
@@ -372,10 +376,6 @@ pub(crate) fn prepare_data(
                 buffers
                     .occluders
                     .write_buffer(&render_device, &render_queue);
-                buffers
-                    .sequences
-                    .write_buffer(&render_device, &render_queue);
-                buffers.vertices.write_buffer(&render_device, &render_queue);
                 buffers.rounds.write_buffer(&render_device, &render_queue);
 
                 light_bind_groups.values.entry(*entity).insert({
@@ -386,11 +386,11 @@ pub(crate) fn prepare_data(
                             view_uniforms.uniforms.binding().unwrap(),
                             &lightmap_pipeline.sampler,
                             buffers.light.binding().unwrap(),
-                            buffers.occluders.binding().unwrap(),
-                            buffers.sequences.binding().unwrap(),
-                            buffers.vertices.binding().unwrap(),
                             round_occluders.binding(),
+                            poly_occluders.binding(),
+                            vertices.binding(),
                             buffers.rounds.binding().unwrap(),
+                            buffers.occluders.binding().unwrap(),
                             &camera.2.0.default_view,
                             &camera.3.0.default_view,
                             camera.4.0.binding().unwrap(),

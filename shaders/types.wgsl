@@ -15,7 +15,7 @@ struct PointLight {
     n_rounds: u32,
 }
 
-struct Occluder {
+struct PolyOccluder {
     n_sequences: u32,
     n_vertices: u32,
     round: u32,
@@ -25,6 +25,12 @@ struct Occluder {
     z_sorting: u32,
 }
 
+struct PolyOccluderPointer {
+    index: u32, 
+    min_v: u32, 
+    max_v: u32,
+}
+
 struct RoundOccluder {
     pos: vec2f,
     rot: f32,
@@ -32,11 +38,6 @@ struct RoundOccluder {
     height: f32, 
     radius: f32,
     padding: vec2f,
-}
-
-struct Vertex {
-    angle: f32,
-    pos: vec2f
 }
 
 struct FireflyConfig {

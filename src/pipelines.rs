@@ -27,7 +27,7 @@ use bevy::{
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
     data::UniformFireflyConfig,
-    lights::UniformPointLight,
+    lights::{PolyOccluderPointer, UniformPointLight},
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
 };
 
@@ -60,22 +60,16 @@ impl FromWorld for LightmapCreationPipeline {
                     (1, sampler(SamplerBindingType::Filtering)),
                     // point light
                     (2, uniform_buffer::<UniformPointLight>(false)),
-                    // occluders
-                    (
-                        3,
-                        GpuArrayBuffer::<UniformOccluder>::binding_layout(render_device),
-                    ),
-                    // sequences
-                    (4, GpuArrayBuffer::<u32>::binding_layout(render_device)),
-                    // vertices
-                    (
-                        5,
-                        GpuArrayBuffer::<UniformVertex>::binding_layout(render_device),
-                    ),
                     // round occluders
-                    (6, storage_buffer_read_only::<UniformRoundOccluder>(false)),
+                    (3, storage_buffer_read_only::<UniformRoundOccluder>(false)),
+                    // poly occluders
+                    (4, storage_buffer_read_only::<UniformOccluder>(false)),
+                    // vertices
+                    (5, storage_buffer_read_only::<Vec2>(false)),
                     // round occluder indices
-                    (7, storage_buffer_read_only::<u32>(false)),
+                    (6, storage_buffer_read_only::<u32>(false)),
+                    // poly occluder indices
+                    (7, storage_buffer_read_only::<PolyOccluderPointer>(false)),
                     // sprite stencil
                     (
                         8,

@@ -171,10 +171,15 @@ pub(crate) struct UniformPointLight {
 #[derive(Component)]
 pub(crate) struct LightBuffers {
     pub light: UniformBuffer<UniformPointLight>,
-    pub occluders: GpuArrayBuffer<UniformOccluder>,
-    pub sequences: GpuArrayBuffer<u32>,
-    pub vertices: GpuArrayBuffer<UniformVertex>,
+    pub occluders: BufferVec<PolyOccluderPointer>,
     pub rounds: BufferVec<u32>,
+}
+
+#[derive(ShaderType, Clone, Copy, Default)]
+pub(crate) struct PolyOccluderPointer {
+    pub index: u32,
+    pub min_v: u32,
+    pub max_v: u32,
 }
 
 /// This resource handles giving lights indices and redistributing unused indices

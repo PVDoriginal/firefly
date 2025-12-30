@@ -453,6 +453,10 @@ impl VertexBuffer {
         res
     }
 
+    pub fn binding(&self) -> BindingResource<'_> {
+        self.vertices.binding().unwrap()
+    }
+
     pub fn write_vertices(
         &mut self,
         occluder: &ExtractedOccluder,
@@ -511,12 +515,12 @@ impl VertexBuffer {
                 .expect("couldn't write range");
         }
 
-        info!(
-            "Vertex buffer capacity: {}, length: {}, empty slots: {}",
-            self.vertices.capacity(),
-            self.vertices.len(),
-            self.empty_slots
-        );
+        // info!(
+        //     "Vertex buffer capacity: {}, length: {}, empty slots: {}",
+        //     self.vertices.capacity(),
+        //     self.vertices.len(),
+        //     self.empty_slots
+        // );
 
         BufferIndex {
             index,
