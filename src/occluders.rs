@@ -2,10 +2,7 @@ use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
     prelude::*,
-    render::{
-        render_resource::{RawBufferVec, ShaderType},
-        sync_world::SyncToRenderWorld,
-    },
+    render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
 };
 use bytemuck::{NoUninit, Pod, Zeroable};
 use core::f32;
@@ -338,7 +335,7 @@ pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> boo
 pub struct OccluderPlugin;
 
 impl Plugin for OccluderPlugin {
-    fn build(&self, app: &mut App) {}
+    fn build(&self, _app: &mut App) {}
 }
 
 /// Data that is transferred to the GPU to be read inside shaders.

@@ -7,8 +7,7 @@ use bevy::{
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
         render_resource::{
-            BindingResource, BufferUsages, BufferVec, RawBufferVec, ShaderType, UniformBuffer,
-            encase::private::WriteInto,
+            BindingResource, BufferUsages, RawBufferVec, ShaderType, encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
     },
@@ -18,7 +17,7 @@ use bytemuck::{NoUninit, Pod, Zeroable};
 use crate::{
     occluders::{
         ExtractedOccluder, Occluder2dShape, PolyOccluderIndex, RoundOccluderIndex, UniformOccluder,
-        UniformRoundOccluder, UniformVertex,
+        UniformRoundOccluder,
     },
     visibility::NotVisible,
 };
@@ -424,8 +423,6 @@ pub struct OccluderPointer {
 pub struct VertexBuffer {
     vertices: RawBufferVec<Vec2>,
     next_index: usize,
-    min_index: usize,
-    max_index: usize,
     empty_slots: u32,
     current_generation: u32,
 }
@@ -444,8 +441,6 @@ impl VertexBuffer {
         let mut res = Self {
             vertices: RawBufferVec::<Vec2>::new(BufferUsages::STORAGE),
             next_index: 0,
-            min_index: usize::MAX,
-            max_index: usize::MIN,
             empty_slots: 0,
             current_generation: 0,
         };
