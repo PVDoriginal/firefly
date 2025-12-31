@@ -24,7 +24,7 @@ var<storage> round_occluders: array<RoundOccluder>;
 var<storage> poly_occluders: array<PolyOccluder>;
 
 @group(0) @binding(5)
-var<storage> vertices: array<vec2f>;
+var<storage> vertices: array<vec4f>;
 
 @group(0) @binding(6)
 var<storage> round_indices: array<u32>;
@@ -60,7 +60,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let b = light.dir;
     let angle = acos(dot(a, b) / (length(a) * length(b)));
     
-    if (dist < light.range && angle <= light.angle / 2.) {
+    if true || (dist < light.range && angle <= light.angle / 2.) {
         var normal_multi = 1f;
     
         if config.normal_mode != 0 && normal.a > 0 {
@@ -123,6 +123,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             if result.occluded == true {
                 shadow = shadow_blend(shadow, vec3f(1), 1.0);
             }                
+
+            // return vec4f(result.extreme_angle, 0, 0, 1);
+            // return vec4f(1.0 - (result.extreme_angle + 0.00001) / 50.0, 0, 0, 1);
+
             // else if config.softness > 0 && result.extreme_angle < soft_angle {
             //     shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
             // }
@@ -189,17 +193,22 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
 
 fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
     let start_v = poly_occluders[pointer.index + 1].vertex_start;
-    
+
     for (var i = 0u; i < pointer.length - 1; i += 1) {
         var v1 = pointer.start_v + i; 
         var v2 = pointer.start_v + i + 1; 
 
-        if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
-            v2 %= poly_occluders[pointer.index + 1].n_vertices; 
-        }
+        // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
+        //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
+        // }
 
-        let p1 = vertices[start_v + v1]; 
-        let p2 = vertices[start_v + v2]; 
+        
+
+        let p1 = vertices[v1].xy; 
+        let p2 = vertices[v2].xy; 
+
+        // return OcclusionResult(false, f32(start_v));
+        // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
 
         var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
         var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
@@ -213,7 +222,7 @@ fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
 
         let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
     
-        if angle >= a1 && angle <= a2 && !same_orientation(vertices[start_v + v1], vertices[start_v + v2], pos, light.pos) {
+        if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
             return OcclusionResult(
                 true,
                 0.0,

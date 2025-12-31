@@ -285,14 +285,18 @@ pub(crate) fn prepare_data(
                     let angle = |a: Vec2| (a.y - light.pos.y).atan2(a.x - light.pos.x);
 
                     let vertices = occluder.vertices();
+                    warn!("{vertices:?}");
 
                     let light_inside_occluder =
                         matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                             && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
 
                     info!("looking at occluder");
+                    error!("vertex start: {}", poly_index.vertices.unwrap().index);
 
                     let mut push_vertices = |vertices: Vec<(usize, &Vec2, f32)>| {
+                        info!("n_vertices: {}", vertices.len());
+
                         let mut last: Option<(u32, &Vec2, f32)> = None;
                         let mut slice: (Option<u32>, u32, u32) = (None, 0, 0);
 
@@ -308,7 +312,8 @@ pub(crate) fn prepare_data(
                                     {
                                         buffers.occluders.push(PolyOccluderPointer {
                                             index: occluder_index.index as u32,
-                                            min_v,
+                                            min_v: min_v
+                                                + poly_index.vertices.unwrap().index as u32,
                                             length,
                                             term: slice.2,
                                         });
@@ -339,7 +344,8 @@ pub(crate) fn prepare_data(
                                     {
                                         buffers.occluders.push(PolyOccluderPointer {
                                             index: occluder_index.index as u32,
-                                            min_v,
+                                            min_v: min_v
+                                                + poly_index.vertices.unwrap().index as u32,
                                             length,
                                             term: 1,
                                         });
@@ -362,7 +368,7 @@ pub(crate) fn prepare_data(
                         {
                             buffers.occluders.push(PolyOccluderPointer {
                                 index: occluder_index.index as u32,
-                                min_v,
+                                min_v: min_v + poly_index.vertices.unwrap().index as u32,
                                 length,
                                 term: slice.2,
                             });

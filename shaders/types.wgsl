@@ -19,7 +19,6 @@ struct PointLight {
 struct PolyOccluder {
     vertex_start: u32,
     n_vertices: u32,
-    round: u32,
     z: f32,
     color: vec3f, 
     opacity: f32,

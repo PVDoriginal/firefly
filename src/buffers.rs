@@ -425,7 +425,7 @@ pub struct OccluderPointer {
 
 #[derive(Resource)]
 pub struct VertexBuffer {
-    vertices: RawBufferVec<Vec2>,
+    vertices: RawBufferVec<[f32; 4]>,
     next_index: usize,
     empty_slots: u32,
     current_generation: u32,
@@ -443,7 +443,7 @@ impl FromWorld for VertexBuffer {
 impl VertexBuffer {
     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
         let mut res = Self {
-            vertices: RawBufferVec::<Vec2>::new(BufferUsages::STORAGE),
+            vertices: RawBufferVec::<[f32; 4]>::new(BufferUsages::STORAGE),
             next_index: 2,
             empty_slots: 0,
             current_generation: 0,
@@ -491,13 +491,20 @@ impl VertexBuffer {
         if index < self.next_index {
             let mut last_index = index;
             for vertex in occluder.vertices_iter() {
-                self.vertices.set(last_index as u32, vertex);
+                self.vertices
+                    .set(last_index as u32, [vertex.x, vertex.y, 0.0, 0.0]);
                 last_index += 1;
             }
 
-            self.vertices
-                .write_buffer_range(queue, index..last_index)
-                .expect("couldn't write range");
+            self.vertices.write_buffer(device, queue);
+
+            // self.vertices
+            //     .write_buffer_range(queue, index..last_index)
+            //     .expect("couldn't write range");
+
+            // for vertex in self.vertices.values() {
+            //     info!("{vertex}");
+            // }
 
             return BufferIndex {
                 index,
@@ -507,7 +514,7 @@ impl VertexBuffer {
 
         // add new vertices
         for vertex in occluder.vertices_iter() {
-            self.vertices.push(vertex);
+            self.vertices.push([vertex.x, vertex.y, 0.0, 0.0]);
             self.next_index += 1;
         }
 

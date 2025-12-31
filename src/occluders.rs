@@ -407,11 +407,7 @@ impl Occluder2dShape {
 
     pub(crate) fn vertices(&self, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
         match &self {
-            Self::Polygon { vertices, .. } => {
-                let mut vertices = vertices.clone();
-                vertices.push(vertices[0]);
-                translate_vertices(vertices, pos, rot)
-            }
+            Self::Polygon { vertices, .. } => translate_vertices(vertices.to_vec(), pos, rot),
             Self::Polyline { vertices, .. } => translate_vertices(vertices.to_vec(), pos, rot),
             Self::RoundRectangle { .. } => default(),
         }

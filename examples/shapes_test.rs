@@ -76,6 +76,8 @@ fn move_light(
         return;
     };
 
+    info!("cursor: {cursor_position:?}");
+
     gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
 
     light.translation = cursor_position.extend(0.);
