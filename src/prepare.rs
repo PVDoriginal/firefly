@@ -19,7 +19,10 @@ use crate::{
 
 use bevy::{
     core_pipeline::tonemapping::{Tonemapping, TonemappingLuts, get_lut_bindings},
-    math::Affine3A,
+    math::{
+        Affine3A,
+        bounding::{Aabb2d, IntersectsVolume},
+    },
     prelude::*,
     render::{
         Render, RenderApp, RenderSystems,
@@ -234,6 +237,9 @@ pub(crate) fn prepare_data(
                     continue;
                 };
 
+                buffers.occluders.set_label("light occluder indices".into());
+                buffers.rounds.set_label("light round indices".into());
+
                 let mut uniform_light = UniformPointLight {
                     pos: light.pos,
                     color: light.color.to_linear().to_vec3(),
@@ -256,6 +262,11 @@ pub(crate) fn prepare_data(
                     max: light.pos + light.range,
                 });
 
+                let light_aabb = Aabb2d {
+                    min: light_rect.min,
+                    max: light_rect.max,
+                };
+
                 buffers.occluders.clear();
                 buffers.rounds.clear();
 
@@ -267,12 +278,13 @@ pub(crate) fn prepare_data(
                 // }
 
                 for (occluder, round_index, poly_index) in &occluders {
-                    if !light.cast_shadows || occluder.rect.intersect(light_rect).is_empty() {
+                    if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
                         continue;
                     }
 
                     if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
                         buffers.rounds.push(round_index.0.unwrap().index as u32);
+                        info!("round: {}", round_index.0.unwrap().index);
                         uniform_light.n_rounds += 1;
                         continue;
                     }
@@ -287,7 +299,7 @@ pub(crate) fn prepare_data(
 
                     let light_inside_occluder =
                         matches!(occluder.shape, Occluder2dShape::Polygon { .. })
-                            && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
+                            && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
 
                     push_vertices(
                         &mut buffers.occluders,
@@ -302,6 +314,8 @@ pub(crate) fn prepare_data(
 
                 buffers.occluders.push(default());
                 buffers.rounds.push(default());
+
+                info!("n_rounds: {}", uniform_light.n_rounds);
 
                 buffers.light.set(uniform_light);
                 buffers.light.write_buffer(&render_device, &render_queue);

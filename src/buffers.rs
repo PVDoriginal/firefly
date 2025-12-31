@@ -228,14 +228,17 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
         let mut res = Self {
             buffer: RawBufferVec::<T>::new(BufferUsages::STORAGE),
-            next_index: default(),
+            next_index: 2,
             free_indices: default(),
             write_min: usize::MAX,
             write_max: usize::MIN,
             current_generation: 0,
         };
 
+        res.buffer.set_label("global buffer".into());
+
         // empty value is added so the buffer can be written to VRAM from the start
+        res.buffer.push(default());
         res.buffer.push(default());
         res.buffer.write_buffer(device, queue);
 
@@ -279,11 +282,11 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         if index + 1 >= self.buffer.len() {
             self.buffer.push(*value);
         } else {
-            self.buffer.set(index as u32 + 1, *value);
+            self.buffer.set(index as u32, *value);
         }
 
-        self.write_min = self.write_min.min(index + 1);
-        self.write_max = self.write_max.max(index + 1);
+        self.write_min = self.write_min.min(index);
+        self.write_max = self.write_max.max(index);
 
         BufferIndex {
             index,
@@ -464,9 +467,13 @@ impl VertexBuffer {
             current_generation: 0,
         };
 
+        res.vertices.set_label("vertex buffer".into());
+
         // empty value is added so the buffer can be written to VRAM from the start
-        // res.vertices.push(default());
-        res.vertices.push(default());
+
+        for _ in 0..10 {
+            res.vertices.push(default());
+        }
         res.vertices.write_buffer(device, queue);
 
         res

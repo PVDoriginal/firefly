@@ -25,7 +25,7 @@ use crate::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
         SpriteAssetEvents, SpriteHeight,
     },
-    visibility::{NotVisible, VisibilityTimer},
+    visibility::{NotVisible, OccluderAabb, VisibilityTimer},
 };
 
 pub(crate) struct ExtractPlugin;
@@ -244,6 +244,7 @@ fn extract_occluders(
             RenderEntity,
             &Occluder2d,
             &GlobalTransform,
+            &OccluderAabb,
             &ViewVisibility,
             &VisibilityTimer,
             &Changes,
@@ -252,7 +253,7 @@ fn extract_occluders(
 ) {
     let mut values = Vec::with_capacity(*previous_len);
 
-    for (render_entity, occluder, global_transform, visibility, visibility_timer, changes) in
+    for (render_entity, occluder, global_transform, aabb, visibility, visibility_timer, changes) in
         &occluders
     {
         if !visibility.get() {
@@ -264,15 +265,11 @@ fn extract_occluders(
 
         let pos = global_transform.translation().truncate() + occluder.offset.xy();
 
-        let mut rect = occluder.rect();
-        rect.min += pos;
-        rect.max += pos;
-
         let extracted_occluder = ExtractedOccluder {
             pos,
             rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
             shape: occluder.shape().clone(),
-            rect,
+            aabb: aabb.0,
             z: global_transform.translation().z + occluder.offset.z,
             color: occluder.color,
             opacity: occluder.opacity,

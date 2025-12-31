@@ -9,12 +9,14 @@ use bevy::{
     camera::visibility::{
         PreviousVisibleEntities, VisibilitySystems, VisibleEntities, check_visibility,
     },
+    math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
     prelude::*,
 };
 
 use crate::{
     data::FireflyConfig,
     lights::{LightHeight, PointLight2d},
+    occluders::Occluder2dShape,
     prelude::Occluder2d,
 };
 
@@ -35,12 +37,23 @@ impl Default for VisibilityTimer {
     }
 }
 
+#[derive(Component)]
+pub struct OccluderAabb(pub Aabb2d);
+
+impl Default for OccluderAabb {
+    fn default() -> Self {
+        Self(Aabb2d::new(default(), default()))
+    }
+}
+
 /// Handles entity visibility. Added automatically through [`FireflyPlugin`](crate::prelude::FireflyPlugin).
 pub struct VisibilityPlugin;
 
 impl Plugin for VisibilityPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LightRect>();
+
+        app.add_systems(Update, occluder_aabb);
 
         app.add_systems(
             PostUpdate,
@@ -71,22 +84,27 @@ fn mark_visible_lights(
         return;
     };
 
+    let camera_aabb = Aabb2d {
+        min: projection.area.min + camera.0.translation().truncate(),
+        max: projection.area.max + camera.0.translation().truncate(),
+    };
+
     let camera_rect = Rect {
         min: projection.area.min + camera.0.translation().truncate(),
         max: projection.area.max + camera.0.translation().truncate(),
     };
 
     light_rect.0 = Rect::EMPTY;
+
     for (entity, transform, light, height, mut visibility) in &mut lights {
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
 
-        if !(Rect {
+        let light_aabb = Aabb2d {
             min: pos - light.range,
             max: pos + light.range,
-        })
-        .intersect(camera_rect)
-        .is_empty()
-        {
+        };
+
+        if light_aabb.intersects(&camera_aabb) {
             if !**visibility {
                 visibility.set();
 
@@ -110,8 +128,7 @@ fn mark_visible_occluders(
     mut camera: Single<&mut VisibleEntities, With<FireflyConfig>>,
     mut occluders: Query<(
         Entity,
-        &Occluder2d,
-        &GlobalTransform,
+        &OccluderAabb,
         &mut ViewVisibility,
         &mut VisibilityTimer,
     )>,
@@ -119,13 +136,13 @@ fn mark_visible_occluders(
     light_rect: Res<LightRect>,
     time: Res<Time>,
 ) {
-    for (entity, occluder, global_transform, mut visibility, mut visibility_timer) in &mut occluders
-    {
-        let mut rect = occluder.rect();
-        rect.min += global_transform.translation().truncate() + occluder.offset.xy();
-        rect.max += global_transform.translation().truncate() + occluder.offset.xy();
+    let light_rect_aabb = Aabb2d {
+        min: light_rect.0.min,
+        max: light_rect.0.max,
+    };
 
-        if !rect.intersect(light_rect.0).is_empty() {
+    for (entity, aabb, mut visibility, mut visibility_timer) in &mut occluders {
+        if aabb.0.intersects(&light_rect_aabb) {
             if !**visibility {
                 visibility.set();
 
@@ -137,7 +154,42 @@ fn mark_visible_occluders(
                 *visibility_timer = default();
             }
         }
+        // } else {
+        //     warn!(
+        //         "occluder {:?} doesn't intersect light {:?}",
+        //         aabb.0, light_rect_aabb
+        //     )
+        // }
 
         visibility_timer.0.tick(time.delta());
+    }
+}
+
+fn occluder_aabb(
+    mut occluders: Query<
+        (&Occluder2d, &GlobalTransform, &mut OccluderAabb),
+        Or<(Changed<GlobalTransform>, Changed<Occluder2d>)>,
+    >,
+) {
+    for (occluder, transform, mut rect) in &mut occluders {
+        let isometry = Isometry2d {
+            rotation: Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
+            translation: transform.translation().truncate() + occluder.offset.truncate(),
+        };
+
+        rect.0 = match occluder.shape() {
+            Occluder2dShape::RoundRectangle {
+                width,
+                height,
+                radius,
+            } => Aabb2d {
+                min: vec2(-width / 2.0, -height / 2.0) - radius,
+                max: vec2(width / 2.0, height / 2.0) + radius,
+            }
+            .transformed_by(isometry.translation, isometry.rotation),
+
+            Occluder2dShape::Polygon { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
+            Occluder2dShape::Polyline { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
+        }
     }
 }

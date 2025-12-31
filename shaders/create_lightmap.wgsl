@@ -107,7 +107,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         // let light_rect = vec4f(light.pos - light.range, light.pos + light.range);
         
         for (var i = 0u; i < light.n_rounds; i += 1) {
-            let result = round_check(pos, round_indices[i] + 1); 
+            let result = round_check(pos, round_indices[i]); 
 
             if result.occluded == true {
                 shadow = shadow_blend(shadow, vec3f(1), 1.0);

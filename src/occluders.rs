@@ -1,13 +1,14 @@
 use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
+    math::bounding::{Aabb2d, BoundingVolume},
     prelude::*,
     render::{render_resource::ShaderType, sync_world::SyncToRenderWorld},
 };
 use bytemuck::{NoUninit, Pod, Zeroable};
 use core::f32;
 
-use crate::visibility::VisibilityTimer;
+use crate::visibility::{OccluderAabb, VisibilityTimer};
 use crate::{buffers::BufferIndex, change::Changes};
 
 /// An occluder that blocks light.
@@ -18,19 +19,19 @@ use crate::{buffers::BufferIndex, change::Changes};
 /// Can be moved around or rotated by their transform.
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
-#[derive(Component, Clone, Default, Reflect)]
+#[derive(Component, Clone, Reflect)]
 #[require(
     SyncToRenderWorld,
     Transform,
     VisibilityClass,
     ViewVisibility,
     VisibilityTimer,
+    OccluderAabb,
     Changes
 )]
 #[component(on_add = add_visibility_class::<Occluder2d>)]
 pub struct Occluder2d {
     shape: Occluder2dShape,
-    rect: Rect,
 
     /// Color of the occluder. **Alpha is ignored**.
     pub color: Color,
@@ -42,11 +43,6 @@ pub struct Occluder2d {
     ///
     /// Anything in-between will cast a colored shadow depending on how opaque it is.
     pub opacity: f32,
-
-    /// List of entities that this occluder will not cast shadows over.
-    ///
-    /// Note that these can be have a significant impact on performance. [`crate::prelude::FireflyConfig::z_sorting`] should be used instead if possible.  
-    pub ignored_sprites: Vec<Entity>,
 
     /// If true, this occluder won't cast shadows over sprites with a higher z value.
     ///
@@ -66,32 +62,13 @@ impl Occluder2d {
     }
 
     fn from_shape(shape: Occluder2dShape) -> Self {
-        let rect = match &shape {
-            Occluder2dShape::RoundRectangle {
-                width,
-                height,
-                radius,
-            } => Rect {
-                min: Vec2::splat(-(width.max(*height)) / 2. - radius),
-                max: Vec2::splat(width.max(*height) / 2. + radius),
-            },
-            Occluder2dShape::Polyline { vertices, .. } => vertices_rect(vertices),
-            Occluder2dShape::Polygon { vertices, .. } => vertices_rect(vertices),
-        };
-
         Self {
             shape,
-            rect,
             opacity: 1.,
             color: bevy::prelude::Color::Srgba(BLACK),
             z_sorting: true,
-            ..default()
+            offset: default(),
         }
-    }
-
-    /// Bounding rect of the occluder.
-    pub fn rect(&self) -> Rect {
-        self.rect
     }
 
     /// Construct a new occluder with the specified [color](Occluder2d::color).
@@ -105,13 +82,6 @@ impl Occluder2d {
     pub fn with_opacity(&self, opacity: f32) -> Self {
         let mut res = self.clone();
         res.opacity = opacity;
-        res
-    }
-
-    /// Construct a new occluder with the specified [ignored sprites](Occluder2d::ignored_sprites).
-    pub fn with_ignored_sprites(&self, sprites: Vec<Entity>) -> Self {
-        let mut res = self.clone();
-        res.ignored_sprites = sprites;
         res
     }
 
@@ -209,7 +179,7 @@ pub struct ExtractedOccluder {
     pub pos: Vec2,
     pub rot: f32,
     pub shape: Occluder2dShape,
-    pub rect: Rect,
+    pub aabb: Aabb2d,
     pub z: f32,
     pub color: Color,
     pub opacity: f32,
@@ -237,16 +207,13 @@ impl ExtractedOccluder {
 }
 
 fn vertices_rect(vertices: &Vec<Vec2>) -> Rect {
-    let r = vertices
-        .iter()
-        .max_by(|a, b| a.length_squared().total_cmp(&b.length_squared()))
-        .unwrap()
-        .length();
+    let mut rect = Rect::EMPTY;
 
-    Rect {
-        min: vec2(-r, -r),
-        max: vec2(r, r),
+    for vertex in vertices {
+        rect = rect.union_point(*vertex);
     }
+
+    rect
 }
 
 // rotates vertices to be clockwise
@@ -305,8 +272,8 @@ fn orientation(a: Vec2, b: Vec2, p: Vec2) -> Orientation {
     Orientation::Touch
 }
 
-pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, rect: Rect) -> bool {
-    if !rect.contains(p) {
+pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, aabb: Aabb2d) -> bool {
+    if !aabb.contains(&Aabb2d { min: p, max: p }) {
         return false;
     }
 
