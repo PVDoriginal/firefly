@@ -122,7 +122,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
             if result.occluded == true {
                 shadow = shadow_blend(shadow, vec3f(1), 1.0);
-            }                
+            }          
+            else if config.softness > 0 && result.extreme_angle < soft_angle {
+                shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+            }      
 
             // return vec4f(result.extreme_angle, 0, 0, 1);
             // return vec4f(1.0 - (result.extreme_angle + 0.00001) / 50.0, 0, 0, 1);
@@ -192,125 +195,154 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
 }
 
 fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
-    let start_v = poly_occluders[pointer.index + 1].vertex_start;
+    let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+
+    var maybe_prev = 0; 
 
     if pointer.reversed == 0 {
-        for (var i = 0u; i < pointer.length - 1; i += 1) {
-            var v1 = pointer.start_v + i; 
-            var v2 = pointer.start_v + i + 1; 
+        maybe_prev = bs_vertex_forward(angle, pointer.start_v, pointer.length, pointer.term);
+    }
+    else {
+        maybe_prev = bs_vertex_reverse(angle, pointer.start_v, pointer.length, pointer.term);
+    }
 
-            // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
-            //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
-            // }
+    var extreme_angle = 0f;
+    if config.softness > 0 {
+        extreme_angle = min(
+            get_extreme_angle(pos, vertices[pointer.start_v]),  
+            get_extreme_angle(pos, vertices[pointer.start_v + pointer.length - 1])
+        );
+    }
 
-            let p1 = vertices[v1].xy; 
-            let p2 = vertices[v2].xy; 
+    if maybe_prev < 0 || maybe_prev >= i32(pointer.length) {
+        return OcclusionResult(
+            false, 
+            extreme_angle,
+        );
+    }
 
-            // return OcclusionResult(false, f32(start_v));
-            // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
+    let prev = u32(maybe_prev);
 
-            var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
-            var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
-
-            if pointer.term == 1 && i == pointer.length - 2 {
-                a2 += PI2; 
-            }
-            else if pointer.term == 2 && i == 0u {
-                a1 -= PI2;
-            }
-
-            let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
-        
-            if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
-                return OcclusionResult(
-                    true,
-                    0.0,
-                );
-            }
+    if pointer.reversed == 0 {
+        if prev + 1 >= pointer.length  {
+            return OcclusionResult(
+                false,
+                extreme_angle,
+            );
+        }
+    
+        if same_orientation(vertices[pointer.start_v + prev], vertices[pointer.start_v + prev + 1], pos, light.pos) {
+            return OcclusionResult(
+                false,
+                extreme_angle,
+            );
         }
     }
     else {
-        for (var i = 0u; i < pointer.length - 1; i += 1) {
-            var v1 = pointer.start_v - i; 
-            var v2 = pointer.start_v - i - 1; 
-
-            // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
-            //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
-            // }
-
-            let p1 = vertices[v1].xy; 
-            let p2 = vertices[v2].xy; 
-
-            // return OcclusionResult(false, f32(start_v));
-            // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
-
-            var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
-            var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
-
-            if pointer.term == 1 && i == pointer.length - 2 {
-                a2 += PI2; 
-            }
-            else if pointer.term == 2 && i == 0u {
-                a1 -= PI2;
-            }
-
-            let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
-        
-            if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
-                return OcclusionResult(
-                    true,
-                    0.0,
-                );
-            }
+        if prev - 1 < 0  {
+            return OcclusionResult(
+                false,
+                extreme_angle,
+            );
+        }
+    
+        if same_orientation(vertices[pointer.start_v - prev], vertices[pointer.start_v - prev - 1], pos, light.pos) {
+            return OcclusionResult(
+                false,
+                extreme_angle,
+            );
         }
     }
     
     return OcclusionResult(
-        false, 
-        0.0 
+        true, 
+        0f,
     );
+}
 
-    // let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+fn angle(p: vec2f) -> f32 {
+    return atan2(p.y - light.pos.y, p.x - light.pos.x);
+}
 
-    // let start_vertex = poly_occluders[pointer.index].start_vertex + pointer.min_v; 
+fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
+    if i == length - 1 {
+        if term == 1 {
+            return atan2(p.y - light.pos.y, p.x - light.pos.x) + PI2;
+        }
+        else {
+            return atan2(p.y - light.pos.y, p.x - light.pos.x);
+        }
+    }
+    else if i == 0 {
+        if term == 2 {
+            return atan2(p.y - light.pos.y, p.x - light.pos.x) - PI2; 
+        }
+        else {
+            return atan2(p.y - light.pos.y, p.x - light.pos.x);
+        }
+    }
 
-    // let maybe_prev = bs_vertex(angle, start_vertex, sequences[sequence]);
+    return atan2(p.y - light.pos.y, p.x - light.pos.x);
+}
 
-    // var extreme_angle = 0f;
-    // if config.softness > 0 {
-    //     extreme_angle = min(
-    //         get_extreme_angle(pos, vertices[start_vertex].pos),  
-    //         get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
-    //     );
-    // }
+fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+    var ans = -1;
+    
+    var low = 0i; 
+    var high = i32(length) - 1;
 
-    // if maybe_prev == -1 {
-    //     return OcclusionResult(
-    //         false, 
-    //         extreme_angle,
-    //     );
-    // }
+    if angle < angle_term(vertices[start + u32(low)], u32(low), length, term) {
+        return -1;
+    }
 
-    // let prev = u32(maybe_prev);
+    if angle >= angle_term(vertices[start + u32(high)], u32(high), length, term) {
+        return high + 1;
+    }
 
-    // if prev + 1 >= sequences[sequence]  {
-    //     return OcclusionResult(
-    //         false,
-    //         extreme_angle,
-    //     );
-    // }
+    while (low <= high) {
+        let mid = low + (high - low + 1) / 2;
+        let val = angle_term(vertices[start + u32(mid)], u32(mid), length, term);
 
-    // if same_orientation(vertices[start_vertex + prev].pos, vertices[start_vertex + prev + 1].pos, pos, light.pos) {
-    //     return OcclusionResult(
-    //         false,
-    //         extreme_angle,
-    //     );
-    // }
+        if (val < angle) {
+            ans = i32(mid);
+            low = mid + 1;
+        }
+        else {
+            high = mid - 1;
+        }
+    }
 
-    // return OcclusionResult(
-    //     true, 
-    //     0f,
-    // );
+    return ans;
+}
+
+fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+    var ans = -1;
+    
+    var low = 0i; 
+    var high = i32(length) - 1;
+
+    if angle < angle_term(vertices[start - u32(low)], u32(low), length, term) {
+        return -1;
+    }
+
+    if angle >= angle_term(vertices[start - u32(high)], u32(high), length, term) {
+        return high + 1;
+    }
+
+    while (low <= high) {
+        let mid = low + (high - low + 1) / 2;
+        let val = angle_term(vertices[start - u32(mid)], u32(mid), length, term);
+
+        if (val < angle) {
+            ans = i32(mid);
+            low = mid + 1;
+        }
+        else {
+            high = mid - 1;
+        }
+    }
+
+    return ans;
 }
 
 // fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
