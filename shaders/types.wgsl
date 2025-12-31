@@ -51,3 +51,11 @@ struct FireflyConfig {
     normal_mode: u32, 
     normal_attenuation: f32,
 }
+
+const N_OCCLUDERS: u32 = 64; 
+const N_BINS: u32 = 256;
+
+struct Bin {
+    occluders: array<OccluderPointer, N_OCCLUDERS>,
+    n_occluders: u32,
+}

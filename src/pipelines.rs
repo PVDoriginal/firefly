@@ -10,8 +10,8 @@ use bevy::{
         render_resource::{
             BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
             BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            FrontFace, GpuArrayBuffer, PipelineCache, PolygonMode, PrimitiveState,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            FrontFace, PipelineCache, PolygonMode, PrimitiveState, RenderPipelineDescriptor,
+            Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat, TextureSampleType,
             TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{sampler, storage_buffer_read_only, texture_2d, uniform_buffer},
@@ -26,10 +26,10 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
-    buffers::OccluderPointer,
+    buffers::{Bin, N_BINS, OccluderPointer},
     data::UniformFireflyConfig,
-    lights::{PolyOccluderPointer, UniformPointLight},
-    occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
+    lights::UniformPointLight,
+    occluders::{UniformOccluder, UniformRoundOccluder},
 };
 
 #[derive(Resource)]
@@ -67,19 +67,18 @@ impl FromWorld for LightmapCreationPipeline {
                     (4, storage_buffer_read_only::<UniformOccluder>(false)),
                     // vertices
                     (5, storage_buffer_read_only::<Vec2>(false)),
-                    // round occluder indices
-                    (6, storage_buffer_read_only::<u32>(false)),
-                    // poly occluder indices
-                    (7, storage_buffer_read_only::<OccluderPointer>(false)),
+                    // bins
+                    (6, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
                     // sprite stencil
                     (
-                        8,
+                        7,
                         texture_2d(TextureSampleType::Float { filterable: false }),
                     ),
                     // sprite normal map
-                    (9, texture_2d(TextureSampleType::Float { filterable: true })),
-                    //config,
-                    (10, uniform_buffer::<UniformFireflyConfig>(false)),
+                    (8, texture_2d(TextureSampleType::Float { filterable: true })),
+                    // config,
+                    (9, uniform_buffer::<UniformFireflyConfig>(false)),
+                    // bins,
                 ),
             ),
         );

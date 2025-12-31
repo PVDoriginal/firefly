@@ -1,7 +1,11 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
-#import firefly::types::{PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, FireflyConfig}
+#import firefly::types::{
+    PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, 
+    FireflyConfig, Bin, N_OCCLUDERS, N_BINS, 
+}
+
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
@@ -27,19 +31,17 @@ var<storage> poly_occluders: array<PolyOccluder>;
 var<storage> vertices: array<vec2f>;
 
 @group(0) @binding(6)
-var<storage> round_indices: array<u32>;
+var<storage> bins: array<array<Bin, N_BINS>>;
 
 @group(0) @binding(7)
-var<storage> poly_indices: array<OccluderPointer>;
-
-@group(0) @binding(8)
 var sprite_stencil: texture_2d<f32>;
 
-@group(0) @binding(9)
+@group(0) @binding(8)
 var normal_map: texture_2d<f32>;
 
-@group(0) @binding(10)
+@group(0) @binding(9)
 var<uniform> config: FireflyConfig;
+
 
 const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
@@ -104,76 +106,55 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         var shadow = vec3f(1); 
 
+        let bin = u32(floor(((atan2(pos.y - light.pos.y, pos.x - light.pos.x) + PI) / PI2) * f32(N_BINS)));
+        
         // let light_rect = vec4f(light.pos - light.range, light.pos + light.range);
         
-        for (var i = 0u; i < light.n_rounds; i += 1) {
-            let result = round_check(pos, round_indices[i]); 
+        // for (var i = 0u; i < light.n_rounds; i += 1) {
+        //     let result = round_check(pos, round_indices[i]); 
 
-            if result.occluded == true {
-                shadow = shadow_blend(shadow, vec3f(1), 1.0);
-            }                    
-            else if config.softness > 0 && result.extreme_angle < soft_angle {
-                shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+        //     if result.occluded == true {
+        //         shadow = shadow_blend(shadow, vec3f(1), 1.0);
+        //     }                    
+        //     else if config.softness > 0 && result.extreme_angle < soft_angle {
+        //         shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+        //     }
+        // } 
+
+        for (var bin_set = 0u; bin_set < arrayLength(&bins); bin_set += 1) {
+            if bins[bin_set][bin].n_occluders == 0 {
+                // return vec4f(1, 0, 0, 1);
+                break;
             }
-        } 
 
-        for (var i = 0u; i < light.n_poly; i += 1) {
-            let result = is_occluded(pos, poly_indices[i]); 
+            for (var i = 0u; i < bins[bin_set][bin].n_occluders; i += 1) {
 
-            if result.occluded == true {
-                shadow = shadow_blend(shadow, vec3f(1), 1.0);
-            }          
-            else if config.softness > 0 && result.extreme_angle < soft_angle {
-                shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
-            }      
+                let occluder_type = bins[bin_set][bin].occluders[i].index & 2147483648u;
 
-            // return vec4f(result.extreme_angle, 0, 0, 1);
-            // return vec4f(1.0 - (result.extreme_angle + 0.00001) / 50.0, 0, 0, 1);
+                // round occluder
+                if occluder_type == 0 {
+                    let result = round_check(pos, bins[bin_set][bin].occluders[i].index); 
 
-            // else if config.softness > 0 && result.extreme_angle < soft_angle {
-            //     shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
-            // }
-        } 
+                    if result.occluded == true {
+                        shadow = shadow_blend(shadow, vec3f(1), 1.0);
+                    }                    
+                    else if config.softness > 0 && result.extreme_angle < soft_angle {
+                        shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+                    }
+                }
+                // poly occluder
+                else {
+                    let result = is_occluded(pos, bins[bin_set][bin].occluders[i]); 
 
-        // var i = 0u; 
-        // loop {
-        //     if (i >= arrayLength(&occluders)) {
-        //         break;
-        //     }
-            
-        //     if (stencil.a > 0.1) {
-        //         if (config.z_sorting == 1 && occluders[i].z_sorting == 1 && stencil.g >= occluders[i].z) {
-        //             continue;
-        //         }
-        //     }
-
-        //     else {
-        //         for (var s = sequence_index; s < sequence_index + occluders[i].n_sequences; s++) {
-        //             let result = is_occluded(pos, s, start_vertex); 
-
-        //             if result.occluded == true {    
-        //                 shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity);
-        //             }
-        //             else if config.softness > 0 && result.extreme_angle < soft_angle {
-        //                 shadow = shadow_blend(shadow, occluders[i].color, occluders[i].opacity * (1f - (result.extreme_angle / soft_angle)));
-        //             }
-
-        //             start_vertex += sequences[s];
-        //         }
-        //         start_vertex -= occluders[i].n_vertices;
-        //     }
-
-        //     continuing {
-        //         sequence_index += occluders[i].n_sequences;
-        //         start_vertex += occluders[i].n_vertices;
-
-        //         if (occluders[i].round == 1) {
-        //             round_index += 1;
-        //         }
-                
-        //         i += 1;
-        //     }
-        // }
+                    if result.occluded == true {
+                        shadow = shadow_blend(shadow, vec3f(1), 1.0);
+                    }          
+                    else if config.softness > 0 && result.extreme_angle < soft_angle {
+                        shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+                    }      
+                }
+            } 
+        }
         res *= vec4f(shadow, 1);
     }
     return res;

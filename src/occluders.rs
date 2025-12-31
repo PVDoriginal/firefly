@@ -206,16 +206,6 @@ impl ExtractedOccluder {
     }
 }
 
-fn vertices_rect(vertices: &Vec<Vec2>) -> Rect {
-    let mut rect = Rect::EMPTY;
-
-    for vertex in vertices {
-        rect = rect.union_point(*vertex);
-    }
-
-    rect
-}
-
 // rotates vertices to be clockwise
 fn normalize_vertices(vertices: Vec<Vec2>) -> Option<Vec<Vec2>> {
     if vertices.len() < 2 {

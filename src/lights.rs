@@ -21,7 +21,7 @@ use bevy::{
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{BindGroup, BufferVec, GpuArrayBuffer, ShaderType, UniformBuffer},
+        render_resource::{BindGroup, BufferVec, ShaderType, UniformBuffer},
         sync_world::SyncToRenderWorld,
         view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
@@ -29,8 +29,7 @@ use bevy::{
 
 use crate::{
     LightBatchSetKey,
-    buffers::OccluderPointer,
-    occluders::{UniformOccluder, UniformVertex},
+    buffers::{BinBuffer, OccluderPointer},
     phases::LightmapPhase,
     pipelines::LightmapCreationPipeline,
 };
@@ -134,6 +133,7 @@ impl Default for PointLight2d {
 }
 
 #[derive(Component, Clone)]
+#[require(BinBuffer)]
 pub(crate) struct ExtractedPointLight {
     pub pos: Vec2,
     pub color: Color,
@@ -173,17 +173,6 @@ pub(crate) struct UniformPointLight {
 #[derive(Component)]
 pub(crate) struct LightBuffers {
     pub light: UniformBuffer<UniformPointLight>,
-    pub occluders: BufferVec<OccluderPointer>,
-    pub rounds: BufferVec<u32>,
-}
-
-#[derive(ShaderType, Clone, Copy, Default)]
-pub(crate) struct PolyOccluderPointer {
-    pub index: u32,
-    pub min_v: u32,
-    pub length: u32,
-    pub term: u32,
-    pub reversed: u32,
 }
 
 /// This resource handles giving lights indices and redistributing unused indices

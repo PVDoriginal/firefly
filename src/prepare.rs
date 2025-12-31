@@ -2,12 +2,10 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    buffers::{BufferManager, OccluderPointer, VertexBuffer},
+    buffers::{BinBuffer, BufferManager, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
-    lights::{
-        Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers, PolyOccluderPointer,
-    },
-    occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly},
+    lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
+    occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
     pipelines::{LightmapCreationPipeline, SpritePipeline},
     sprites::{
@@ -29,8 +27,8 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, BufferUsages, BufferVec, GpuArrayBuffer, TextureDescriptor,
-            TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
+            BindGroupEntries, BufferUsages, BufferVec, TextureDescriptor, TextureDimension,
+            TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
@@ -42,9 +40,7 @@ use crate::{
     LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig},
     lights::{ExtractedPointLight, UniformPointLight},
-    occluders::{
-        ExtractedOccluder, Occluder2dShape, UniformOccluder, UniformRoundOccluder, UniformVertex,
-    },
+    occluders::{ExtractedOccluder, Occluder2dShape, UniformOccluder, UniformRoundOccluder},
 };
 
 #[derive(Component)]
@@ -185,8 +181,6 @@ fn insert_light_buffers(
         if !has_buffers {
             commands.entity(light).insert(LightBuffers {
                 light: UniformBuffer::<UniformPointLight>::from(UniformPointLight::default()),
-                occluders: BufferVec::<OccluderPointer>::new(BufferUsages::STORAGE),
-                rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
             });
         }
     }
@@ -195,7 +189,12 @@ fn insert_light_buffers(
 pub(crate) fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut lights: Query<(Entity, &ExtractedPointLight, &mut LightBuffers)>,
+    mut lights: Query<(
+        Entity,
+        &ExtractedPointLight,
+        &mut LightBuffers,
+        &mut BinBuffer,
+    )>,
     occluders: Query<(&ExtractedOccluder, &RoundOccluderIndex, &PolyOccluderIndex)>,
     camera: Single<(
         &ExtractedWorldData,
@@ -203,6 +202,7 @@ pub(crate) fn prepare_data(
         &SpriteStencilTexture,
         &NormalMapTexture,
         &BufferedFireflyConfig,
+        &FireflyConfig,
     )>,
     mut phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
     lightmap_pipeline: Res<LightmapCreationPipeline>,
@@ -233,14 +233,11 @@ pub(crate) fn prepare_data(
             let item = &transparent_phase.non_mesh_items[item_index];
 
             for (_, entity) in &item.entities {
-                let Ok((_, light, mut buffers)) = lights.get_mut(*entity) else {
+                let Ok((_, light, mut buffers, mut bins)) = lights.get_mut(*entity) else {
                     continue;
                 };
 
-                buffers.occluders.set_label("light occluder indices".into());
-                buffers.rounds.set_label("light round indices".into());
-
-                let mut uniform_light = UniformPointLight {
+                let uniform_light = UniformPointLight {
                     pos: light.pos,
                     color: light.color.to_linear().to_vec3(),
                     intensity: light.intensity,
@@ -267,8 +264,7 @@ pub(crate) fn prepare_data(
                     max: light_rect.max,
                 };
 
-                buffers.occluders.clear();
-                buffers.rounds.clear();
+                bins.reset();
 
                 // for (i, occluder) in round_occluder_rects.iter().enumerate() {
                 //     if occluder.intersect(light_rect).is_empty() {
@@ -277,50 +273,86 @@ pub(crate) fn prepare_data(
                 //     buffers.rounds.push(i as u32);
                 // }
 
+                let softness = match camera.5.softness {
+                    None => 0.0,
+                    Some(x) => x.clamp(0.0, 1.0),
+                };
+
                 for (occluder, round_index, poly_index) in &occluders {
                     if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
                         continue;
                     }
 
-                    if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
-                        buffers.rounds.push(round_index.0.unwrap().index as u32);
-                        uniform_light.n_rounds += 1;
-                        continue;
+                    if let Occluder2dShape::RoundRectangle {
+                        width,
+                        height,
+                        radius,
+                    } = occluder.shape
+                    {
+                        let Some(occluder_index) = round_index.0 else {
+                            continue;
+                        };
+
+                        let vertices = vec![
+                            vec2(-width / 2.0 - radius, -height / 2.0 - radius),
+                            vec2(-width / 2.0 - radius, height / 2.0 + radius),
+                            vec2(width / 2.0 + radius, height / 2.0 + radius),
+                            vec2(width / 2.0 + radius, -height / 2.0 - radius),
+                            vec2(-width / 2.0 - radius, -height / 2.0 - radius),
+                        ];
+
+                        let isometry = Isometry2d {
+                            translation: occluder.pos,
+                            rotation: Rot2::radians(occluder.rot),
+                        };
+                        let aabb = Aabb2d::from_point_cloud(isometry, &vertices);
+
+                        let vertices =
+                            translate_vertices(vertices, isometry.translation, isometry.rotation);
+
+                        let light_inside_occluder =
+                            point_inside_poly(light.pos, vertices.clone(), aabb);
+
+                        push_vertices(
+                            &mut bins,
+                            vertices,
+                            light.pos,
+                            0,
+                            occluder_index.index as u32,
+                            softness,
+                            light_inside_occluder,
+                            false,
+                        );
+                    } else {
+                        let Some(occluder_index) = poly_index.occluder else {
+                            continue;
+                        };
+
+                        let Some(vertex_index) = poly_index.vertices else {
+                            continue;
+                        };
+
+                        let light_inside_occluder =
+                            matches!(occluder.shape, Occluder2dShape::Polygon { .. })
+                                && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
+
+                        push_vertices(
+                            &mut bins,
+                            occluder.vertices(),
+                            light.pos,
+                            vertex_index.index as u32,
+                            occluder_index.index as u32,
+                            softness,
+                            light_inside_occluder,
+                            true,
+                        );
                     }
-
-                    let Some(occluder_index) = poly_index.occluder else {
-                        continue;
-                    };
-
-                    let Some(vertex_index) = poly_index.vertices else {
-                        continue;
-                    };
-
-                    let light_inside_occluder =
-                        matches!(occluder.shape, Occluder2dShape::Polygon { .. })
-                            && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
-
-                    push_vertices(
-                        &mut buffers.occluders,
-                        &mut uniform_light,
-                        occluder,
-                        light.pos,
-                        vertex_index.index as u32,
-                        occluder_index.index as u32,
-                        light_inside_occluder,
-                    );
                 }
-
-                buffers.occluders.push(default());
-                buffers.rounds.push(default());
 
                 buffers.light.set(uniform_light);
                 buffers.light.write_buffer(&render_device, &render_queue);
 
-                buffers
-                    .occluders
-                    .write_buffer(&render_device, &render_queue);
-                buffers.rounds.write_buffer(&render_device, &render_queue);
+                bins.write(&render_device, &render_queue);
 
                 light_bind_groups.values.entry(*entity).insert({
                     render_device.create_bind_group(
@@ -333,8 +365,7 @@ pub(crate) fn prepare_data(
                             round_occluders.binding(),
                             poly_occluders.binding(),
                             vertices.binding(),
-                            buffers.rounds.binding().unwrap(),
-                            buffers.occluders.binding().unwrap(),
+                            bins.binding(),
                             &camera.2.0.default_view,
                             &camera.3.0.default_view,
                             camera.4.0.binding().unwrap(),
@@ -358,6 +389,9 @@ struct OccluderSlice {
     pub start: u32,
     pub length: u32,
     pub term: u32,
+
+    pub start_angle: f32,
+    pub end_angle: f32,
 }
 
 struct Vertex {
@@ -366,13 +400,14 @@ struct Vertex {
 }
 
 fn push_vertices(
-    buffer: &mut BufferVec<OccluderPointer>,
-    light: &mut UniformPointLight,
-    occluder: &ExtractedOccluder,
+    bins: &mut BinBuffer,
+    occluder_vertices: Vec<Vec2>,
     light_pos: Vec2,
     start_vertex: u32,
     index: u32,
+    softness: f32,
     rev: bool,
+    poly: bool,
 ) {
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
@@ -381,19 +416,38 @@ fn push_vertices(
                 false => 0,
             };
 
-            let index: u32 = (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32;
+            let index = match poly {
+                true => (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32,
+                false => (0 << 31) | index as u32,
+            };
 
-            buffer.push(OccluderPointer {
+            let occluder = OccluderPointer {
                 index,
                 min_v: slice.start + start_vertex,
                 length: slice.length,
                 distance: 0.0,
-            });
-            light.n_poly += 1;
+            };
+
+            match slice.term {
+                0 => bins.add_occluder(
+                    occluder,
+                    slice.start_angle - softness,
+                    slice.end_angle + softness,
+                ),
+                1 => bins.add_occluder(
+                    occluder,
+                    slice.start_angle - softness,
+                    slice.end_angle + (2.0 * PI),
+                ),
+                2 => bins.add_occluder(
+                    occluder,
+                    slice.start_angle - (2.0 * PI),
+                    slice.end_angle + softness,
+                ),
+                _ => {}
+            }
         }
     };
-
-    let occluder_vertices = occluder.vertices();
 
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
@@ -420,6 +474,8 @@ fn push_vertices(
                     start: vertex.index,
                     length: 1,
                     term: 0,
+                    start_angle: vertex.angle,
+                    end_angle: vertex.angle,
                 };
             }
             // if the next vertex is increasing, simple case
@@ -428,6 +484,7 @@ fn push_vertices(
                     slice.start = vertex.index;
                 }
                 slice.length += 1;
+                slice.end_angle = vertex.angle;
             }
             // if the next vertex is increasing and loops over
             else {
@@ -443,6 +500,8 @@ fn push_vertices(
                     start: last.index,
                     length: 2,
                     term: 2,
+                    start_angle: last.angle,
+                    end_angle: vertex.angle,
                 };
             }
         } else {
@@ -450,6 +509,8 @@ fn push_vertices(
                 start: vertex.index,
                 length: 1,
                 term: 0,
+                start_angle: vertex.angle,
+                end_angle: vertex.angle,
             };
         }
 
