@@ -174,8 +174,6 @@ fn prepare_occluders(
             );
             poly_index.vertices = Some(vertex_index);
 
-            info!("vertex start: {}", vertex_index.index);
-
             let value = UniformOccluder {
                 vertex_start: vertex_index.index as u32,
                 n_vertices: occluder.shape.n_vertices(),
@@ -425,7 +423,7 @@ pub struct OccluderPointer {
 
 #[derive(Resource)]
 pub struct VertexBuffer {
-    vertices: RawBufferVec<[f32; 4]>,
+    vertices: RawBufferVec<Vec2>,
     next_index: usize,
     empty_slots: u32,
     current_generation: u32,
@@ -443,14 +441,14 @@ impl FromWorld for VertexBuffer {
 impl VertexBuffer {
     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
         let mut res = Self {
-            vertices: RawBufferVec::<[f32; 4]>::new(BufferUsages::STORAGE),
-            next_index: 2,
+            vertices: RawBufferVec::<Vec2>::new(BufferUsages::STORAGE),
+            next_index: 1,
             empty_slots: 0,
             current_generation: 0,
         };
 
         // empty value is added so the buffer can be written to VRAM from the start
-        res.vertices.push(default());
+        // res.vertices.push(default());
         res.vertices.push(default());
         res.vertices.write_buffer(device, queue);
 
@@ -491,16 +489,13 @@ impl VertexBuffer {
         if index < self.next_index {
             let mut last_index = index;
             for vertex in occluder.vertices_iter() {
-                self.vertices
-                    .set(last_index as u32, [vertex.x, vertex.y, 0.0, 0.0]);
+                self.vertices.set(last_index as u32, vertex);
                 last_index += 1;
             }
 
-            self.vertices.write_buffer(device, queue);
-
-            // self.vertices
-            //     .write_buffer_range(queue, index..last_index)
-            //     .expect("couldn't write range");
+            self.vertices
+                .write_buffer_range(queue, index..last_index)
+                .expect("couldn't write range");
 
             // for vertex in self.vertices.values() {
             //     info!("{vertex}");
@@ -514,14 +509,14 @@ impl VertexBuffer {
 
         // add new vertices
         for vertex in occluder.vertices_iter() {
-            self.vertices.push([vertex.x, vertex.y, 0.0, 0.0]);
+            self.vertices.push(vertex);
             self.next_index += 1;
         }
 
-        if self.next_index % 2 == 1 {
-            self.vertices.push(default());
-            self.next_index += 1;
-        }
+        // if self.next_index % 2 == 1 {
+        //     self.vertices.push(default());
+        //     self.next_index += 1;
+        // }
 
         if self.next_index >= self.vertices.capacity() {
             self.vertices.reserve(

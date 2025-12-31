@@ -30,6 +30,7 @@ struct PolyOccluderPointer {
     start_v: u32, 
     length: u32,
     term: u32,
+    reversed: u32,
 }
 
 struct RoundOccluder {

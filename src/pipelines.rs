@@ -65,7 +65,7 @@ impl FromWorld for LightmapCreationPipeline {
                     // poly occluders
                     (4, storage_buffer_read_only::<UniformOccluder>(false)),
                     // vertices
-                    (5, storage_buffer_read_only::<[f32; 4]>(false)),
+                    (5, storage_buffer_read_only::<Vec2>(false)),
                     // round occluder indices
                     (6, storage_buffer_read_only::<u32>(false)),
                     // poly occluder indices

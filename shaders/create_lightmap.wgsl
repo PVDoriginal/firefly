@@ -24,7 +24,7 @@ var<storage> round_occluders: array<RoundOccluder>;
 var<storage> poly_occluders: array<PolyOccluder>;
 
 @group(0) @binding(5)
-var<storage> vertices: array<vec4f>;
+var<storage> vertices: array<vec2f>;
 
 @group(0) @binding(6)
 var<storage> round_indices: array<u32>;
@@ -194,39 +194,74 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
 fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
     let start_v = poly_occluders[pointer.index + 1].vertex_start;
 
-    for (var i = 0u; i < pointer.length - 1; i += 1) {
-        var v1 = pointer.start_v + i; 
-        var v2 = pointer.start_v + i + 1; 
+    if pointer.reversed == 0 {
+        for (var i = 0u; i < pointer.length - 1; i += 1) {
+            var v1 = pointer.start_v + i; 
+            var v2 = pointer.start_v + i + 1; 
 
-        // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
-        //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
-        // }
+            // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
+            //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
+            // }
 
+            let p1 = vertices[v1].xy; 
+            let p2 = vertices[v2].xy; 
+
+            // return OcclusionResult(false, f32(start_v));
+            // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
+
+            var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
+            var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
+
+            if pointer.term == 1 && i == pointer.length - 2 {
+                a2 += PI2; 
+            }
+            else if pointer.term == 2 && i == 0u {
+                a1 -= PI2;
+            }
+
+            let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
         
-
-        let p1 = vertices[v1].xy; 
-        let p2 = vertices[v2].xy; 
-
-        // return OcclusionResult(false, f32(start_v));
-        // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
-
-        var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
-        var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
-
-        if pointer.term == 1 && i == pointer.length - 2 {
-            a2 += PI2; 
+            if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
+                return OcclusionResult(
+                    true,
+                    0.0,
+                );
+            }
         }
-        else if pointer.term == 2 && i == 0u {
-            a1 -= PI2;
-        }
+    }
+    else {
+        for (var i = 0u; i < pointer.length - 1; i += 1) {
+            var v1 = pointer.start_v - i; 
+            var v2 = pointer.start_v - i - 1; 
 
-        let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
-    
-        if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
-            return OcclusionResult(
-                true,
-                0.0,
-            );
+            // if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
+            //     v2 %= poly_occluders[pointer.index + 1].n_vertices; 
+            // }
+
+            let p1 = vertices[v1].xy; 
+            let p2 = vertices[v2].xy; 
+
+            // return OcclusionResult(false, f32(start_v));
+            // return OcclusionResult(false, min(distance(pos, p1), distance(pos, p2)));
+
+            var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
+            var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
+
+            if pointer.term == 1 && i == pointer.length - 2 {
+                a2 += PI2; 
+            }
+            else if pointer.term == 2 && i == 0u {
+                a1 -= PI2;
+            }
+
+            let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+        
+            if angle >= a1 && angle <= a2 && !same_orientation(p1, p2, pos, light.pos) {
+                return OcclusionResult(
+                    true,
+                    0.0,
+                );
+            }
         }
     }
     

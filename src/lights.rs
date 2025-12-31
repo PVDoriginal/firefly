@@ -182,6 +182,7 @@ pub(crate) struct PolyOccluderPointer {
     pub min_v: u32,
     pub length: u32,
     pub term: u32,
+    pub reversed: u32,
 }
 
 /// This resource handles giving lights indices and redistributing unused indices

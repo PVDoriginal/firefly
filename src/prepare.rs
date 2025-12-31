@@ -266,7 +266,6 @@ pub(crate) fn prepare_data(
                 //     buffers.rounds.push(i as u32);
                 // }
 
-                warn!("looking at light");
                 for (occluder, round_index, poly_index) in &occluders {
                     if !light.cast_shadows || occluder.rect.intersect(light_rect).is_empty() {
                         continue;
@@ -285,18 +284,32 @@ pub(crate) fn prepare_data(
                     let angle = |a: Vec2| (a.y - light.pos.y).atan2(a.x - light.pos.x);
 
                     let vertices = occluder.vertices();
-                    warn!("{vertices:?}");
 
                     let light_inside_occluder =
                         matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                             && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
 
-                    info!("looking at occluder");
-                    error!("vertex start: {}", poly_index.vertices.unwrap().index);
+                    let poly_start_v = poly_index.vertices.unwrap().index as u32;
 
-                    let mut push_vertices = |vertices: Vec<(usize, &Vec2, f32)>| {
-                        info!("n_vertices: {}", vertices.len());
+                    let mut push_slice = |slice: (Option<u32>, u32, u32), rev: bool| {
+                        if slice.1 > 1
+                            && let Some(min_v) = slice.0
+                        {
+                            buffers.occluders.push(PolyOccluderPointer {
+                                index: occluder_index.index as u32,
+                                min_v: min_v + poly_start_v,
+                                length: slice.1,
+                                term: slice.2,
+                                reversed: match rev {
+                                    true => 1,
+                                    false => 0,
+                                },
+                            });
+                            uniform_light.n_poly += 1;
+                        }
+                    };
 
+                    let mut push_vertices = |vertices: Vec<(usize, &Vec2, f32)>, rev: bool| {
                         let mut last: Option<(u32, &Vec2, f32)> = None;
                         let mut slice: (Option<u32>, u32, u32) = (None, 0, 0);
 
@@ -306,20 +319,7 @@ pub(crate) fn prepare_data(
 
                                 // if the next vertex is decreasing
                                 if (!loops && angle < last.2) || (loops && angle > last.2) {
-                                    let length = slice.1;
-                                    if length > 1
-                                        && let Some(min_v) = slice.0
-                                    {
-                                        buffers.occluders.push(PolyOccluderPointer {
-                                            index: occluder_index.index as u32,
-                                            min_v: min_v
-                                                + poly_index.vertices.unwrap().index as u32,
-                                            length,
-                                            term: slice.2,
-                                        });
-                                        uniform_light.n_poly += 1;
-                                        info!("pushing {min_v}, {length}, {}", slice.2);
-                                    }
+                                    push_slice(slice, rev);
                                     slice = (Some(i as u32), 1, 0);
                                 }
                                 // if the next vertex is increasing, simple case
@@ -335,23 +335,9 @@ pub(crate) fn prepare_data(
                                         slice.0 = Some(i as u32);
                                     }
                                     slice.1 += 1;
+                                    slice.2 = 1;
 
-                                    info!("looping over!");
-
-                                    let length = slice.1;
-                                    if length > 1
-                                        && let Some(min_v) = slice.0
-                                    {
-                                        buffers.occluders.push(PolyOccluderPointer {
-                                            index: occluder_index.index as u32,
-                                            min_v: min_v
-                                                + poly_index.vertices.unwrap().index as u32,
-                                            length,
-                                            term: 1,
-                                        });
-                                        uniform_light.n_poly += 1;
-                                        info!("pushing {min_v}, {length}, 1",);
-                                    }
+                                    push_slice(slice, rev);
 
                                     slice = (Some(last.0 as u32), 2, 2);
                                 }
@@ -361,20 +347,7 @@ pub(crate) fn prepare_data(
 
                             last = Some((i as u32, vertex, angle));
                         }
-
-                        let length = slice.1;
-                        if length > 1
-                            && let Some(min_v) = slice.0
-                        {
-                            buffers.occluders.push(PolyOccluderPointer {
-                                index: occluder_index.index as u32,
-                                min_v: min_v + poly_index.vertices.unwrap().index as u32,
-                                length,
-                                term: slice.2,
-                            });
-                            uniform_light.n_poly += 1;
-                            info!("pushing {min_v}, {length}, {}", slice.2);
-                        }
+                        push_slice(slice, rev);
                     };
 
                     if !light_inside_occluder {
@@ -384,6 +357,7 @@ pub(crate) fn prepare_data(
                                 .enumerate()
                                 .map(|(i, v)| (i, v, angle(*v)))
                                 .collect(),
+                            false,
                         );
                     } else {
                         push_vertices(
@@ -393,6 +367,7 @@ pub(crate) fn prepare_data(
                                 .map(|(i, v)| (i, v, angle(*v)))
                                 .rev()
                                 .collect(),
+                            true,
                         );
                     }
                 }
