@@ -284,7 +284,6 @@ pub(crate) fn prepare_data(
 
                     if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
                         buffers.rounds.push(round_index.0.unwrap().index as u32);
-                        info!("round: {}", round_index.0.unwrap().index);
                         uniform_light.n_rounds += 1;
                         continue;
                     }
@@ -314,8 +313,6 @@ pub(crate) fn prepare_data(
 
                 buffers.occluders.push(default());
                 buffers.rounds.push(default());
-
-                info!("n_rounds: {}", uniform_light.n_rounds);
 
                 buffers.light.set(uniform_light);
                 buffers.light.write_buffer(&render_device, &render_queue);
