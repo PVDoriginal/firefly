@@ -19,11 +19,11 @@ struct Timers {
 }
 
 const LIGHT_FREQ: f32 = 1.5;
-const OCCLUDER_FREQ: f32 = 0.1;
+const OCCLUDER_FREQ: f32 = 0.12;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
-const MOVE_FREQ: f32 = 0.5;
+const MOVE_FREQ: f32 = 1.0;
 
 impl Default for Timers {
     fn default() -> Self {
@@ -143,7 +143,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let r = rng.random_range(4000.0..15000.0);
+        let r = rng.random_range(1000.0..10000.0);
 
         commands.spawn((
             PointLight2d {
@@ -190,7 +190,7 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let occluder_type = rng.random_range(0..1);
+        let occluder_type = rng.random_range(0..4);
         let occluder = match occluder_type {
             0 => Occluder2d::round_rectangle(
                 rng.random_range(10.0..40.0),

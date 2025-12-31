@@ -1,5 +1,6 @@
 //! This module contains structs and functions that create and manage render-world entities and GPU buffers.
 
+use core::f32;
 use std::{collections::VecDeque, f32::consts::PI};
 
 use bevy::{
@@ -350,10 +351,10 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 }
 
 /// The amount of bins that each [`Bins`] will have.
-pub const N_BINS: usize = 256;
+pub const N_BINS: usize = 32;
 
 /// The amount of occluder per bin.
-pub const N_OCCLUDERS: usize = 64;
+pub const N_OCCLUDERS: usize = 32;
 
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 #[derive(Component)]
@@ -399,6 +400,19 @@ impl BinBuffer {
     }
 
     pub fn write(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+        let values = self.buffer.values_mut();
+        for bin in 0..N_BINS {
+            for index in 0..values.len() {
+                if values[index][bin].n_occluders == 0 {
+                    continue;
+                }
+
+                values[index][bin]
+                    .occluders
+                    .sort_unstable_by(|a, b| a.distance.total_cmp(&b.distance));
+            }
+        }
+
         self.buffer.write_buffer(device, queue);
     }
 
@@ -422,11 +436,12 @@ impl BinBuffer {
             .clamp(0.0, Self::N_BINS - 1.0) as usize;
 
         for bin_index in min_bin..max_bin + 1 {
-            if self.counts[bin_index] >= self.buffer.len() {
-                self.push_empty();
+            let values = self.buffer.values_mut();
+
+            while self.counts[bin_index] >= values.len() {
+                values.push([default(); N_BINS]);
             }
 
-            let values = self.buffer.values_mut();
             let bin = &mut values[self.counts[bin_index]][bin_index];
 
             bin.occluders[bin.n_occluders as usize] = occluder;
@@ -448,12 +463,23 @@ impl BinBuffer {
 
 /// Compact struct pointing to an occluder.
 #[repr(C)]
-#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType)]
+#[derive(Pod, Zeroable, Clone, Copy, ShaderType)]
 pub struct OccluderPointer {
     pub index: u32,
     pub min_v: u32,
     pub length: u32,
     pub distance: f32,
+}
+
+impl Default for OccluderPointer {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            min_v: 0,
+            length: 0,
+            distance: f32::MAX,
+        }
+    }
 }
 
 // index:
@@ -490,9 +516,7 @@ impl VertexBuffer {
 
         // empty value is added so the buffer can be written to VRAM from the start
 
-        for _ in 0..10 {
-            res.vertices.push(default());
-        }
+        res.vertices.push(default());
         res.vertices.write_buffer(device, queue);
 
         res

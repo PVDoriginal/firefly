@@ -313,6 +313,8 @@ pub(crate) fn prepare_data(
                         let light_inside_occluder =
                             point_inside_poly(light.pos, vertices.clone(), aabb);
 
+                        let closest = aabb.closest_point(light.pos);
+
                         push_vertices(
                             &mut bins,
                             vertices,
@@ -320,6 +322,7 @@ pub(crate) fn prepare_data(
                             0,
                             occluder_index.index as u32,
                             softness,
+                            closest.distance(light.pos),
                             light_inside_occluder,
                             false,
                         );
@@ -336,6 +339,8 @@ pub(crate) fn prepare_data(
                             matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                                 && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
 
+                        let closest = occluder.aabb.closest_point(light.pos);
+
                         push_vertices(
                             &mut bins,
                             occluder.vertices(),
@@ -343,6 +348,7 @@ pub(crate) fn prepare_data(
                             vertex_index.index as u32,
                             occluder_index.index as u32,
                             softness,
+                            closest.distance(light.pos),
                             light_inside_occluder,
                             true,
                         );
@@ -406,6 +412,7 @@ fn push_vertices(
     start_vertex: u32,
     index: u32,
     softness: f32,
+    distance: f32,
     rev: bool,
     poly: bool,
 ) {
@@ -425,7 +432,7 @@ fn push_vertices(
                 index,
                 min_v: slice.start + start_vertex,
                 length: slice.length,
-                distance: 0.0,
+                distance,
             };
 
             match slice.term {

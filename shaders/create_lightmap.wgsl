@@ -107,19 +107,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var shadow = vec3f(1); 
 
         let bin = u32(floor(((atan2(pos.y - light.pos.y, pos.x - light.pos.x) + PI) / PI2) * f32(N_BINS)));
-        
-        // let light_rect = vec4f(light.pos - light.range, light.pos + light.range);
-        
-        // for (var i = 0u; i < light.n_rounds; i += 1) {
-        //     let result = round_check(pos, round_indices[i]); 
-
-        //     if result.occluded == true {
-        //         shadow = shadow_blend(shadow, vec3f(1), 1.0);
-        //     }                    
-        //     else if config.softness > 0 && result.extreme_angle < soft_angle {
-        //         shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
-        //     }
-        // } 
 
         for (var bin_set = 0u; bin_set < arrayLength(&bins); bin_set += 1) {
             if bins[bin_set][bin].n_occluders == 0 {
@@ -128,6 +115,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
 
             for (var i = 0u; i < bins[bin_set][bin].n_occluders; i += 1) {
+
+                if bins[bin_set][bin].occluders[i].distance > dist { break; }
 
                 let occluder_type = bins[bin_set][bin].occluders[i].index & 2147483648u;
 
@@ -153,7 +142,15 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                         shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
                     }      
                 }
-            } 
+
+                if shadow.x == 0.0 && shadow.y == 0.0 && shadow.z == 0.0 {
+                    break;
+                }
+            }
+
+            if shadow.x == 0.0 && shadow.y == 0.0 && shadow.z == 0.0 {
+                break;
+            }
         }
         res *= vec4f(shadow, 1);
     }
