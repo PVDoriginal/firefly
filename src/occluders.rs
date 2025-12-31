@@ -342,7 +342,7 @@ impl Plugin for OccluderPlugin {
 #[repr(C)]
 #[derive(ShaderType, Clone, Copy, Default, NoUninit)]
 pub struct UniformOccluder {
-    pub n_sequences: u32,
+    pub vertex_start: u32,
     pub n_vertices: u32,
     pub z: f32,
     pub color: Vec3,

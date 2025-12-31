@@ -143,7 +143,9 @@ fn prepare_occluders(
     mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
     for (occluder, mut round_index, mut poly_index) in &mut occluders {
-        let changed = occluder.changes.translation || occluder.changes.shape;
+        // let changed = occluder.changes.translation || occluder.changes.shape;
+
+        let changed = true;
 
         if let Occluder2dShape::RoundRectangle {
             width,
@@ -163,8 +165,19 @@ fn prepare_occluders(
             let new_index = round_manager.set_value(&value, round_index.0, changed);
             round_index.0 = Some(new_index);
         } else {
+            let vertex_index = vertex_buffer.write_vertices(
+                occluder,
+                poly_index.vertices,
+                &render_device,
+                &render_queue,
+                changed,
+            );
+            poly_index.vertices = Some(vertex_index);
+
+            info!("vertex start: {}", vertex_index.index);
+
             let value = UniformOccluder {
-                n_sequences: 0,
+                vertex_start: vertex_index.index as u32,
                 n_vertices: occluder.shape.n_vertices(),
                 z: occluder.z,
                 color: occluder.color.to_linear().to_vec3(),
@@ -177,15 +190,6 @@ fn prepare_occluders(
 
             let new_index = poly_manager.set_value(&value, poly_index.occluder, changed);
             poly_index.occluder = Some(new_index);
-
-            let new_index = vertex_buffer.write_vertices(
-                occluder,
-                poly_index.vertices,
-                &render_device,
-                &render_queue,
-                changed,
-            );
-            poly_index.vertices = Some(new_index);
         }
     }
 
@@ -440,7 +444,7 @@ impl VertexBuffer {
     fn new(device: &RenderDevice, queue: &RenderQueue) -> Self {
         let mut res = Self {
             vertices: RawBufferVec::<Vec2>::new(BufferUsages::STORAGE),
-            next_index: 0,
+            next_index: 2,
             empty_slots: 0,
             current_generation: 0,
         };
@@ -483,35 +487,44 @@ impl VertexBuffer {
             }
         };
 
-        let mut last_index = index;
-
         // change existent vertices
         if index < self.next_index {
+            let mut last_index = index;
             for vertex in occluder.vertices_iter() {
                 self.vertices.set(last_index as u32, vertex);
                 last_index += 1;
             }
-        } else {
-            for vertex in occluder.vertices_iter() {
-                self.vertices.push(vertex);
-                last_index += 1;
-            }
+
+            self.vertices
+                .write_buffer_range(queue, index..last_index)
+                .expect("couldn't write range");
+
+            return BufferIndex {
+                index,
+                generation: self.current_generation,
+            };
         }
 
-        if last_index % 2 == 1 {
+        // add new vertices
+        for vertex in occluder.vertices_iter() {
+            self.vertices.push(vertex);
+            self.next_index += 1;
+        }
+
+        if self.next_index % 2 == 1 {
             self.vertices.push(default());
-            last_index += 1;
+            self.next_index += 1;
         }
 
-        if last_index >= self.vertices.capacity() {
+        if self.next_index >= self.vertices.capacity() {
             self.vertices.reserve(
-                ((last_index + 1) as f32 / 4096.0).ceil() as usize * 4096,
+                (self.next_index as f32 / 4096.0).ceil() as usize * 4096,
                 device,
             );
             self.vertices.write_buffer(device, queue);
         } else {
             self.vertices
-                .write_buffer_range(queue, index..last_index)
+                .write_buffer_range(queue, index..self.next_index)
                 .expect("couldn't write range");
         }
 

@@ -249,13 +249,13 @@ pub(crate) fn prepare_data(
                     dir: light.dir,
                     height: light.height,
                     n_rounds: 0,
+                    n_poly: 0,
                 };
                 let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
                     min: light.pos - light.range,
                     max: light.pos + light.range,
                 });
 
-                buffers.occluders.clear();
                 buffers.occluders.clear();
                 buffers.rounds.clear();
 
@@ -266,6 +266,7 @@ pub(crate) fn prepare_data(
                 //     buffers.rounds.push(i as u32);
                 // }
 
+                warn!("looking at light");
                 for (occluder, round_index, poly_index) in &occluders {
                     if !light.cast_shadows || occluder.rect.intersect(light_rect).is_empty() {
                         continue;
@@ -289,9 +290,11 @@ pub(crate) fn prepare_data(
                         matches!(occluder.shape, Occluder2dShape::Polygon { .. })
                             && point_inside_poly(light.pos, occluder.vertices(), occluder.rect);
 
+                    info!("looking at occluder");
+
                     let mut push_vertices = |vertices: Vec<(usize, &Vec2, f32)>| {
                         let mut last: Option<(u32, &Vec2, f32)> = None;
-                        let mut slice: (Option<u32>, Option<u32>) = (None, None);
+                        let mut slice: (Option<u32>, u32, u32) = (None, 0, 0);
 
                         for (i, vertex, angle) in vertices {
                             if let Some(last) = last {
@@ -299,52 +302,72 @@ pub(crate) fn prepare_data(
 
                                 // if the next vertex is decreasing
                                 if (!loops && angle < last.2) || (loops && angle > last.2) {
-                                    if let Some(b) = slice.1
-                                        && let Some(a) = slice.0
+                                    let length = slice.1;
+                                    if length > 1
+                                        && let Some(min_v) = slice.0
                                     {
                                         buffers.occluders.push(PolyOccluderPointer {
                                             index: occluder_index.index as u32,
-                                            min_v: a,
-                                            max_v: b,
+                                            min_v,
+                                            length,
+                                            term: slice.2,
                                         });
+                                        uniform_light.n_poly += 1;
+                                        info!("pushing {min_v}, {length}, {}", slice.2);
                                     }
-                                    slice = (Some(i as u32), None);
+                                    slice = (Some(i as u32), 1, 0);
                                 }
                                 // if the next vertex is increasing, simple case
                                 else if !loops && angle > last.2 {
-                                    slice.1 = Some(i as u32);
+                                    if slice.1 == 0 {
+                                        slice.0 = Some(i as u32);
+                                    }
+                                    slice.1 += 1;
                                 }
                                 // if the next vertex is increasing and loops over
                                 else {
-                                    slice.1 = Some(i as u32);
+                                    if slice.1 == 0 {
+                                        slice.0 = Some(i as u32);
+                                    }
+                                    slice.1 += 1;
 
-                                    if let Some(b) = slice.1
-                                        && let Some(a) = slice.0
+                                    info!("looping over!");
+
+                                    let length = slice.1;
+                                    if length > 1
+                                        && let Some(min_v) = slice.0
                                     {
                                         buffers.occluders.push(PolyOccluderPointer {
                                             index: occluder_index.index as u32,
-                                            min_v: a,
-                                            max_v: b,
+                                            min_v,
+                                            length,
+                                            term: 1,
                                         });
+                                        uniform_light.n_poly += 1;
+                                        info!("pushing {min_v}, {length}, 1",);
                                     }
 
-                                    slice = (Some(last.0 as u32), Some(i as u32));
+                                    slice = (Some(last.0 as u32), 2, 2);
                                 }
                             } else {
-                                slice.0 = Some(i as u32);
+                                slice = (Some(i as u32), 1, 0);
                             }
 
                             last = Some((i as u32, vertex, angle));
                         }
 
-                        if let Some(b) = slice.1
-                            && let Some(a) = slice.0
+                        let length = slice.1;
+                        if length > 1
+                            && let Some(min_v) = slice.0
                         {
                             buffers.occluders.push(PolyOccluderPointer {
                                 index: occluder_index.index as u32,
-                                min_v: a,
-                                max_v: b,
+                                min_v,
+                                length,
+                                term: slice.2,
                             });
+                            uniform_light.n_poly += 1;
+                            info!("pushing {min_v}, {length}, {}", slice.2);
                         }
                     };
 

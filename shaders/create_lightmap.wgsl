@@ -117,6 +117,17 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
         } 
 
+        for (var i = 0u; i < light.n_poly; i += 1) {
+            let result = is_occluded(pos, poly_indices[i]); 
+
+            if result.occluded == true {
+                shadow = shadow_blend(shadow, vec3f(1), 1.0);
+            }                
+            // else if config.softness > 0 && result.extreme_angle < soft_angle {
+            //     shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+            // }
+        } 
+
         // var i = 0u; 
         // loop {
         //     if (i >= arrayLength(&occluders)) {
@@ -166,57 +177,97 @@ struct OcclusionResult {
     extreme_angle: f32,
 }
 
-// fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
-//     let light_proj = (extreme - light.pos) + extreme;  
+fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
+    let light_proj = (extreme - light.pos) + extreme;  
     
-//     let a = vec2f(extreme.x - pos.x, extreme.y - pos.y);
-//     let b = vec2f(extreme.x - light_proj.x, extreme.y - light_proj.y);
-//     let angle = acos(dot(a, b) / (length(a) * length(b)));
+    let a = vec2f(extreme.x - pos.x, extreme.y - pos.y);
+    let b = vec2f(extreme.x - light_proj.x, extreme.y - light_proj.y);
+    let angle = acos(dot(a, b) / (length(a) * length(b)));
     
-//     return angle;
-// }
+    return angle;
+}
 
-// fn is_occluded(pos: vec2f, sequence: u32, start_vertex: u32) -> OcclusionResult {
-//     let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
+    let start_v = poly_occluders[pointer.index + 1].vertex_start;
+    
+    for (var i = 0u; i < pointer.length - 1; i += 1) {
+        var v1 = pointer.start_v + i; 
+        var v2 = pointer.start_v + i + 1; 
 
-//     let maybe_prev = bs_vertex(angle, start_vertex, sequences[sequence]);
+        if v2 >= poly_occluders[pointer.index + 1].n_vertices { 
+            v2 %= poly_occluders[pointer.index + 1].n_vertices; 
+        }
 
-//     var extreme_angle = 0f;
-//     if config.softness > 0 {
-//         extreme_angle = min(
-//             get_extreme_angle(pos, vertices[start_vertex].pos),  
-//             get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
-//         );
-//     }
+        let p1 = vertices[start_v + v1]; 
+        let p2 = vertices[start_v + v2]; 
 
-//     if maybe_prev == -1 {
-//         return OcclusionResult(
-//             false, 
-//             extreme_angle,
-//         );
-//     }
+        var a1 = atan2(p1.y - light.pos.y, p1.x - light.pos.x);
+        var a2 = atan2(p2.y - light.pos.y, p2.x - light.pos.x);
 
-//     let prev = u32(maybe_prev);
+        if pointer.term == 1 && i == pointer.length - 2 {
+            a2 += PI2; 
+        }
+        else if pointer.term == 2 && i == 0u {
+            a1 -= PI2;
+        }
 
-//     if prev + 1 >= sequences[sequence]  {
-//         return OcclusionResult(
-//             false,
-//             extreme_angle,
-//         );
-//     }
+        let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
+    
+        if angle >= a1 && angle <= a2 && !same_orientation(vertices[start_v + v1], vertices[start_v + v2], pos, light.pos) {
+            return OcclusionResult(
+                true,
+                0.0,
+            );
+        }
+    }
+    
+    return OcclusionResult(
+        false, 
+        0.0 
+    );
 
-//     if same_orientation(vertices[start_vertex + prev].pos, vertices[start_vertex + prev + 1].pos, pos, light.pos) {
-//         return OcclusionResult(
-//             false,
-//             extreme_angle,
-//         );
-//     }
+    // let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
 
-//     return OcclusionResult(
-//         true, 
-//         0f,
-//     );
-// }
+    // let start_vertex = poly_occluders[pointer.index].start_vertex + pointer.min_v; 
+
+    // let maybe_prev = bs_vertex(angle, start_vertex, sequences[sequence]);
+
+    // var extreme_angle = 0f;
+    // if config.softness > 0 {
+    //     extreme_angle = min(
+    //         get_extreme_angle(pos, vertices[start_vertex].pos),  
+    //         get_extreme_angle(pos, vertices[start_vertex + sequences[sequence] - 1].pos)
+    //     );
+    // }
+
+    // if maybe_prev == -1 {
+    //     return OcclusionResult(
+    //         false, 
+    //         extreme_angle,
+    //     );
+    // }
+
+    // let prev = u32(maybe_prev);
+
+    // if prev + 1 >= sequences[sequence]  {
+    //     return OcclusionResult(
+    //         false,
+    //         extreme_angle,
+    //     );
+    // }
+
+    // if same_orientation(vertices[start_vertex + prev].pos, vertices[start_vertex + prev + 1].pos, pos, light.pos) {
+    //     return OcclusionResult(
+    //         false,
+    //         extreme_angle,
+    //     );
+    // }
+
+    // return OcclusionResult(
+    //     true, 
+    //     0f,
+    // );
+}
 
 // fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
 //     var ans = -1;

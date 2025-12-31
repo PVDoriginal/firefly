@@ -13,10 +13,11 @@ struct PointLight {
     z: f32,
     height: f32,
     n_rounds: u32,
+    n_poly: u32,
 }
 
 struct PolyOccluder {
-    n_sequences: u32,
+    vertex_start: u32,
     n_vertices: u32,
     round: u32,
     z: f32,
@@ -27,8 +28,9 @@ struct PolyOccluder {
 
 struct PolyOccluderPointer {
     index: u32, 
-    min_v: u32, 
-    max_v: u32,
+    start_v: u32, 
+    length: u32,
+    term: u32,
 }
 
 struct RoundOccluder {

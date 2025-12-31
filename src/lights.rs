@@ -166,6 +166,7 @@ pub(crate) struct UniformPointLight {
     pub z: f32,
     pub height: f32,
     pub n_rounds: u32,
+    pub n_poly: u32,
 }
 
 #[derive(Component)]
@@ -179,7 +180,8 @@ pub(crate) struct LightBuffers {
 pub(crate) struct PolyOccluderPointer {
     pub index: u32,
     pub min_v: u32,
-    pub max_v: u32,
+    pub length: u32,
+    pub term: u32,
 }
 
 /// This resource handles giving lights indices and redistributing unused indices
