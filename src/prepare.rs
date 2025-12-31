@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    buffers::{BufferManager, VertexBuffer},
+    buffers::{BufferManager, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
     lights::{
         Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers, PolyOccluderPointer,
@@ -182,7 +182,7 @@ fn insert_light_buffers(
         if !has_buffers {
             commands.entity(light).insert(LightBuffers {
                 light: UniformBuffer::<UniformPointLight>::from(UniformPointLight::default()),
-                occluders: BufferVec::<PolyOccluderPointer>::new(BufferUsages::STORAGE),
+                occluders: BufferVec::<OccluderPointer>::new(BufferUsages::STORAGE),
                 rounds: BufferVec::<u32>::new(BufferUsages::STORAGE),
             });
         }
@@ -295,15 +295,21 @@ pub(crate) fn prepare_data(
                         if slice.1 > 1
                             && let Some(min_v) = slice.0
                         {
-                            buffers.occluders.push(PolyOccluderPointer {
-                                index: occluder_index.index as u32,
+                            let rev: u32 = match rev {
+                                true => 1,
+                                false => 0,
+                            };
+
+                            let index: u32 = (1 << 31)
+                                | (slice.2 << 29)
+                                | (rev << 28)
+                                | occluder_index.index as u32;
+
+                            buffers.occluders.push(OccluderPointer {
+                                index,
                                 min_v: min_v + poly_start_v,
                                 length: slice.1,
-                                term: slice.2,
-                                reversed: match rev {
-                                    true => 1,
-                                    false => 0,
-                                },
+                                distance: 0.0,
                             });
                             uniform_light.n_poly += 1;
                         }

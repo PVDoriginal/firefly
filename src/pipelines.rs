@@ -26,6 +26,7 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
+    buffers::OccluderPointer,
     data::UniformFireflyConfig,
     lights::{PolyOccluderPointer, UniformPointLight},
     occluders::{UniformOccluder, UniformRoundOccluder, UniformVertex},
@@ -69,7 +70,7 @@ impl FromWorld for LightmapCreationPipeline {
                     // round occluder indices
                     (6, storage_buffer_read_only::<u32>(false)),
                     // poly occluder indices
-                    (7, storage_buffer_read_only::<PolyOccluderPointer>(false)),
+                    (7, storage_buffer_read_only::<OccluderPointer>(false)),
                     // sprite stencil
                     (
                         8,

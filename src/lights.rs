@@ -29,6 +29,7 @@ use bevy::{
 
 use crate::{
     LightBatchSetKey,
+    buffers::OccluderPointer,
     occluders::{UniformOccluder, UniformVertex},
     phases::LightmapPhase,
     pipelines::LightmapCreationPipeline,
@@ -172,7 +173,7 @@ pub(crate) struct UniformPointLight {
 #[derive(Component)]
 pub(crate) struct LightBuffers {
     pub light: UniformBuffer<UniformPointLight>,
-    pub occluders: BufferVec<PolyOccluderPointer>,
+    pub occluders: BufferVec<OccluderPointer>,
     pub rounds: BufferVec<u32>,
 }
 

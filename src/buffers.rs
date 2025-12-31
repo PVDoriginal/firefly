@@ -406,20 +406,17 @@ impl BinBuffer {
 
 /// Compact struct pointing to an occluder.
 #[repr(C)]
-#[derive(Default, Pod, Zeroable, Clone, Copy)]
+#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType)]
 pub struct OccluderPointer {
     pub index: u32,
     pub min_v: u32,
-    pub max_v: u32,
+    pub length: u32,
     pub distance: f32,
 }
 
-// Index - ( 00  |      ..     )
-//          type   actual index
-
-// type: 0 - end of buffer
-//       1 - round occluder
-//       2 - polygonal occluder
+// index:
+// Round Occluders - (00|index(30))
+// Poly Occluders -  (1|term(2)|rev(1)|index(28))
 
 #[derive(Resource)]
 pub struct VertexBuffer {

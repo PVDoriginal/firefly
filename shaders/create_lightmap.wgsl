@@ -1,7 +1,7 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
-#import firefly::types::{PointLight, LightingData, PolyOccluder, RoundOccluder, PolyOccluderPointer, FireflyConfig}
+#import firefly::types::{PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, FireflyConfig}
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
@@ -30,7 +30,7 @@ var<storage> vertices: array<vec2f>;
 var<storage> round_indices: array<u32>;
 
 @group(0) @binding(7)
-var<storage> poly_indices: array<PolyOccluderPointer>;
+var<storage> poly_indices: array<OccluderPointer>;
 
 @group(0) @binding(8)
 var sprite_stencil: texture_2d<f32>;
@@ -194,23 +194,26 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     return angle;
 }
 
-fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
+fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> OcclusionResult {
+    let term = (pointer.index & 1610612736u) >> 29;
+    let rev = (pointer.index & 268435456u) >> 28;
+
     let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
 
     var maybe_prev = 0; 
 
-    if pointer.reversed == 0 {
-        maybe_prev = bs_vertex_forward(angle, pointer.start_v, pointer.length, pointer.term);
+    if rev == 0 {
+        maybe_prev = bs_vertex_forward(angle, pointer.min_v, pointer.length, term);
     }
     else {
-        maybe_prev = bs_vertex_reverse(angle, pointer.start_v, pointer.length, pointer.term);
+        maybe_prev = bs_vertex_reverse(angle, pointer.min_v, pointer.length, term);
     }
 
     var extreme_angle = 0f;
     if config.softness > 0 {
         extreme_angle = min(
-            get_extreme_angle(pos, vertices[pointer.start_v]),  
-            get_extreme_angle(pos, vertices[pointer.start_v + pointer.length - 1])
+            get_extreme_angle(pos, vertices[pointer.min_v]),  
+            get_extreme_angle(pos, vertices[pointer.min_v + pointer.length - 1])
         );
     }
 
@@ -223,7 +226,7 @@ fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
 
     let prev = u32(maybe_prev);
 
-    if pointer.reversed == 0 {
+    if rev == 0 {
         if prev + 1 >= pointer.length  {
             return OcclusionResult(
                 false,
@@ -231,7 +234,7 @@ fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
             );
         }
     
-        if same_orientation(vertices[pointer.start_v + prev], vertices[pointer.start_v + prev + 1], pos, light.pos) {
+        if same_orientation(vertices[pointer.min_v + prev], vertices[pointer.min_v + prev + 1], pos, light.pos) {
             return OcclusionResult(
                 false,
                 extreme_angle,
@@ -246,7 +249,7 @@ fn is_occluded(pos: vec2f, pointer: PolyOccluderPointer) -> OcclusionResult {
             );
         }
     
-        if same_orientation(vertices[pointer.start_v - prev], vertices[pointer.start_v - prev - 1], pos, light.pos) {
+        if same_orientation(vertices[pointer.min_v - prev], vertices[pointer.min_v - prev - 1], pos, light.pos) {
             return OcclusionResult(
                 false,
                 extreme_angle,

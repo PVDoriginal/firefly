@@ -25,12 +25,11 @@ struct PolyOccluder {
     z_sorting: u32,
 }
 
-struct PolyOccluderPointer {
+struct OccluderPointer {
     index: u32, 
-    start_v: u32, 
-    length: u32,
-    term: u32,
-    reversed: u32,
+    min_v: u32,
+    length: u32, 
+    distance: f32,
 }
 
 struct RoundOccluder {
