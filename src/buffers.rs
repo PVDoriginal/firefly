@@ -355,17 +355,34 @@ pub const N_OCCLUDERS: usize = 64;
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 #[derive(Component)]
 pub struct BinBuffer {
-    buffer: RawBufferVec<[[OccluderPointer; N_OCCLUDERS]; N_BINS]>,
-    counts: [(usize, usize); N_BINS],
+    buffer: RawBufferVec<[Bin; N_BINS]>,
+    // the number of bins for each bin interval,
+    // used in case not all occluders fit in a single set of bins
+    counts: [usize; N_BINS],
 }
 
 impl Default for BinBuffer {
     fn default() -> Self {
         Self {
-            buffer: RawBufferVec::<[[OccluderPointer; N_OCCLUDERS]; N_BINS]>::new(
-                BufferUsages::STORAGE,
-            ),
-            counts: [(0, 0); N_BINS],
+            buffer: RawBufferVec::<[Bin; N_BINS]>::new(BufferUsages::STORAGE),
+            counts: [0; N_BINS],
+        }
+    }
+}
+
+/// A bin containing occluders
+#[repr(C)]
+#[derive(Zeroable, Pod, Clone, Copy)]
+pub struct Bin {
+    pub occluders: [OccluderPointer; N_OCCLUDERS],
+    pub n_occluders: usize,
+}
+
+impl Default for Bin {
+    fn default() -> Self {
+        Self {
+            occluders: [default(); N_OCCLUDERS],
+            n_occluders: 0,
         }
     }
 }
@@ -375,30 +392,33 @@ impl BinBuffer {
     const N_BINS: f32 = N_BINS as f32;
 
     fn push_empty(&mut self) {
-        self.buffer.push([[default(); N_OCCLUDERS]; N_BINS]);
+        self.buffer.push([default(); N_BINS]);
     }
 
+    /// Clear the buffer and add one empty set of bins
     pub fn reset(&mut self) {
         self.buffer.clear();
         self.push_empty();
     }
 
+    /// Add an occluder to this buffer
     pub fn add_occluder(&mut self, occluder: OccluderPointer, min_angle: f32, max_angle: f32) {
         let min_bin = ((min_angle / Self::PI2) * Self::N_BINS).floor() as usize;
         let max_bin = ((max_angle / Self::PI2) * Self::N_BINS).ceil() as usize;
 
-        for bin in min_bin..max_bin {
-            if self.counts[bin].0 >= self.buffer.len() {
+        for bin_index in min_bin..max_bin {
+            if self.counts[bin_index] >= self.buffer.len() {
                 self.push_empty();
             }
 
             let values = self.buffer.values_mut();
-            values[self.counts[bin].0][bin][self.counts[bin].1] = occluder;
+            let mut bin = values[self.counts[bin_index]][bin_index];
 
-            if self.counts[bin].1 + 1 == N_OCCLUDERS {
-                self.counts[bin] = (self.counts[bin].0 + 1, 0);
-            } else {
-                self.counts[bin].1 += 1;
+            bin.occluders[bin.n_occluders] = occluder;
+            bin.n_occluders += 1;
+
+            if bin.n_occluders == N_OCCLUDERS {
+                self.counts[bin_index] += 1;
             }
         }
     }
