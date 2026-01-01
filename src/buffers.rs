@@ -368,7 +368,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 pub const N_BINS: usize = 128;
 
 /// The amount of occluder per bin.
-pub const N_OCCLUDERS: usize = 64;
+pub const N_OCCLUDERS: usize = 32;
 
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 #[derive(Component)]

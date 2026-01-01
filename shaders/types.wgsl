@@ -59,7 +59,7 @@ struct FireflyConfig {
 
 // Should correspond to the values in buffers.rs!
 const N_BINS: u32 = 128;
-const N_OCCLUDERS: u32 = 64; 
+const N_OCCLUDERS: u32 = 32; 
 
 struct Bin {
     occluders: array<OccluderPointer, N_OCCLUDERS>,
