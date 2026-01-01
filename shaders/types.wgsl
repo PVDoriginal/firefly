@@ -2,14 +2,17 @@
 
 struct PointLight {
     pos: vec2f,
-    color: vec3f, 
     intensity: f32,
     range: f32,
+
+    @size(16)
+    color: vec3f, 
+
     inner_range: f32,
     // 0 - inverse square, 1 - linear
     falloff: u32,
     angle: f32,
-    dir: vec2f,
+    dir: vec2f, 
     z: f32,
     height: f32,
     n_rounds: u32,

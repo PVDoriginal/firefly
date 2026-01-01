@@ -16,6 +16,7 @@ pub(crate) struct ExtractedWorldData {
 /// # Panics
 /// Panics if added to multiple cameras at once.
 #[derive(Component, ExtractComponent, Clone, Reflect)]
+#[require(Transform)]
 pub struct FireflyConfig {
     /// Ambient light that will be added over all other lights.  
     ///

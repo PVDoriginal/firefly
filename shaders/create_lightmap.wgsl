@@ -19,27 +19,30 @@ var<uniform> view: View;
 var texture_sampler: sampler;
 
 @group(0) @binding(2)
-var<uniform> light: PointLight;
+var<storage> lights: array<PointLight>;
 
 @group(0) @binding(3)
-var<storage> round_occluders: array<RoundOccluder>;
+var<storage> light_index: u32; 
 
 @group(0) @binding(4)
-var<storage> poly_occluders: array<PolyOccluder>;
+var<storage> round_occluders: array<RoundOccluder>;
 
 @group(0) @binding(5)
-var<storage> vertices: array<vec2f>;
+var<storage> poly_occluders: array<PolyOccluder>;
 
 @group(0) @binding(6)
-var<storage> bins: array<array<Bin, N_BINS>>;
+var<storage> vertices: array<vec2f>;
 
 @group(0) @binding(7)
-var sprite_stencil: texture_2d<f32>;
+var<storage> bins: array<array<Bin, N_BINS>>;
 
 @group(0) @binding(8)
-var normal_map: texture_2d<f32>;
+var sprite_stencil: texture_2d<f32>;
 
 @group(0) @binding(9)
+var normal_map: texture_2d<f32>;
+
+@group(0) @binding(10)
 var<uniform> config: FireflyConfig;
 
 
@@ -49,6 +52,8 @@ const PIDIV2: f32 = 1.57079632679;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
+    let light = lights[light_index];
+
     var res = vec4f(0);
     
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
@@ -62,7 +67,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let b = light.dir;
     let angle = acos(dot(a, b) / (length(a) * length(b)));
     
-    if true || (dist < light.range && angle <= light.angle / 2.) {
+    if (dist < light.range && angle <= light.angle / 2.) {
         var normal_multi = 1f;
     
         if config.normal_mode != 0 && normal.a > 0 {
@@ -179,6 +184,8 @@ struct OcclusionResult {
 }
 
 fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
+    let light = lights[light_index];
+
     let light_proj = (extreme - light.pos) + extreme;  
     
     let a = vec2f(extreme.x - pos.x, extreme.y - pos.y);
@@ -189,6 +196,8 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
 }
 
 fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> OcclusionResult {
+    let light = lights[light_index];
+
     let term = (pointer.index & 1610612736u) >> 29;
     let rev = (pointer.index & 268435456u) >> 28;
 
@@ -258,10 +267,14 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> OcclusionResult {
 }
 
 fn angle(p: vec2f) -> f32 {
+    let light = lights[light_index];
+
     return atan2(p.y - light.pos.y, p.x - light.pos.x);
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
+    let light = lights[light_index];
+    
     if i == length - 1 {
         if term == 1 {
             return atan2(p.y - light.pos.y, p.x - light.pos.x) + PI2;
@@ -283,6 +296,8 @@ fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
 }
 
 fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+    let light = lights[light_index];
+
     var ans = -1;
     
     var low = 0i; 
@@ -313,6 +328,8 @@ fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
 }
 
 fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+    let light = lights[light_index];
+
     var ans = -1;
     
     var low = 0i; 
@@ -374,6 +391,8 @@ fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
 
 // checks if pixel is blocked by round occluder
 fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
+    let light = lights[light_index];
+
     let occ = round_occluders[occluder];
     let half_w = occ.width * 0.5;
     let half_h = occ.height * 0.5;

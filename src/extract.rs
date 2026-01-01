@@ -206,21 +206,26 @@ fn extract_lights(
     mut commands: Commands,
     lights: Extract<
         Query<(
-            &RenderEntity,
+            RenderEntity,
             &GlobalTransform,
             &PointLight2d,
             &LightHeight,
             &ViewVisibility,
+            &VisibilityTimer,
+            &Changes,
         )>,
     >,
 ) {
-    for (entity, transform, light, height, view_visibility) in &lights {
-        if !view_visibility.get() {
+    for (entity, transform, light, height, visibility, visibility_timer, changes) in &lights {
+        if !visibility.get() {
+            if visibility_timer.0.just_finished() {
+                commands.entity(entity).insert(NotVisible);
+            }
             continue;
         }
 
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
-        commands.entity(entity.id()).insert(ExtractedPointLight {
+        commands.entity(entity).insert(ExtractedPointLight {
             pos: pos,
             color: light.color,
             intensity: light.intensity,
@@ -232,6 +237,7 @@ fn extract_lights(
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
             height: height.0,
+            changes: changes.clone(),
         });
     }
 }
@@ -253,12 +259,12 @@ fn extract_occluders(
 ) {
     let mut values = Vec::with_capacity(*previous_len);
 
-    for (render_entity, occluder, global_transform, aabb, visibility, visibility_timer, changes) in
+    for (entity, occluder, global_transform, aabb, visibility, visibility_timer, changes) in
         &occluders
     {
         if !visibility.get() {
             if visibility_timer.0.just_finished() {
-                commands.entity(render_entity).insert(NotVisible);
+                commands.entity(entity).insert(NotVisible);
             }
             continue;
         }
@@ -277,7 +283,7 @@ fn extract_occluders(
             changes: changes.clone(),
         };
 
-        values.push((render_entity, extracted_occluder));
+        values.push((entity, extracted_occluder));
     }
 
     *previous_len = values.len();

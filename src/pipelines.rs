@@ -26,7 +26,7 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
-    buffers::{Bin, N_BINS, OccluderPointer},
+    buffers::{Bin, N_BINS},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder},
@@ -59,25 +59,26 @@ impl FromWorld for LightmapCreationPipeline {
                     (0, uniform_buffer::<ViewUniform>(true)),
                     // sampler
                     (1, sampler(SamplerBindingType::Filtering)),
-                    // point light
-                    (2, uniform_buffer::<UniformPointLight>(false)),
+                    // point lights
+                    (2, storage_buffer_read_only::<UniformPointLight>(false)),
+                    (3, storage_buffer_read_only::<u32>(false)),
                     // round occluders
-                    (3, storage_buffer_read_only::<UniformRoundOccluder>(false)),
+                    (4, storage_buffer_read_only::<UniformRoundOccluder>(false)),
                     // poly occluders
-                    (4, storage_buffer_read_only::<UniformOccluder>(false)),
+                    (5, storage_buffer_read_only::<UniformOccluder>(false)),
                     // vertices
-                    (5, storage_buffer_read_only::<Vec2>(false)),
+                    (6, storage_buffer_read_only::<Vec2>(false)),
                     // bins
-                    (6, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
+                    (7, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
                     // sprite stencil
                     (
-                        7,
+                        8,
                         texture_2d(TextureSampleType::Float { filterable: false }),
                     ),
                     // sprite normal map
-                    (8, texture_2d(TextureSampleType::Float { filterable: true })),
+                    (9, texture_2d(TextureSampleType::Float { filterable: true })),
                     // config,
-                    (9, uniform_buffer::<UniformFireflyConfig>(false)),
+                    (10, uniform_buffer::<UniformFireflyConfig>(false)),
                     // bins,
                 ),
             ),

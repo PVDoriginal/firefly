@@ -75,10 +75,12 @@ fn mark_visible_lights(
         &PointLight2d,
         &LightHeight,
         &mut ViewVisibility,
+        &mut VisibilityTimer,
     )>,
     mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
     mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     mut light_rect: ResMut<LightRect>,
+    time: Res<Time>,
 ) {
     let Projection::Orthographic(projection) = camera.2 else {
         return;
@@ -96,7 +98,7 @@ fn mark_visible_lights(
 
     light_rect.0 = Rect::EMPTY;
 
-    for (entity, transform, light, height, mut visibility) in &mut lights {
+    for (entity, transform, light, height, mut visibility, mut visibility_timer) in &mut lights {
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
 
         let light_aabb = Aabb2d {
@@ -112,6 +114,8 @@ fn mark_visible_lights(
                 visible_lights.push(entity);
 
                 previous_visible_entities.remove(&entity);
+
+                *visibility_timer = default();
             }
 
             light_rect.0 = light_rect
@@ -121,6 +125,8 @@ fn mark_visible_lights(
                     max: pos + light.range,
                 }));
         }
+
+        visibility_timer.0.tick(time.delta());
     }
 }
 
@@ -154,12 +160,6 @@ fn mark_visible_occluders(
                 *visibility_timer = default();
             }
         }
-        // } else {
-        //     warn!(
-        //         "occluder {:?} doesn't intersect light {:?}",
-        //         aabb.0, light_rect_aabb
-        //     )
-        // }
 
         visibility_timer.0.tick(time.delta());
     }

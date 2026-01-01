@@ -16,6 +16,7 @@ use bevy::{
 use bytemuck::{NoUninit, Pod, Zeroable};
 
 use crate::{
+    lights::{ExtractedPointLight, Falloff, LightIndex, UniformPointLight},
     occluders::{
         ExtractedOccluder, Occluder2dShape, PolyOccluderIndex, RoundOccluderIndex, UniformOccluder,
         UniformRoundOccluder,
@@ -35,7 +36,7 @@ impl Plugin for BuffersPlugin {
         render_app.add_systems(RenderStartup, spawn_observers);
         render_app.add_systems(
             Render,
-            prepare_occluders
+            (prepare_occluders, prepare_lights)
                 .in_set(RenderSystems::Prepare)
                 .before(crate::prepare::prepare_data),
         );
@@ -48,13 +49,30 @@ impl Plugin for BuffersPlugin {
 
         render_app.init_resource::<BufferManager<UniformRoundOccluder>>();
         render_app.init_resource::<BufferManager<UniformOccluder>>();
+        render_app.init_resource::<BufferManager<UniformPointLight>>();
         render_app.init_resource::<VertexBuffer>();
     }
 }
 
 fn spawn_observers(mut commands: Commands) {
     commands.spawn(Observer::new(on_occluder_removed));
-    commands.spawn(Observer::new(on_occluder_not_visible));
+    commands.spawn(Observer::new(on_light_removed));
+
+    commands.spawn(Observer::new(on_entity_not_visible));
+}
+
+// handles buffer when the light gets despawned or the component is removed
+fn on_light_removed(
+    trigger: On<Remove, ExtractedPointLight>,
+    mut lights: Query<&mut LightIndex>,
+    mut light_manager: ResMut<BufferManager<UniformPointLight>>,
+) {
+    if let Ok(mut index) = lights.get_mut(trigger.entity) {
+        if let Some(old_index) = index.0 {
+            light_manager.free_index(old_index);
+            index.0 = None;
+        }
+    }
 }
 
 // handles buffer when the occluder gets despawned or the component is removed
@@ -91,8 +109,8 @@ fn on_occluder_removed(
     }
 }
 
-// handles buffer when occluder is not visible anymore
-fn on_occluder_not_visible(
+// handles buffer when entity is not visible anymore
+fn on_entity_not_visible(
     trigger: On<Add, NotVisible>,
     mut occluders: Query<
         (
@@ -103,9 +121,11 @@ fn on_occluder_not_visible(
         ),
         With<NotVisible>,
     >,
+    mut lights: Query<(Entity, &mut LightIndex)>,
     mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
     mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
     mut vertex_buffer: ResMut<VertexBuffer>,
+    mut light_manager: ResMut<BufferManager<UniformPointLight>>,
     mut commands: Commands,
 ) {
     if let Ok((id, occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
@@ -127,7 +147,52 @@ fn on_occluder_not_visible(
 
         commands.entity(id).remove::<ExtractedOccluder>();
         commands.entity(id).remove::<NotVisible>();
+    } else if let Ok((id, mut index)) = lights.get_mut(trigger.entity) {
+        if let Some(old_index) = index.0 {
+            light_manager.free_index(old_index);
+            index.0 = None;
+        }
+
+        commands.entity(id).remove::<ExtractedPointLight>();
+        commands.entity(id).remove::<NotVisible>();
     }
+}
+
+// adds lights to buffer for use in prepare system
+fn prepare_lights(
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    mut lights: Query<(&ExtractedPointLight, &mut LightIndex)>,
+    mut light_manager: ResMut<BufferManager<UniformPointLight>>,
+) {
+    for (light, mut index) in &mut lights {
+        let changed = light.changes.0;
+
+        let light = UniformPointLight {
+            pos: light.pos,
+            intensity: light.intensity,
+            range: light.range,
+            color: light.color.to_linear().to_vec3(),
+            z: light.z,
+            inner_range: light.inner_range.min(light.range),
+            falloff: match light.falloff {
+                Falloff::InverseSquare => 0,
+                Falloff::Linear => 1,
+            },
+            angle: light.angle / 180. * PI,
+            dir: light.dir,
+            height: light.height,
+            n_rounds: 0,
+            n_poly: 0,
+            // _pad0: 0,
+            // _pad1: [0, 0, 0],
+        };
+
+        let new_index = light_manager.set_value(&light, index.0, changed);
+        index.0 = Some(new_index);
+    }
+
+    light_manager.flush(&render_device, &render_queue);
 }
 
 // adds occluders to buffers for use in prepare system
@@ -144,9 +209,7 @@ fn prepare_occluders(
     mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
     for (occluder, mut round_index, mut poly_index) in &mut occluders {
-        let changed = occluder.changes.translation || occluder.changes.shape;
-
-        let changed = true;
+        let changed = occluder.changes.0;
 
         if let Occluder2dShape::RoundRectangle {
             width,

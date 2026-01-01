@@ -1,5 +1,3 @@
-use std::{collections::VecDeque, ops::Range};
-
 use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::WHITE,
@@ -21,17 +19,20 @@ use bevy::{
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{BindGroup, BufferVec, ShaderType, UniformBuffer},
+        render_resource::{BindGroup, ShaderType, StorageBuffer},
         sync_world::SyncToRenderWorld,
         view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
 };
+use bytemuck::NoUninit;
 
 use crate::{
     LightBatchSetKey,
-    buffers::{BinBuffer, OccluderPointer},
+    buffers::{BinBuffer, BufferIndex},
+    change::Changes,
     phases::LightmapPhase,
     pipelines::LightmapCreationPipeline,
+    visibility::VisibilityTimer,
 };
 
 /// Point light with adjustable fields.
@@ -41,7 +42,9 @@ use crate::{
     Transform,
     VisibilityClass,
     ViewVisibility,
-    LightHeight
+    VisibilityTimer,
+    LightHeight,
+    Changes
 )]
 #[component(on_add = add_visibility_class::<PointLight2d>)]
 pub struct PointLight2d {
@@ -132,9 +135,10 @@ impl Default for PointLight2d {
     }
 }
 
+/// The data that is extracted to the render world from a [`PointLight2d`].
 #[derive(Component, Clone)]
-#[require(BinBuffer)]
-pub(crate) struct ExtractedPointLight {
+#[require(BinBuffer, LightIndex, LightPointer)]
+pub struct ExtractedPointLight {
     pub pos: Vec2,
     pub color: Color,
     pub intensity: f32,
@@ -146,6 +150,7 @@ pub(crate) struct ExtractedPointLight {
     pub dir: Vec2,
     pub z: f32,
     pub height: f32,
+    pub changes: Changes,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -154,62 +159,38 @@ impl PartialEq for ExtractedPointLight {
     }
 }
 
-#[derive(Component, Default, Clone, ShaderType)]
-pub(crate) struct UniformPointLight {
+/// Data that is sent to the GPU for each visible [`PointLight2d`].
+#[repr(C)]
+#[derive(Default, Clone, Copy, ShaderType, NoUninit)]
+pub struct UniformPointLight {
     pub pos: Vec2,
-    pub color: Vec3,
     pub intensity: f32,
     pub range: f32,
+
+    pub color: Vec3,
+    // pub _pad0: u32,
     pub inner_range: f32,
     pub falloff: u32,
     pub angle: f32,
+
     pub dir: Vec2,
+
     pub z: f32,
     pub height: f32,
     pub n_rounds: u32,
     pub n_poly: u32,
+    // pub _pad1: [u32; 3],
 }
 
-#[derive(Component)]
-pub(crate) struct LightBuffers {
-    pub light: UniformBuffer<UniformPointLight>,
-}
+/// Render World component that contains the buffer a [`PointLight2d`] writes to each frame.   
+#[derive(Component, Default)]
+pub struct LightPointer(pub StorageBuffer<u32>);
 
-/// This resource handles giving lights indices and redistributing unused indices
-#[derive(Resource, Default)]
-pub(crate) struct LightIndices {
-    next_index: u32,
-    discarded: VecDeque<u32>,
-}
-
-impl LightIndices {
-    pub fn take_index(&mut self) -> u32 {
-        let index = match self.discarded.pop_back() {
-            Some(index) => index,
-            None => self.next_index,
-        };
-
-        self.next_index += 1;
-        index
-    }
-
-    pub fn return_index(&mut self, index: u32) {
-        self.discarded.push_front(index);
-    }
-}
-
-#[derive(Component)]
-#[require(SyncToRenderWorld)]
-pub(crate) struct LightIndex(pub u32);
-
-pub(crate) struct LightPlugin;
+/// Plugin responsible for functionality related to lights. Added automatically
+/// by [`FireflyPlugin`](crate::prelude::FireflyPlugin).
+pub struct LightPlugin;
 impl Plugin for LightPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LightIndices>();
-
-        app.add_systems(Update, assign_light_indices);
-        app.add_observer(discard_light_index);
-
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.init_resource::<LightBindGroups>();
             render_app.init_resource::<DrawFunctions<LightmapPhase>>();
@@ -231,30 +212,6 @@ impl Plugin for LightPlugin {
             render_app.init_resource::<LightBatches>();
         }
     }
-}
-
-fn assign_light_indices(
-    lights: Populated<Entity, Added<PointLight2d>>,
-    mut indices: ResMut<LightIndices>,
-    mut commands: Commands,
-) {
-    for light in lights {
-        commands
-            .entity(light)
-            .insert(LightIndex(indices.take_index()));
-    }
-}
-
-fn discard_light_index(
-    trigger: On<Remove, PointLight2d>,
-    lights: Query<&LightIndex>,
-    mut indices: ResMut<LightIndices>,
-) {
-    if let Ok(light) = lights.get(trigger.entity) {
-        indices.return_index(light.0);
-        return;
-    }
-    warn!("Can't find light index for entity: {}", trigger.entity);
 }
 
 #[derive(Resource, Deref, DerefMut, Default)]
@@ -347,3 +304,8 @@ impl<P: PhaseItem> RenderCommand<P> for DrawLightBatch {
         RenderCommandResult::Success
     }
 }
+
+/// Buffer index that each visible light gets assigned
+/// corresponding to its [`BufferManager`](crate::buffers::BufferManager) slot.  
+#[derive(Component, Default)]
+pub struct LightIndex(pub Option<BufferIndex>);

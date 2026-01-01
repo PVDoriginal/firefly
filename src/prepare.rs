@@ -4,7 +4,7 @@ use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BufferManager, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
-    lights::{Falloff, LightBatch, LightBatches, LightBindGroups, LightBuffers},
+    lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
     pipelines::{LightmapCreationPipeline, SpritePipeline},
@@ -27,14 +27,14 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroup, BindGroupEntries, BufferUsages, BufferVec, TextureDescriptor,
-            TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
+            BindGroup, BindGroupEntries, TextureDescriptor, TextureDimension, TextureFormat,
+            TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
-    tasks::{ComputeTaskPool, ParallelSlice, ParallelSliceMut},
+    tasks::{ComputeTaskPool, ParallelSliceMut},
 };
 
 use crate::{
@@ -55,12 +55,7 @@ impl Plugin for PreparePlugin {
             return;
         };
 
-        render_app.add_systems(
-            Render,
-            (insert_light_buffers, prepare_data)
-                .chain()
-                .in_set(RenderSystems::Prepare),
-        );
+        render_app.add_systems(Render, prepare_data.in_set(RenderSystems::Prepare));
         render_app.add_systems(Render, prepare_config.in_set(RenderSystems::Prepare));
         render_app.add_systems(Render, prepare_lightmap.in_set(RenderSystems::Prepare));
 
@@ -174,26 +169,14 @@ fn prepare_lightmap(
     }
 }
 
-fn insert_light_buffers(
-    lights: Query<(Entity, Has<LightBuffers>), With<ExtractedPointLight>>,
-    mut commands: Commands,
-) {
-    for (light, has_buffers) in lights {
-        if !has_buffers {
-            commands.entity(light).insert(LightBuffers {
-                light: UniformBuffer::<UniformPointLight>::from(UniformPointLight::default()),
-            });
-        }
-    }
-}
-
 pub(crate) fn prepare_data(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut lights: Query<(
         Entity,
         &ExtractedPointLight,
-        &mut LightBuffers,
+        &mut LightPointer,
+        &LightIndex,
         &mut BinBuffer,
     )>,
     occluders: Query<(&ExtractedOccluder, &RoundOccluderIndex, &PolyOccluderIndex)>,
@@ -212,6 +195,7 @@ pub(crate) fn prepare_data(
     view_uniforms: Res<ViewUniforms>,
     round_occluders: Res<BufferManager<UniformRoundOccluder>>,
     poly_occluders: Res<BufferManager<UniformOccluder>>,
+    light_buffer: Res<BufferManager<UniformPointLight>>,
     vertices: Res<VertexBuffer>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
@@ -234,24 +218,14 @@ pub(crate) fn prepare_data(
             .par_splat_map_mut(ComputeTaskPool::get(), None, |_, lights| {
                 let mut bind_groups: Vec<(Entity, BindGroup)> = vec![];
 
-                for (entity, light, buffers, bins) in lights {
-                    let uniform_light = UniformPointLight {
-                        pos: light.pos,
-                        color: light.color.to_linear().to_vec3(),
-                        intensity: light.intensity,
-                        range: light.range,
-                        z: light.z,
-                        inner_range: light.inner_range.min(light.range),
-                        falloff: match light.falloff {
-                            Falloff::InverseSquare => 0,
-                            Falloff::Linear => 1,
-                        },
-                        angle: light.angle / 180. * PI,
-                        dir: light.dir,
-                        height: light.height,
-                        n_rounds: 0,
-                        n_poly: 0,
+                for (entity, light, light_pointer, light_index, bins) in lights {
+                    let Some(index) = light_index.0 else {
+                        continue;
                     };
+
+                    light_pointer.0.set(index.index as u32);
+                    light_pointer.0.write_buffer(&render_device, &render_queue);
+
                     let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
                         min: light.pos - light.range,
                         max: light.pos + light.range,
@@ -353,9 +327,6 @@ pub(crate) fn prepare_data(
                         }
                     }
 
-                    buffers.light.set(uniform_light);
-                    buffers.light.write_buffer(&render_device, &render_queue);
-
                     bins.write(&render_device, &render_queue);
 
                     bind_groups.push((
@@ -366,7 +337,8 @@ pub(crate) fn prepare_data(
                             &BindGroupEntries::sequential((
                                 view_uniforms.uniforms.binding().unwrap(),
                                 &lightmap_pipeline.sampler,
-                                buffers.light.binding().unwrap(),
+                                light_buffer.binding(),
+                                light_pointer.0.binding().unwrap(),
                                 round_occluders.binding(),
                                 poly_occluders.binding(),
                                 vertices.binding(),
