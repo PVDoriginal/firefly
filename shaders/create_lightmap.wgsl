@@ -119,28 +119,31 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 if bins[bin_set][bin].occluders[i].distance > dist { break; }
 
                 let occluder_type = bins[bin_set][bin].occluders[i].index & 2147483648u;
-
+                
                 // round occluder
                 if occluder_type == 0 {
-                    let result = round_check(pos, bins[bin_set][bin].occluders[i].index); 
-
+                    let index = bins[bin_set][bin].occluders[i].index;
+                    let result = round_check(pos, index); 
+    
                     if result.occluded == true {
-                        shadow = shadow_blend(shadow, vec3f(1), 1.0);
+                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
                     }                    
                     else if config.softness > 0 && result.extreme_angle < soft_angle {
-                        shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
+                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
                     }
                 }
                 // poly occluder
                 else {
                     let result = is_occluded(pos, bins[bin_set][bin].occluders[i]); 
 
+                    let index = (bins[bin_set][bin].occluders[i].index << 4) >> 4; 
+
                     if result.occluded == true {
-                        shadow = shadow_blend(shadow, vec3f(1), 1.0);
-                    }          
+                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity);
+                    }                    
                     else if config.softness > 0 && result.extreme_angle < soft_angle {
-                        shadow = shadow_blend(shadow, vec3f(1), 1.0 * (1f - (result.extreme_angle / soft_angle)));
-                    }      
+                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
+                    }
                 }
 
                 if shadow.x == 0.0 && shadow.y == 0.0 && shadow.z == 0.0 {

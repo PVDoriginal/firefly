@@ -18,8 +18,8 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 1.5;
-const OCCLUDER_FREQ: f32 = 0.12;
+const LIGHT_FREQ: f32 = 1.7;
+const OCCLUDER_FREQ: f32 = 0.06;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
@@ -108,14 +108,14 @@ fn change_scale(
     };
 
     if keys.pressed(KeyCode::ArrowLeft) {
-        projection.scale += 30. * time.delta_secs();
+        projection.scale += 10. * time.delta_secs();
     }
     if keys.pressed(KeyCode::ArrowRight) {
-        projection.scale = (projection.scale - 30. * time.delta_secs()).max(0.5);
+        projection.scale = (projection.scale - 10. * time.delta_secs()).max(0.5);
     }
 }
 
-const CAMERA_SPEED: f32 = 4000.0;
+const CAMERA_SPEED: f32 = 2000.0;
 fn move_camera(
     mut camera: Single<&mut Transform, With<FireflyConfig>>,
     keys: Res<ButtonInput<KeyCode>>,

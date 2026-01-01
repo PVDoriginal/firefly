@@ -146,7 +146,7 @@ fn prepare_occluders(
     for (occluder, mut round_index, mut poly_index) in &mut occluders {
         let changed = occluder.changes.translation || occluder.changes.shape;
 
-        // let changed = true;
+        let changed = true;
 
         if let Occluder2dShape::RoundRectangle {
             width,
@@ -160,8 +160,20 @@ fn prepare_occluders(
                 width,
                 height,
                 radius,
-                _padding: default(),
+                // padding: default(),
+                z: occluder.z,
+                color: occluder.color.to_linear().to_vec3(),
+                _pad0: 0.0,
+                opacity: occluder.opacity,
+                z_sorting: match occluder.z_sorting {
+                    true => 1,
+                    false => 0,
+                },
+                _pad1: [0, 0, 0],
             };
+
+            // assert_eq!(std::mem::size_of::<UniformRoundOccluder>(), 64);
+            // assert_eq!(std::mem::align_of::<UniformRoundOccluder>(), 16);
 
             let new_index = round_manager.set_value(&value, round_index.0, changed);
             round_index.0 = Some(new_index);
@@ -180,11 +192,13 @@ fn prepare_occluders(
                 n_vertices: occluder.shape.n_vertices(),
                 z: occluder.z,
                 color: occluder.color.to_linear().to_vec3(),
+                _pad0: 0.0,
                 opacity: occluder.opacity,
                 z_sorting: match occluder.z_sorting {
                     true => 1,
                     false => 0,
                 },
+                _pad1: [0, 0, 0],
             };
 
             let new_index = poly_manager.set_value(&value, poly_index.occluder, changed);
@@ -351,10 +365,10 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 }
 
 /// The amount of bins that each [`Bins`] will have.
-pub const N_BINS: usize = 32;
+pub const N_BINS: usize = 128;
 
 /// The amount of occluder per bin.
-pub const N_OCCLUDERS: usize = 32;
+pub const N_OCCLUDERS: usize = 64;
 
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 #[derive(Component)]

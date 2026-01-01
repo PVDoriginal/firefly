@@ -20,6 +20,7 @@ struct PolyOccluder {
     vertex_start: u32,
     n_vertices: u32,
     z: f32,
+    @size(16)
     color: vec3f, 
     opacity: f32,
     z_sorting: u32,
@@ -38,7 +39,11 @@ struct RoundOccluder {
     width: f32,
     height: f32, 
     radius: f32,
-    padding: vec2f,
+    z: f32, 
+    @size(16)
+    color: vec3f,
+    opacity: f32, 
+    z_sorting: u32, 
 }
 
 struct FireflyConfig {
@@ -53,8 +58,8 @@ struct FireflyConfig {
 }
 
 // Should correspond to the values in buffers.rs!
-const N_BINS: u32 = 32;
-const N_OCCLUDERS: u32 = 32; 
+const N_BINS: u32 = 128;
+const N_OCCLUDERS: u32 = 64; 
 
 struct Bin {
     occluders: array<OccluderPointer, N_OCCLUDERS>,

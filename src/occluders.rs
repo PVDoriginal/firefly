@@ -303,8 +303,10 @@ pub struct UniformOccluder {
     pub n_vertices: u32,
     pub z: f32,
     pub color: Vec3,
+    pub _pad0: f32,
     pub opacity: f32,
     pub z_sorting: u32,
+    pub _pad1: [u32; 3],
 }
 
 /// Data that is transferred to the GPU to be read inside shaders.
@@ -316,7 +318,12 @@ pub struct UniformRoundOccluder {
     pub width: f32,
     pub height: f32,
     pub radius: f32,
-    pub _padding: Vec2,
+    pub z: f32,
+    pub color: Vec3,
+    pub _pad0: f32,
+    pub opacity: f32,
+    pub z_sorting: u32,
+    pub _pad1: [u32; 3],
 }
 
 #[repr(C)]

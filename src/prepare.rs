@@ -27,13 +27,14 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, BufferUsages, BufferVec, TextureDescriptor, TextureDimension,
-            TextureFormat, TextureUsages, UniformBuffer,
+            BindGroup, BindGroupEntries, BufferUsages, BufferVec, TextureDescriptor,
+            TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
+    tasks::{ComputeTaskPool, ParallelSlice, ParallelSliceMut},
 };
 
 use crate::{
@@ -204,7 +205,7 @@ pub(crate) fn prepare_data(
         &BufferedFireflyConfig,
         &FireflyConfig,
     )>,
-    mut phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
+    phases: Res<ViewBinnedRenderPhases<LightmapPhase>>,
     lightmap_pipeline: Res<LightmapCreationPipeline>,
     mut light_bind_groups: ResMut<LightBindGroups>,
     mut batches: ResMut<LightBatches>,
@@ -226,167 +227,172 @@ pub(crate) fn prepare_data(
 
     let light_bind_groups = &mut *light_bind_groups;
 
-    for (retained_view, transparent_phase) in phases.iter_mut() {
-        let mut index = 0;
+    let mut lights: Vec<_> = lights.iter_mut().collect();
 
-        for item_index in 0..transparent_phase.non_mesh_items.len() {
-            let item = &transparent_phase.non_mesh_items[item_index];
+    for (retained_view, _) in phases.iter() {
+        lights
+            .par_splat_map_mut(ComputeTaskPool::get(), None, |_, lights| {
+                let mut bind_groups: Vec<(Entity, BindGroup)> = vec![];
 
-            for (_, entity) in &item.entities {
-                let Ok((_, light, mut buffers, mut bins)) = lights.get_mut(*entity) else {
-                    continue;
-                };
+                for (entity, light, buffers, bins) in lights {
+                    let uniform_light = UniformPointLight {
+                        pos: light.pos,
+                        color: light.color.to_linear().to_vec3(),
+                        intensity: light.intensity,
+                        range: light.range,
+                        z: light.z,
+                        inner_range: light.inner_range.min(light.range),
+                        falloff: match light.falloff {
+                            Falloff::InverseSquare => 0,
+                            Falloff::Linear => 1,
+                        },
+                        angle: light.angle / 180. * PI,
+                        dir: light.dir,
+                        height: light.height,
+                        n_rounds: 0,
+                        n_poly: 0,
+                    };
+                    let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
+                        min: light.pos - light.range,
+                        max: light.pos + light.range,
+                    });
 
-                let uniform_light = UniformPointLight {
-                    pos: light.pos,
-                    color: light.color.to_linear().to_vec3(),
-                    intensity: light.intensity,
-                    range: light.range,
-                    z: light.z,
-                    inner_range: light.inner_range.min(light.range),
-                    falloff: match light.falloff {
-                        Falloff::InverseSquare => 0,
-                        Falloff::Linear => 1,
-                    },
-                    angle: light.angle / 180. * PI,
-                    dir: light.dir,
-                    height: light.height,
-                    n_rounds: 0,
-                    n_poly: 0,
-                };
-                let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
-                    min: light.pos - light.range,
-                    max: light.pos + light.range,
-                });
+                    let light_aabb = Aabb2d {
+                        min: light_rect.min,
+                        max: light_rect.max,
+                    };
 
-                let light_aabb = Aabb2d {
-                    min: light_rect.min,
-                    max: light_rect.max,
-                };
+                    bins.reset();
 
-                bins.reset();
+                    let softness = match camera.5.softness {
+                        None => 0.0,
+                        Some(x) => x.clamp(0.0, 1.0),
+                    };
 
-                // for (i, occluder) in round_occluder_rects.iter().enumerate() {
-                //     if occluder.intersect(light_rect).is_empty() {
-                //         continue;
-                //     }
-                //     buffers.rounds.push(i as u32);
-                // }
+                    for (occluder, round_index, poly_index) in &occluders {
+                        if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
+                            continue;
+                        }
 
-                let softness = match camera.5.softness {
-                    None => 0.0,
-                    Some(x) => x.clamp(0.0, 1.0),
-                };
+                        if let Occluder2dShape::RoundRectangle {
+                            width,
+                            height,
+                            radius,
+                        } = occluder.shape
+                        {
+                            let Some(occluder_index) = round_index.0 else {
+                                continue;
+                            };
 
-                for (occluder, round_index, poly_index) in &occluders {
-                    if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
-                        continue;
+                            let vertices = vec![
+                                vec2(-width / 2.0 - radius, -height / 2.0 - radius),
+                                vec2(-width / 2.0 - radius, height / 2.0 + radius),
+                                vec2(width / 2.0 + radius, height / 2.0 + radius),
+                                vec2(width / 2.0 + radius, -height / 2.0 - radius),
+                                vec2(-width / 2.0 - radius, -height / 2.0 - radius),
+                            ];
+
+                            let isometry = Isometry2d {
+                                translation: occluder.pos,
+                                rotation: Rot2::radians(occluder.rot),
+                            };
+                            let aabb = Aabb2d::from_point_cloud(isometry, &vertices);
+
+                            let vertices = translate_vertices(
+                                vertices,
+                                isometry.translation,
+                                isometry.rotation,
+                            );
+
+                            let light_inside_occluder =
+                                point_inside_poly(light.pos, vertices.clone(), aabb);
+
+                            let closest = aabb.closest_point(light.pos);
+
+                            push_vertices(
+                                bins,
+                                vertices,
+                                light.pos,
+                                0,
+                                occluder_index.index as u32,
+                                softness,
+                                closest.distance(light.pos),
+                                light_inside_occluder,
+                                false,
+                            );
+                        } else {
+                            let Some(occluder_index) = poly_index.occluder else {
+                                continue;
+                            };
+
+                            let Some(vertex_index) = poly_index.vertices else {
+                                continue;
+                            };
+
+                            let light_inside_occluder =
+                                matches!(occluder.shape, Occluder2dShape::Polygon { .. })
+                                    && point_inside_poly(
+                                        light.pos,
+                                        occluder.vertices(),
+                                        occluder.aabb,
+                                    );
+
+                            let closest = occluder.aabb.closest_point(light.pos);
+
+                            push_vertices(
+                                bins,
+                                occluder.vertices(),
+                                light.pos,
+                                vertex_index.index as u32,
+                                occluder_index.index as u32,
+                                softness,
+                                closest.distance(light.pos),
+                                light_inside_occluder,
+                                true,
+                            );
+                        }
                     }
 
-                    if let Occluder2dShape::RoundRectangle {
-                        width,
-                        height,
-                        radius,
-                    } = occluder.shape
-                    {
-                        let Some(occluder_index) = round_index.0 else {
-                            continue;
-                        };
+                    buffers.light.set(uniform_light);
+                    buffers.light.write_buffer(&render_device, &render_queue);
 
-                        let vertices = vec![
-                            vec2(-width / 2.0 - radius, -height / 2.0 - radius),
-                            vec2(-width / 2.0 - radius, height / 2.0 + radius),
-                            vec2(width / 2.0 + radius, height / 2.0 + radius),
-                            vec2(width / 2.0 + radius, -height / 2.0 - radius),
-                            vec2(-width / 2.0 - radius, -height / 2.0 - radius),
-                        ];
+                    bins.write(&render_device, &render_queue);
 
-                        let isometry = Isometry2d {
-                            translation: occluder.pos,
-                            rotation: Rot2::radians(occluder.rot),
-                        };
-                        let aabb = Aabb2d::from_point_cloud(isometry, &vertices);
-
-                        let vertices =
-                            translate_vertices(vertices, isometry.translation, isometry.rotation);
-
-                        let light_inside_occluder =
-                            point_inside_poly(light.pos, vertices.clone(), aabb);
-
-                        let closest = aabb.closest_point(light.pos);
-
-                        push_vertices(
-                            &mut bins,
-                            vertices,
-                            light.pos,
-                            0,
-                            occluder_index.index as u32,
-                            softness,
-                            closest.distance(light.pos),
-                            light_inside_occluder,
-                            false,
-                        );
-                    } else {
-                        let Some(occluder_index) = poly_index.occluder else {
-                            continue;
-                        };
-
-                        let Some(vertex_index) = poly_index.vertices else {
-                            continue;
-                        };
-
-                        let light_inside_occluder =
-                            matches!(occluder.shape, Occluder2dShape::Polygon { .. })
-                                && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
-
-                        let closest = occluder.aabb.closest_point(light.pos);
-
-                        push_vertices(
-                            &mut bins,
-                            occluder.vertices(),
-                            light.pos,
-                            vertex_index.index as u32,
-                            occluder_index.index as u32,
-                            softness,
-                            closest.distance(light.pos),
-                            light_inside_occluder,
-                            true,
-                        );
-                    }
+                    bind_groups.push((
+                        *entity,
+                        render_device.create_bind_group(
+                            "light bind group",
+                            &lightmap_pipeline.layout,
+                            &BindGroupEntries::sequential((
+                                view_uniforms.uniforms.binding().unwrap(),
+                                &lightmap_pipeline.sampler,
+                                buffers.light.binding().unwrap(),
+                                round_occluders.binding(),
+                                poly_occluders.binding(),
+                                vertices.binding(),
+                                bins.binding(),
+                                &camera.2.0.default_view,
+                                &camera.3.0.default_view,
+                                camera.4.0.binding().unwrap(),
+                            )),
+                        ),
+                    ));
                 }
+                bind_groups
+            })
+            .iter()
+            .for_each(|bind_groups| {
+                for (entity, bind_group) in bind_groups {
+                    light_bind_groups
+                        .values
+                        .entry(*entity)
+                        .insert(bind_group.clone());
 
-                buffers.light.set(uniform_light);
-                buffers.light.write_buffer(&render_device, &render_queue);
-
-                bins.write(&render_device, &render_queue);
-
-                light_bind_groups.values.entry(*entity).insert({
-                    render_device.create_bind_group(
-                        "light bind group",
-                        &lightmap_pipeline.layout,
-                        &BindGroupEntries::sequential((
-                            view_uniforms.uniforms.binding().unwrap(),
-                            &lightmap_pipeline.sampler,
-                            buffers.light.binding().unwrap(),
-                            round_occluders.binding(),
-                            poly_occluders.binding(),
-                            vertices.binding(),
-                            bins.binding(),
-                            &camera.2.0.default_view,
-                            &camera.3.0.default_view,
-                            camera.4.0.binding().unwrap(),
-                        )),
-                    )
-                });
-
-                batches.entry((*retained_view, *entity)).insert(LightBatch {
-                    id: *entity,
-                    range: index..index,
-                });
-
-                index += 1;
-            }
-        }
+                    batches
+                        .entry((*retained_view, *entity))
+                        .insert(LightBatch { id: *entity });
+                }
+            });
     }
 }
 

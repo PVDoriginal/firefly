@@ -263,7 +263,6 @@ pub(crate) struct LightBatches(pub HashMap<(RetainedViewEntity, Entity), LightBa
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct LightBatch {
     pub id: Entity,
-    pub range: Range<u32>,
 }
 
 #[derive(Resource, Default)]
