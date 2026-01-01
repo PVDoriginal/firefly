@@ -119,10 +119,17 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 if bins[bin_set][bin].occluders[i].distance > dist { break; }
 
                 let occluder_type = bins[bin_set][bin].occluders[i].index & 2147483648u;
-                
+
                 // round occluder
                 if occluder_type == 0 {
                     let index = bins[bin_set][bin].occluders[i].index;
+                    
+                    if stencil.a > 0.1 {
+                        if config.z_sorting == 1 && round_occluders[index].z_sorting == 1 && stencil.g >= round_occluders[index].z {
+                            continue;
+                        }
+                    }
+
                     let result = round_check(pos, index); 
     
                     if result.occluded == true {
@@ -134,9 +141,15 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 }
                 // poly occluder
                 else {
-                    let result = is_occluded(pos, bins[bin_set][bin].occluders[i]); 
-
                     let index = (bins[bin_set][bin].occluders[i].index << 4) >> 4; 
+
+                    if stencil.a > 0.1 {
+                        if config.z_sorting == 1 && poly_occluders[index].z_sorting == 1 && stencil.g >= poly_occluders[index].z {
+                            continue;
+                        }
+                    }
+
+                    let result = is_occluded(pos, bins[bin_set][bin].occluders[i]); 
 
                     if result.occluded == true {
                         shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity);
@@ -146,12 +159,12 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     }
                 }
 
-                if shadow.x == 0.0 && shadow.y == 0.0 && shadow.z == 0.0 {
+                if dot(shadow, shadow) < 0.0001 {
                     break;
                 }
             }
 
-            if shadow.x == 0.0 && shadow.y == 0.0 && shadow.z == 0.0 {
+            if dot(shadow, shadow) < 0.0001 {
                 break;
             }
         }
