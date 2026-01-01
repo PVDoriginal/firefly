@@ -442,21 +442,27 @@ impl BinBuffer {
 
     /// Add an occluder to this buffer
     pub fn add_occluder(&mut self, occluder: OccluderPointer, min_angle: f32, max_angle: f32) {
-        let min_bin = (((min_angle + PI) / Self::PI2) * Self::N_BINS)
-            .floor()
-            .clamp(0.0, Self::N_BINS - 1.0) as usize;
-        let max_bin = (((max_angle + PI) / Self::PI2) * Self::N_BINS)
-            .floor()
-            .clamp(0.0, Self::N_BINS - 1.0) as usize;
+        let min_bin = (((min_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
+        let max_bin = (((max_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
 
-        for bin_index in min_bin..max_bin + 1 {
+        let mut bin_index = min_bin;
+
+        loop {
             let values = self.buffer.values_mut();
 
-            while self.counts[bin_index] >= values.len() {
+            let index = if bin_index < 0 {
+                bin_index + N_BINS as i32
+            } else if bin_index >= N_BINS as i32 {
+                bin_index - N_BINS as i32
+            } else {
+                bin_index
+            } as usize;
+
+            while self.counts[index] >= values.len() {
                 values.push([default(); N_BINS]);
             }
 
-            let bin = &mut values[self.counts[bin_index]][bin_index];
+            let bin = &mut values[self.counts[index]][index];
 
             bin.occluders[bin.n_occluders as usize] = occluder;
             bin.n_occluders += 1;
@@ -469,8 +475,14 @@ impl BinBuffer {
             // }
 
             if bin.n_occluders == N_OCCLUDERS as u32 {
-                self.counts[bin_index] += 1;
+                self.counts[index] += 1;
             }
+
+            if bin_index == max_bin {
+                break;
+            }
+
+            bin_index += 1;
         }
     }
 }

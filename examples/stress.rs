@@ -18,8 +18,8 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 1.7;
-const OCCLUDER_FREQ: f32 = 0.06;
+const LIGHT_FREQ: f32 = 2.2;
+const OCCLUDER_FREQ: f32 = 0.1;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
@@ -108,10 +108,10 @@ fn change_scale(
     };
 
     if keys.pressed(KeyCode::ArrowLeft) {
-        projection.scale += 10. * time.delta_secs();
+        projection.scale += 5. * time.delta_secs();
     }
     if keys.pressed(KeyCode::ArrowRight) {
-        projection.scale = (projection.scale - 10. * time.delta_secs()).max(0.5);
+        projection.scale = (projection.scale - 5. * time.delta_secs()).max(0.5);
     }
 }
 
@@ -169,7 +169,7 @@ fn move_lights(
         let r = rng.random_range(0.0..1.0);
 
         if r <= MOVE_FREQ {
-            transform.translation.y -= time.delta_secs() * 900.0;
+            transform.translation.y -= time.delta_secs() * 600.0;
 
             if transform.translation.y + light.range < -HEIGHT / 2.0 {
                 commands.entity(id).despawn();
@@ -242,7 +242,7 @@ fn move_occluders(
         let r = rng.random_range(0.0..1.0);
 
         if r <= MOVE_FREQ {
-            transform.translation.y += time.delta_secs() * 1000.0;
+            transform.translation.y += time.delta_secs() * 500.0;
 
             if transform.translation.y > HEIGHT / 2.0 + 60. {
                 commands.entity(id).despawn();

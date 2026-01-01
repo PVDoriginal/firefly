@@ -447,16 +447,8 @@ fn push_vertices(
                     slice.start_angle - softness,
                     slice.end_angle + softness,
                 ),
-                1 => bins.add_occluder(
-                    occluder,
-                    slice.start_angle - softness,
-                    slice.end_angle + (2.0 * PI),
-                ),
-                2 => bins.add_occluder(
-                    occluder,
-                    slice.start_angle - (2.0 * PI),
-                    slice.end_angle + softness,
-                ),
+                1 => bins.add_occluder(occluder, slice.start_angle - softness, PI),
+                2 => bins.add_occluder(occluder, -PI, slice.end_angle + softness),
                 _ => {}
             }
         }
