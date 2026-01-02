@@ -12,8 +12,8 @@ I am working on it as part of my college thesis. It uses certain geometrical and
 My final goal is to have a lighting crate with features akin to the ones of more mature game engines, while 
 keeping performance as high as possible and minimizing the end-user API.
 
-Firefly is still pretty early in development, with many features to be added still. However, there is already lot of cool stuff for you to play with 
-or use for your games, if you wish to. 
+Firefly already has most of the essential features of the respective 2d lighting pipelines of Unity and Godot. There are still 
+many more planned though! 
 
 Short video showing off soft shadows and z-sorting: 
 
