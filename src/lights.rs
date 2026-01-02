@@ -73,6 +73,11 @@ pub struct PointLight2d {
     /// **Default:** [InverseSquare](Falloff::InverseSquare).
     pub falloff: Falloff,
 
+    /// The intensity of this light's falloff effect.
+    ///
+    /// **Default:** 1.
+    pub falloff_intensity: f32,
+
     /// Angle in degrees of the point light. Between 0 and 360.
     ///
     /// 0 - No light;
@@ -128,6 +133,7 @@ impl Default for PointLight2d {
             range: 100.,
             inner_range: 0.,
             falloff: Falloff::InverseSquare,
+            falloff_intensity: 1.0,
             angle: 360.0,
             cast_shadows: true,
             offset: Vec3::ZERO,
@@ -145,6 +151,7 @@ pub struct ExtractedPointLight {
     pub range: f32,
     pub inner_range: f32,
     pub falloff: Falloff,
+    pub falloff_intensity: f32,
     pub angle: f32,
     pub cast_shadows: bool,
     pub dir: Vec2,
@@ -167,19 +174,16 @@ pub struct UniformPointLight {
     pub intensity: f32,
     pub range: f32,
 
-    pub color: Vec3,
-    // pub _pad0: u32,
+    pub color: Vec4,
     pub inner_range: f32,
     pub falloff: u32,
+    pub falloff_intensity: f32,
     pub angle: f32,
 
     pub dir: Vec2,
 
     pub z: f32,
     pub height: f32,
-    pub n_rounds: u32,
-    pub n_poly: u32,
-    // pub _pad1: [u32; 3],
 }
 
 /// Render World component that contains the buffer a [`PointLight2d`] writes to each frame.   

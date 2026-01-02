@@ -89,19 +89,18 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
         }; 
 
-        res = vec4f(light.color, 0f) * normal_multi;
-
         if dist <= light.inner_range {
-            res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * normal_multi);
+            res = min(vec4f(1), vec4f(light.color.xyz, 0) * light.intensity * normal_multi);
         }
         else {
             let x = (dist - light.inner_range) / (light.range - light.inner_range);
 
             if light.falloff == 0 {
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x * x) * normal_multi);
+                let x2 = x * x; 
+                res = min(vec4f(1), vec4f(light.color.xyz, 0) * light.intensity * ((1.0 - x2) * (1.0 - x2) / (1.0 + light.falloff_intensity * x2)) * normal_multi);
             }
             else if light.falloff == 1 { 
-                res = min(vec4f(1), vec4f(light.color, 0) * light.intensity * (1. - x) * normal_multi);
+                res = min(vec4f(1), vec4f(light.color.xyz, 0) * light.intensity * ((1.0 - x) / (1.0 + light.falloff_intensity * x)) * normal_multi);
             }
         }
 

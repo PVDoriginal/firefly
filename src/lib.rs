@@ -69,25 +69,24 @@
 //! [FireflyConfig](crate::prelude::FireflyConfig) has a [Softness](crate::prelude::FireflyConfig::softness) field
 //! that can be adjusted to disable / enable soft shadows, as well as give it a value (0 to 1) to set how soft the shadows should be.
 //!
-//! - **Occlusion Layers**: You can enable [z-sorting](crate::prelude::FireflyConfig::z_sorting) on [FireflyConfig](crate::prelude::FireflyConfig) to have shadows
+//! - **Occlusion Z-Sorting**: You can enable [z-sorting](crate::prelude::FireflyConfig::z_sorting) on [FireflyConfig](crate::prelude::FireflyConfig) to have shadows
 //! only render over sprites with a lower z position than the occluder that cast them. This is extremely useful for certain 2d games, such as top-down games.
-//! Additionally, [Occluders](crate::prelude::Occluder2d) have a [list of entities](crate::prelude::Occluder2d::ignored_sprites) that
-//! they won't cast shadows over.
 //!
 //! - **Normal maps**: You can enable normal maps by changing the [normal mode](crate::prelude::FireflyConfig::normal_mode) field. You can then
 //! add the [NormalMap](crate::prelude::NormalMap) component to sprites. Normal maps need to have the same exact layout as their entity's sprite image.
 //! If [normal mode](crate::prelude::FireflyConfig::normal_mode) is set to [top down](crate::prelude::NormalMode::TopDown),
-//! you can use [LightHeight](crate::prelude::LightHeight) and [SpriteHeight](crate::prelude::SpriteHeight) to emulate 3d directions for the normal maps.  
+//! you can use [LightHeight](crate::prelude::LightHeight) and [SpriteHeight](crate::prelude::SpriteHeight) to emulate 3d dimensions for the normal maps.  
 //!
 //! - **Light Banding**: You can enable [light bands](crate::prelude::FireflyConfig::light_bands) on [FireflyConfig](crate::prelude::FireflyConfig) to
-//! reduce the lightmap to a certain number of 'bands', creating a stylized retro look.  
+//! reduce the lightmap to a certain number of 'bands', creating a stylized look.
 //!
 //! # Upcoming Features
 //!
-//! Here are some of the features that are still being worked on:
+//! Here are some of the features that are currently planned:
 //! - Multiple lightmaps.
 //! - Sprite-based shadows.
 //! - Light textures.
+
 use bevy::{
     asset::uuid_handle,
     prelude::*,
@@ -102,12 +101,13 @@ pub mod lights;
 pub mod occluders;
 pub mod visibility;
 
-mod extract;
-mod nodes;
-mod phases;
-mod pipelines;
-mod prepare;
-mod sprites;
+pub mod extract;
+pub mod nodes;
+pub mod phases;
+pub mod pipelines;
+pub mod prepare;
+pub mod sprites;
+
 mod utils;
 
 pub(crate) use phases::*;
@@ -115,20 +115,23 @@ pub(crate) use phases::*;
 pub mod prelude {
     pub use crate::app::{FireflyGizmosPlugin, FireflyPlugin};
     pub use crate::data::{FireflyConfig, NormalMode};
-    pub use crate::lights::{LightHeight, PointLight2d};
+    pub use crate::lights::{Falloff, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
     pub use crate::{ApplyLightmapLabel, CreateLightmapLabel};
 }
 
+/// Camera component that stores the texture of the lightmap.
 #[derive(Component)]
-struct LightMapTexture(pub CachedTexture);
+pub struct LightMapTexture(pub CachedTexture);
 
+/// Camera component that stores the sprite stencil.
 #[derive(Component)]
-pub(crate) struct SpriteStencilTexture(pub CachedTexture);
+pub struct SpriteStencilTexture(pub CachedTexture);
 
+/// Camera component that stores the normal map texture.  
 #[derive(Component)]
-pub(crate) struct NormalMapTexture(pub CachedTexture);
+pub struct NormalMapTexture(pub CachedTexture);
 
 /// Render graph label for creating the lightmap.
 ///
@@ -136,12 +139,15 @@ pub(crate) struct NormalMapTexture(pub CachedTexture);
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct CreateLightmapLabel;
 
-/// Render graph label for when the lightmap is applied over the camera view.
+/// Render graph label for when the lightmap is applied over the view texture and fed to the camera.
 ///
 /// Useful if you want to add your own render passes before / after it.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct ApplyLightmapLabel;
 
+/// Render graph label for when the normal maps and sprite stencils are created.
+///
+/// Useful if you want to add your own render passes before / after it.
 #[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct SpriteLabel;
 

@@ -1,3 +1,5 @@
+//! Module containg `Render Graph Nodes` used by Firefly.  
+
 use bevy::{
     ecs::{query::QueryItem, system::lifetimeless::Read},
     prelude::*,
@@ -17,11 +19,13 @@ use crate::{
     pipelines::LightmapApplicationPipeline, prepare::BufferedFireflyConfig,
 };
 
+/// Node used to create the lightmap.
 #[derive(Default)]
-pub(crate) struct CreateLightmapNode;
+pub struct CreateLightmapNode;
 
+/// Node used to apply the lightmap over the fullscreen view.
 #[derive(Default)]
-pub(crate) struct ApplyLightmapNode;
+pub struct ApplyLightmapNode;
 
 impl ViewNode for CreateLightmapNode {
     type ViewQuery = (&'static ExtractedView, Read<LightMapTexture>);

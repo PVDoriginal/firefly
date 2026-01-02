@@ -38,14 +38,13 @@ fn setup(mut commands: Commands) {
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 1.0,
-            range: 2500.,
+            range: 250.,
             ..default()
         },
         Transform::default(),
     ));
 
     // occluders
-
     commands.spawn((
         Occluder2d::rectangle(22.0, 14.0),
         Transform::from_translation(vec3(-322., 164., 0.)),

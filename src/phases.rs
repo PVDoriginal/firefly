@@ -1,3 +1,5 @@
+//! Module containing custom render phases.
+
 use std::ops::Range;
 
 use bevy::math::FloatOrd;
@@ -9,14 +11,16 @@ use bevy::render::render_phase::{
 use bevy::render::render_resource::CachedRenderPipelineId;
 use bevy::render::sync_world::MainEntity;
 
-pub(crate) struct LightmapPhase {
+/// Binned Render Phase that uses lights to render the lightmap texture.
+pub struct LightmapPhase {
     batch_set_key: LightBatchSetKey,
     pub entity: (Entity, MainEntity),
     pub batch_range: Range<u32>,
     pub extra_index: PhaseItemExtraIndex,
 }
 
-pub(crate) struct SpritePhase {
+/// Sorted Render Phase that uses sprites to render the stencil and normal textures.
+pub struct SpritePhase {
     pub sort_key: FloatOrd,
     pub entity: (Entity, MainEntity),
     pub pipeline: CachedRenderPipelineId,
@@ -68,7 +72,7 @@ impl PhaseItem for LightmapPhase {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct LightBatchSetKey {
+pub struct LightBatchSetKey {
     pub pipeline: CachedRenderPipelineId,
     pub draw_function: DrawFunctionId,
 }

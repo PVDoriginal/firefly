@@ -1,3 +1,5 @@
+//! Module containing structs and functions relevant to Occluders.
+
 use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,

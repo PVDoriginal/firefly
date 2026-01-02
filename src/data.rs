@@ -112,8 +112,9 @@ impl Default for FireflyConfig {
     }
 }
 
+/// GPU-alligned data from [`FireflyConfig`].
 #[derive(ShaderType, Clone)]
-pub(crate) struct UniformFireflyConfig {
+pub struct UniformFireflyConfig {
     pub ambient_color: Vec3,
     pub ambient_brightness: f32,
     pub light_bands: u32,

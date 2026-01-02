@@ -1,3 +1,9 @@
+//! Module containing structs and functions relevant to sprites and normal maps.
+//!
+//! Firefly uses it's own sprite pipeline inspired by Bevy's. This is needed in order to
+//! generate the `Stencil Texture`, a texture containing encoded data of various sprites in the camera view,
+//! and the `Normal Map`, the full texture of all normal maps in the view.
+
 use std::ops::Range;
 
 use crate::phases::SpritePhase;
@@ -200,7 +206,9 @@ impl NormalMap {
     }
 }
 
-pub(crate) struct SpritesPlugin;
+/// Plugin that processed and queues sprites into render phases. Added
+/// automatically by [`FireflyPlugin`](crate::prelude::FireflyPlugin).
+pub struct SpritesPlugin;
 impl Plugin for SpritesPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(

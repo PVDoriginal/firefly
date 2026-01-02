@@ -5,18 +5,16 @@ struct PointLight {
     intensity: f32,
     range: f32,
 
-    @size(16)
-    color: vec3f, 
+    color: vec4f, 
 
     inner_range: f32,
     // 0 - inverse square, 1 - linear
     falloff: u32,
+    falloff_intensity: f32,
     angle: f32,
     dir: vec2f, 
     z: f32,
     height: f32,
-    n_rounds: u32,
-    n_poly: u32,
 }
 
 struct PolyOccluder {

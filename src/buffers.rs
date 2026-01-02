@@ -1,4 +1,10 @@
 //! This module contains structs and functions that create and manage render-world entities and GPU buffers.
+//!
+//! Lights and Occluders are stored in global buffers through their own [`BufferManager`]s.
+//!
+//! Round and Polygonal Occluders are stores in separate buffers due to having significantly different structures.   
+//!
+//! Vertices for Polygonal Occluders are stored in a global [`VertexBuffer`].
 
 use core::f32;
 use std::{collections::VecDeque, f32::consts::PI};
@@ -172,20 +178,17 @@ fn prepare_lights(
             pos: light.pos,
             intensity: light.intensity,
             range: light.range,
-            color: light.color.to_linear().to_vec3(),
+            color: light.color.to_linear().to_vec4(),
             z: light.z,
             inner_range: light.inner_range.min(light.range),
             falloff: match light.falloff {
                 Falloff::InverseSquare => 0,
                 Falloff::Linear => 1,
             },
+            falloff_intensity: light.falloff_intensity,
             angle: light.angle / 180. * PI,
             dir: light.dir,
             height: light.height,
-            n_rounds: 0,
-            n_poly: 0,
-            // _pad0: 0,
-            // _pad1: [0, 0, 0],
         };
 
         let new_index = light_manager.set_value(&light, index.0, changed);
@@ -275,7 +278,7 @@ fn prepare_occluders(
 }
 
 /// This resource is a wrapper around [`RawBufferVec`] that reserves and distributes VRAM slots to
-/// a set of entities that are intended to be transferred to the GPU.  
+/// a set of entities that are intended to be transferred to the GPU. It is currently used for Occluders and Lights.
 #[derive(Resource)]
 pub struct BufferManager<T: ShaderType + WriteInto + Default + NoUninit> {
     buffer: RawBufferVec<T>,
@@ -323,6 +326,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         res
     }
 
+    /// Get the binding of this buffer. It is guaranteed to exist.
     pub fn binding(&self) -> BindingResource<'_> {
         self.buffer.binding().unwrap()
     }
@@ -357,7 +361,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
             }
         };
 
-        if index + 1 >= self.buffer.len() {
+        if index >= self.buffer.len() {
             self.buffer.push(*value);
         } else {
             self.buffer.set(index as u32, *value);
@@ -434,6 +438,8 @@ pub const N_BINS: usize = 128;
 pub const N_OCCLUDERS: usize = 32;
 
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
+/// This is the most important acceleration structure used by Firefly. It is used in a custom
+/// type of angular sweep with BVH-inspired elements.
 #[derive(Component)]
 pub struct BinBuffer {
     buffer: RawBufferVec<[Bin; N_BINS]>,
@@ -451,7 +457,7 @@ impl Default for BinBuffer {
     }
 }
 
-/// A bin containing occluders
+/// A bin containing occluders.
 #[repr(C)]
 #[derive(Zeroable, Pod, Clone, Copy, ShaderType)]
 pub struct Bin {
@@ -472,10 +478,13 @@ impl BinBuffer {
     const PI2: f32 = PI * 2.0;
     const N_BINS: f32 = N_BINS as f32;
 
+    /// Get the binding of this buffer. It is guaranteed to exist.
     pub fn binding(&self) -> BindingResource<'_> {
         self.buffer.binding().unwrap()
     }
 
+    /// Write this buffer's data to the GPU. This function also sorts the
+    /// occluders by distance enabling early-stopping in GPU checks.
     pub fn write(&mut self, device: &RenderDevice, queue: &RenderQueue) {
         let values = self.buffer.values_mut();
         for bin in 0..N_BINS {
@@ -497,13 +506,13 @@ impl BinBuffer {
         self.buffer.push([default(); N_BINS]);
     }
 
-    /// Clear the buffer and add one empty set of bins
+    /// Clear the buffer and add one empty set of bins.
     pub fn reset(&mut self) {
         self.buffer.clear();
         self.push_empty();
     }
 
-    /// Add an occluder to this buffer
+    /// Add an occluder to this buffer.
     pub fn add_occluder(&mut self, occluder: OccluderPointer, min_angle: f32, max_angle: f32) {
         let min_bin = (((min_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
         let max_bin = (((max_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
@@ -550,13 +559,28 @@ impl BinBuffer {
     }
 }
 
-/// Compact struct pointing to an occluder.
+/// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, ShaderType)]
 pub struct OccluderPointer {
+    /// The index's first bit is the type of occluder: 0 for round, 1 for polygonal.
+    ///
+    /// In the case of polygonal occluders, there is additional data positioned on the consecutive bits:
+    ///
+    /// - A `term` variable that takes 2 bits, describing the terminator format of this chain. This is 1
+    /// if the chain ends looping over the atan2 seam, 2 if it starts like that, and 0 otherwise.
+    ///
+    /// - A `rev` variable that takes 1 bit and specifies if the chain is made of vertices in the same order as they're
+    /// stored in (clockwise) or not. This is used for when a light is inside the perimeter of an occluder and the
+    /// edges need to be reversed.
     pub index: u32,
+    /// Only used for polygonal occluders, the index of the first vertex of the chain in the global vertex buffer.
     pub min_v: u32,
+    /// Only used for polygonal occluders, the length of the vertex chain.
     pub length: u32,
+    /// The minimum distance from the occluder to the light source. This is used to accelerate GPU computations,
+    /// because a point can't be blocked by this occluder if it's distance is greater than the point's own
+    /// distance to the light soruce.
     pub distance: f32,
 }
 
@@ -571,10 +595,13 @@ impl Default for OccluderPointer {
     }
 }
 
-// index:
-// Round Occluders - (00|index(30))
-// Poly Occluders -  (1|term(2)|rev(1)|index(28))
-
+/// A global buffer in which all visible vertices are stored.
+///
+/// This is different from the [`BufferManager`] in order to use a specific allocation
+/// that suits vertices better. They are quickly added on top of each other without keeping track
+/// of their position for re-allocation. When an occluder disappears, it's number of vertices is simply
+/// subtracted from the total lenght of the buffer, and the buffer refragments itself when
+/// there is a significant amount of wasted space.  
 #[derive(Resource)]
 pub struct VertexBuffer {
     vertices: RawBufferVec<Vec2>,
@@ -611,10 +638,13 @@ impl VertexBuffer {
         res
     }
 
+    /// Get the binding of this buffer. It is guaranteed to exist.
     pub fn binding(&self) -> BindingResource<'_> {
         self.vertices.binding().unwrap()
     }
 
+    /// Insert all of an occluder's vertices to this buffer. This
+    /// function also automatically writes them to the GPU.  
     pub fn write_vertices(
         &mut self,
         occluder: &ExtractedOccluder,
@@ -699,6 +729,7 @@ impl VertexBuffer {
         }
     }
 
+    /// Called at the end of a frame. Potentially triggers refragmentation.
     pub fn pass(&mut self, device: &RenderDevice, queue: &RenderQueue) {
         if self.empty_slots > 500 && self.empty_slots > self.vertices.capacity() as u32 / 2 {
             let old_generation = self.current_generation;
@@ -707,6 +738,7 @@ impl VertexBuffer {
         }
     }
 
+    /// Called by an occluder to subtract it's total number of vertices from the allocated space.
     pub fn free_indices(&mut self, n_indices: u32, generation: u32) {
         if generation != self.current_generation {
             return;
@@ -716,6 +748,10 @@ impl VertexBuffer {
     }
 }
 
+/// An index given and returned to the various buffer structures.
+///
+/// This is used for storing an entity's slot in the buffer, and
+/// contains a generation to keep track of buffer refragmentations.
 #[derive(Clone, Copy)]
 pub struct BufferIndex {
     pub index: usize,

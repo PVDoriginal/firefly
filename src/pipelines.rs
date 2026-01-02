@@ -1,3 +1,5 @@
+//! Module containing the custom `Render Pipelines` used by Firefly.
+
 use std::borrow::Cow;
 
 use bevy::{
@@ -32,15 +34,17 @@ use crate::{
     occluders::{UniformOccluder, UniformRoundOccluder},
 };
 
+/// Pipeline that creates the lightmap from the relevant bindings.
 #[derive(Resource)]
-pub(crate) struct LightmapCreationPipeline {
+pub struct LightmapCreationPipeline {
     pub layout: BindGroupLayout,
     pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
 }
 
+/// Pipeline that applies the lightmap over the fullscreen view.
 #[derive(Resource)]
-pub(crate) struct LightmapApplicationPipeline {
+pub struct LightmapApplicationPipeline {
     pub layout: BindGroupLayout,
     pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
@@ -180,9 +184,10 @@ impl FromWorld for LightmapApplicationPipeline {
     }
 }
 
+/// Pipeline that produces the stencil and normal textures from the sprite bindings.
 #[derive(Resource)]
 #[allow(dead_code)]
-pub(crate) struct SpritePipeline {
+pub struct SpritePipeline {
     pub view_layout: BindGroupLayout,
     pub material_layout: BindGroupLayout,
     pub dummy_white_gpu_image: GpuImage,

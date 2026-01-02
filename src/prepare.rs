@@ -1,3 +1,5 @@
+//! Module that prepares BindGroups for GPU use.
+
 use std::f32::consts::PI;
 
 use crate::{
@@ -44,10 +46,16 @@ use crate::{
     occluders::{ExtractedOccluder, Occluder2dShape, UniformOccluder, UniformRoundOccluder},
 };
 
+/// Camera buffer component containing the data extracted from [`FireflyConfig`].
 #[derive(Component)]
-pub(crate) struct BufferedFireflyConfig(pub UniformBuffer<UniformFireflyConfig>);
+pub struct BufferedFireflyConfig(pub UniformBuffer<UniformFireflyConfig>);
 
-pub(crate) struct PreparePlugin;
+/// Plugin responsible for processing extracted entities and
+/// sending relevant BindGroups to the GPU. Automatically added by
+/// [`FireflyPlugin`](crate::prelude::FireflyPlugin).  
+///
+/// This is where all the heavy CPU precomputations are done.
+pub struct PreparePlugin;
 
 impl Plugin for PreparePlugin {
     fn build(&self, app: &mut App) {

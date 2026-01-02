@@ -1,3 +1,5 @@
+//! This module extracts data from the Main World to the Render World.
+
 use bevy::{
     platform::collections::HashSet,
     prelude::*,
@@ -28,7 +30,9 @@ use crate::{
     visibility::{NotVisible, OccluderAabb, VisibilityTimer},
 };
 
-pub(crate) struct ExtractPlugin;
+/// Plugin that handles extracting data from the Main World to the Render World. Automatically
+/// added by [`FireflyPlugin`](crate::prelude::FireflyPlugin).
+pub struct ExtractPlugin;
 impl Plugin for ExtractPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ExtractComponentPlugin::<FireflyConfig>::default());
@@ -83,7 +87,7 @@ fn extract_camera_phases(
     lightmap_phases.retain(|camera_entity, _| live_entities.contains(camera_entity));
 }
 
-pub fn extract_sprite_events(
+fn extract_sprite_events(
     mut events: ResMut<SpriteAssetEvents>,
     mut image_events: Extract<MessageReader<AssetEvent<Image>>>,
 ) {
@@ -95,7 +99,7 @@ pub fn extract_sprite_events(
     }
 }
 
-pub fn extract_sprites(
+fn extract_sprites(
     mut extracted_sprites: ResMut<ExtractedSprites>,
     mut extracted_slices: ResMut<ExtractedSlices>,
     texture_atlases: Extract<Res<Assets<TextureAtlasLayout>>>,
@@ -233,6 +237,7 @@ fn extract_lights(
             z: transform.translation().z + light.offset.z,
             inner_range: light.inner_range,
             falloff: light.falloff,
+            falloff_intensity: light.falloff_intensity,
             angle: light.angle,
             cast_shadows: light.cast_shadows,
             dir: (transform.rotation() * Vec3::Y).xy(),
