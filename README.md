@@ -84,7 +84,6 @@ Some of the existing features are:
   - Soft shadows
   - Occlusion z-sorting
   - Normal maps
-  - Occlusion sprite masking
   - Transparent & colored occluders
   - Light banding
 
