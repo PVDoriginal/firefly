@@ -1,3 +1,16 @@
+# 0.17.1 
+Update mainly focused on performance improvements. 
+
+## Major 
+  - Moved most GPU data to global buffers that assign and reallocate resources to each entity, based on visibility and change detection. Previously the buffers were rewritten each frame, bottlenecking performance.
+  - Implemented a custom hybrid of angular sweep and 2D BVH that allocates occluders to bins based on their polar intervals relative to the light sources. This has added a huge boost to performance.
+
+## Minor 
+  - Firefly no longer supports WebGL2. I've decided to use Storage Buffers which are only available on WebGPU which are considerably more flexible. This should hopefully not affect anyone.
+  - Sprite exclusions were removed from occluders and are no longer a feature. They were unreliable and added considerable overhead. If you consider they were useful, consider creating an issue telling me to re-add them.
+  - Frustrum culling has been greatly improved.
+  - Lights now have an optional 'falloff intensity' that can be used to adjust them further.    
+
 # 0.17.0 
 ## Major
   - Updated Bevy version to 0.17.
@@ -10,5 +23,3 @@
   - Small bugfixes and optimizations.
   - Offset field for lights and occluders. 
 
-## Migration Guide 
-Public API remains the same. 
