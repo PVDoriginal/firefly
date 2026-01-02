@@ -25,15 +25,15 @@ Here's the same game but with light banding and hard shadows:
 
 https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
 
+> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
+
 Here's a video of the [crates example](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs), showcasing normal maps and z-sorting:
 
 https://github.com/user-attachments/assets/fd9453ba-e42a-4155-b96b-889bfdceea48
 
-> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
+And here is a video of the [stress example](https://github.com/PVDoriginal/firefly/blob/main/examples/stress.rs).
 
-And here is a video of the [shapes example](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs).
-
-https://github.com/user-attachments/assets/387799ba-7834-4fb6-9dbb-52f038c1ab0b
+https://github.com/user-attachments/assets/c9b8c716-a0c4-4604-8fbb-50d6bbbe8aad
 
 ## Usage 
 To use this crate, simply run `cargo add bevy_firefly` or add firefly to your Cargo.toml file. 
