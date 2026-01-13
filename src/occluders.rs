@@ -21,7 +21,7 @@ use crate::{buffers::BufferIndex, change::Changes};
 /// Can be moved around or rotated by their transform.
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
-#[derive(Component, Clone, Reflect)]
+#[derive(Component, Clone, Reflect, Default)]
 #[require(
     SyncToRenderWorld,
     Transform,
