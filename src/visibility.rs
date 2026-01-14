@@ -6,9 +6,7 @@
 use std::any::TypeId;
 
 use bevy::{
-    camera::visibility::{
-        PreviousVisibleEntities, VisibilitySystems, VisibleEntities, check_visibility,
-    },
+    camera::visibility::{SetViewVisibility, VisibilitySystems, VisibleEntities, check_visibility},
     math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
     prelude::*,
 };
@@ -78,7 +76,6 @@ fn mark_visible_lights(
         &mut VisibilityTimer,
     )>,
     mut camera: Single<(&GlobalTransform, &mut VisibleEntities, &Projection), With<FireflyConfig>>,
-    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     mut light_rect: ResMut<LightRect>,
     time: Res<Time>,
 ) {
@@ -107,13 +104,11 @@ fn mark_visible_lights(
         };
 
         if light_aabb.intersects(&camera_aabb) {
-            if !**visibility {
-                visibility.set();
+            if !visibility.get() {
+                visibility.set_visible();
 
                 let visible_lights = camera.1.get_mut(TypeId::of::<PointLight2d>());
                 visible_lights.push(entity);
-
-                previous_visible_entities.remove(&entity);
 
                 *visibility_timer = default();
             }
@@ -138,7 +133,6 @@ fn mark_visible_occluders(
         &mut ViewVisibility,
         &mut VisibilityTimer,
     )>,
-    mut previous_visible_entities: ResMut<PreviousVisibleEntities>,
     light_rect: Res<LightRect>,
     time: Res<Time>,
 ) {
@@ -149,13 +143,11 @@ fn mark_visible_occluders(
 
     for (entity, aabb, mut visibility, mut visibility_timer) in &mut occluders {
         if aabb.0.intersects(&light_rect_aabb) {
-            if !**visibility {
-                visibility.set();
+            if !visibility.get() {
+                visibility.set_visible();
 
                 let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());
                 visible_occluders.push(entity);
-
-                previous_visible_entities.remove(&entity);
 
                 *visibility_timer = default();
             }

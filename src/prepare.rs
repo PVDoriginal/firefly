@@ -29,8 +29,8 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroup, BindGroupEntries, TextureDescriptor, TextureDimension, TextureFormat,
-            TextureUsages, UniformBuffer,
+            BindGroup, BindGroupEntries, PipelineCache, TextureDescriptor, TextureDimension,
+            TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
@@ -205,6 +205,7 @@ pub(crate) fn prepare_data(
     poly_occluders: Res<BufferManager<UniformOccluder>>,
     light_buffer: Res<BufferManager<UniformPointLight>>,
     vertices: Res<VertexBuffer>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     let Projection::Orthographic(projection) = camera.1 else {
         return;
@@ -341,7 +342,7 @@ pub(crate) fn prepare_data(
                         *entity,
                         render_device.create_bind_group(
                             "light bind group",
-                            &lightmap_pipeline.layout,
+                            &pipeline_cache.get_bind_group_layout(&lightmap_pipeline.layout),
                             &BindGroupEntries::sequential((
                                 view_uniforms.uniforms.binding().unwrap(),
                                 &lightmap_pipeline.sampler,
@@ -514,6 +515,7 @@ fn prepare_sprite_view_bind_groups(
     tonemapping_luts: Res<TonemappingLuts>,
     images: Res<RenderAssets<GpuImage>>,
     fallback_image: Res<FallbackImage>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     let Some(view_binding) = view_uniforms.uniforms.binding() else {
         return;
@@ -524,7 +526,7 @@ fn prepare_sprite_view_bind_groups(
             get_lut_bindings(&images, &tonemapping_luts, tonemapping, &fallback_image);
         let view_bind_group = render_device.create_bind_group(
             "mesh2d_view_bind_group",
-            &sprite_pipeline.view_layout,
+            &pipeline_cache.get_bind_group_layout(&sprite_pipeline.view_layout),
             &BindGroupEntries::with_indices((
                 (0, view_binding.clone()),
                 (1, lut_bindings.0),
@@ -550,6 +552,7 @@ fn prepare_sprite_image_bind_groups(
     mut phases: ResMut<ViewSortedRenderPhases<SpritePhase>>,
     events: Res<SpriteAssetEvents>,
     mut batches: ResMut<SpriteBatches>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     let mut is_dummy = UniformBuffer::<u32>::from(0);
     is_dummy.write_buffer(&render_device, &render_queue);
@@ -632,7 +635,7 @@ fn prepare_sprite_image_bind_groups(
                     .or_insert_with(|| {
                         render_device.create_bind_group(
                             "sprite_material_bind_group",
-                            &sprite_pipeline.material_layout,
+                            &pipeline_cache.get_bind_group_layout(&sprite_pipeline.material_layout),
                             &BindGroupEntries::sequential((
                                 &gpu_image.texture_view,
                                 &normal_image.texture_view,

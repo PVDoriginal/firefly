@@ -20,7 +20,7 @@ use crate::{
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
     occluders::{Occluder2dShape, OccluderPlugin, translate_vertices},
-    pipelines::{LightmapApplicationPipeline, LightmapCreationPipeline},
+    pipelines::PipelinePlugin,
     sprites::SpritesPlugin,
     visibility::VisibilityPlugin,
     *,
@@ -66,6 +66,7 @@ impl Plugin for FireflyPlugin {
         );
 
         app.add_plugins((
+            PipelinePlugin,
             PreparePlugin,
             ExtractPlugin,
             BuffersPlugin,
@@ -98,14 +99,6 @@ impl Plugin for FireflyPlugin {
                 Node2d::EndMainPassPostProcessing,
             ),
         );
-    }
-    fn finish(&self, app: &mut App) {
-        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-
-        render_app.init_resource::<LightmapCreationPipeline>();
-        render_app.init_resource::<LightmapApplicationPipeline>();
     }
 }
 

@@ -100,7 +100,7 @@ impl ViewNode for ApplyLightmapNode {
 
         let bind_group = render_context.render_device().create_bind_group(
             "apply lightmap bind group",
-            &pipeline.layout,
+            &pipeline_cache.get_bind_group_layout(&pipeline.layout),
             &BindGroupEntries::sequential((
                 post_process.source,
                 &light_map_texture.0.default_view,

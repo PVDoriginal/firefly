@@ -1,7 +1,7 @@
 use bevy::{
     color::palettes::{
         self,
-        css::{BLUE, GREEN, PURPLE, RED},
+        css::{BLUE, GREEN, LIME, MAROON, PURPLE, RED, TEAL, YELLOW},
     },
     diagnostic::{
         DiagnosticPath, EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin,
@@ -18,10 +18,10 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 1.5;
-const OCCLUDER_FREQ: f32 = 0.05;
-const HEIGHT: f32 = 25000.0;
-const WIDTH: f32 = 50000.0;
+const LIGHT_FREQ: f32 = 0.3;
+const OCCLUDER_FREQ: f32 = 0.04;
+const HEIGHT: f32 = 20000.0;
+const WIDTH: f32 = 40000.0;
 
 const MOVE_FREQ: f32 = 1.0;
 
@@ -135,19 +135,18 @@ fn move_camera(
     }
 }
 
-const COLORS: [Color; 3] = [Color::Srgba(RED), Color::Srgba(BLUE), Color::Srgba(GREEN)];
+const COLORS: [Srgba; 8] = [BLUE, GREEN, LIME, MAROON, PURPLE, RED, TEAL, YELLOW];
 
 fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Time>) {
     if timers.light_timer.tick(time.delta()).just_finished() {
         let mut rng = rng();
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
-
-        let r = rng.random_range(1000.0..10000.0);
+        let r = rng.random_range(400.0..15000.0);
 
         commands.spawn((
             PointLight2d {
-                color: *COLORS.choose(&mut rng).unwrap(),
+                color: *COLORS.map(|c| Color::Srgba(c)).choose(&mut rng).unwrap(),
                 intensity: 1.,
                 range: r,
                 // cast_shadows: false,
@@ -190,44 +189,53 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let occluder_type = rng.random_range(0..4);
-        let occluder = match occluder_type {
-            0 => Occluder2d::round_rectangle(
-                rng.random_range(10.0..40.0),
-                rng.random_range(10.0..40.0),
-                rng.random_range(10.0..40.0),
-            ),
-            1 => {
-                Occluder2d::polygon(vec![vec2(-20., -10.), vec2(0., 20.), vec2(20., -10.)]).unwrap()
-            }
-            2 => Occluder2d::polyline(vec![
-                vec2(-30., -3.),
-                vec2(-20., 2.),
-                vec2(-12., -7.),
-                vec2(-3., 5.),
-                vec2(0., 0.),
-                vec2(8., -4.),
-                vec2(15., 6.),
-                vec2(25., -7.),
-                vec2(30., 5.),
-            ])
-            .unwrap(),
-            _ => Occluder2d::polygon(vec![
-                vec2(-15., -30.),
-                vec2(15., -30.),
-                vec2(30., 0.),
-                vec2(15., 30.),
-                vec2(0., 30.),
-                vec2(-15., 30.),
-                vec2(-30., 0.),
-            ])
-            .unwrap(),
-        };
+        let occluder_type = rng.random_range(0..5);
+        let occluder =
+            match occluder_type {
+                0 => Occluder2d::round_rectangle(
+                    rng.random_range(10.0..40.0),
+                    rng.random_range(10.0..40.0),
+                    rng.random_range(10.0..40.0),
+                ),
+                1 => Occluder2d::polygon(vec![vec2(-20., -10.), vec2(0., 20.), vec2(20., -10.)])
+                    .unwrap(),
+                2 => Occluder2d::polyline(vec![
+                    vec2(-30., -3.),
+                    vec2(-20., 2.),
+                    vec2(-12., -7.),
+                    vec2(-3., 5.),
+                    vec2(0., 0.),
+                    vec2(8., -4.),
+                    vec2(15., 6.),
+                    vec2(25., -7.),
+                    vec2(30., 5.),
+                ])
+                .unwrap(),
+                3 => Occluder2d::polygon(vec![
+                    vec2(-15., -30.),
+                    vec2(15., -30.),
+                    vec2(30., 0.),
+                    vec2(15., 30.),
+                    vec2(0., 30.),
+                    vec2(-15., 30.),
+                    vec2(-30., 0.),
+                ])
+                .unwrap(),
+                _ => Occluder2d::polygon(vec![vec2(-20., -20.), vec2(0., 20.), vec2(20., 20.)])
+                    .unwrap(),
+            };
+
+        let scale = vec3(
+            rng.random_range(1.0..100.0),
+            rng.random_range(1.0..100.0),
+            1.0,
+        );
 
         commands.spawn((
             occluder,
             Transform::from_translation(vec3(x, -HEIGHT / 2.0 - rng.random_range(30.0..60.0), 0.))
-                .with_rotation(Quat::from_rotation_z(rng.random_range(-4.0..4.0))),
+                .with_rotation(Quat::from_rotation_z(rng.random_range(-4.0..4.0)))
+                .with_scale(scale),
         ));
     }
 }

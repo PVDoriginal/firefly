@@ -154,7 +154,7 @@ pub(crate) fn compute_slices_on_sprite_change(
 
 /// Scales a texture to fit within a given quad size with keeping the aspect ratio.
 pub(crate) fn apply_scaling(
-    scaling_mode: ScalingMode,
+    scaling_mode: SpriteScalingMode,
     texture_size: Vec2,
     quad_size: &mut Vec2,
     quad_translation: &mut Vec2,
@@ -166,7 +166,7 @@ pub(crate) fn apply_scaling(
     let quad_tex_scale = quad_ratio / texture_ratio;
 
     match scaling_mode {
-        ScalingMode::FillCenter => {
+        SpriteScalingMode::FillCenter => {
             if quad_ratio > texture_ratio {
                 // offset texture to center by y coordinate
                 uv_offset_scale.y += (uv_offset_scale.w - uv_offset_scale.w * tex_quad_scale) * 0.5;
@@ -178,7 +178,7 @@ pub(crate) fn apply_scaling(
                 uv_offset_scale.z *= quad_tex_scale;
             };
         }
-        ScalingMode::FillStart => {
+        SpriteScalingMode::FillStart => {
             if quad_ratio > texture_ratio {
                 uv_offset_scale.y += uv_offset_scale.w - uv_offset_scale.w * tex_quad_scale;
                 uv_offset_scale.w *= tex_quad_scale;
@@ -186,7 +186,7 @@ pub(crate) fn apply_scaling(
                 uv_offset_scale.z *= quad_tex_scale;
             }
         }
-        ScalingMode::FillEnd => {
+        SpriteScalingMode::FillEnd => {
             if quad_ratio > texture_ratio {
                 uv_offset_scale.w *= tex_quad_scale;
             } else {
@@ -194,7 +194,7 @@ pub(crate) fn apply_scaling(
                 uv_offset_scale.z *= quad_tex_scale;
             }
         }
-        ScalingMode::FitCenter => {
+        SpriteScalingMode::FitCenter => {
             if texture_ratio > quad_ratio {
                 // Scale based on width
                 quad_size.y *= quad_tex_scale;
@@ -203,7 +203,7 @@ pub(crate) fn apply_scaling(
                 quad_size.x *= tex_quad_scale;
             }
         }
-        ScalingMode::FitStart => {
+        SpriteScalingMode::FitStart => {
             if texture_ratio > quad_ratio {
                 // The quad is scaled to match the image ratio, and the quad translation is adjusted
                 // to start of the quad within the original quad size.
@@ -220,7 +220,7 @@ pub(crate) fn apply_scaling(
                 *quad_size = new_quad;
             }
         }
-        ScalingMode::FitEnd => {
+        SpriteScalingMode::FitEnd => {
             if texture_ratio > quad_ratio {
                 let scale = Vec2::new(1.0, quad_tex_scale);
                 let new_quad = *quad_size * scale;

@@ -4,22 +4,20 @@ use std::borrow::Cow;
 
 use bevy::{
     core_pipeline::{FullscreenShader, tonemapping::get_lut_bind_group_layout_entries},
-    ecs::system::SystemState,
-    image::{ImageSampler, TextureFormatPixelInfo},
     mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
     prelude::*,
     render::{
+        RenderApp, RenderStartup,
         render_resource::{
-            BindGroupLayout, BindGroupLayoutEntries, BlendComponent, BlendFactor, BlendOperation,
-            BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            FrontFace, PipelineCache, PolygonMode, PrimitiveState, RenderPipelineDescriptor,
-            Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            SpecializedRenderPipeline, TexelCopyBufferLayout, TextureFormat, TextureSampleType,
-            TextureViewDescriptor, VertexAttribute, VertexState, VertexStepMode,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendComponent, BlendFactor,
+            BlendOperation, BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites,
+            FragmentState, FrontFace, PipelineCache, PolygonMode, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            SpecializedRenderPipeline, TextureFormat, TextureSampleType, VertexAttribute,
+            VertexState, VertexStepMode,
             binding_types::{sampler, storage_buffer_read_only, texture_2d, uniform_buffer},
         },
-        renderer::{RenderDevice, RenderQueue},
-        texture::{DefaultImageSampler, GpuImage},
+        renderer::RenderDevice,
         view::ViewUniform,
     },
     shader::ShaderDefVal,
@@ -34,10 +32,30 @@ use crate::{
     occluders::{UniformOccluder, UniformRoundOccluder},
 };
 
+/// Plugin that initializes various Pipelines. Added automatically by [`FireflyPlugin`](crate::prelude::FireflyPlugin).
+pub struct PipelinePlugin;
+
+impl Plugin for PipelinePlugin {
+    fn build(&self, app: &mut App) {
+        let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app.add_systems(
+            RenderStartup,
+            (
+                init_lightmap_creation_pipeline,
+                init_lightmap_application_pipeline,
+                init_sprite_pipeline,
+            ),
+        );
+    }
+}
+
 /// Pipeline that creates the lightmap from the relevant bindings.
 #[derive(Resource)]
 pub struct LightmapCreationPipeline {
-    pub layout: BindGroupLayout,
+    pub layout: BindGroupLayoutDescriptor,
     pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
 }
@@ -45,236 +63,188 @@ pub struct LightmapCreationPipeline {
 /// Pipeline that applies the lightmap over the fullscreen view.
 #[derive(Resource)]
 pub struct LightmapApplicationPipeline {
-    pub layout: BindGroupLayout,
+    pub layout: BindGroupLayoutDescriptor,
     pub sampler: Sampler,
     pub pipeline_id: CachedRenderPipelineId,
 }
 
-impl FromWorld for LightmapCreationPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let layout = render_device.create_bind_group_layout(
-            "create lightmap layout",
-            &BindGroupLayoutEntries::with_indices(
-                ShaderStages::FRAGMENT,
+fn init_lightmap_creation_pipeline(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    fullscreen_shader: Res<FullscreenShader>,
+    pipeline_cache: Res<PipelineCache>,
+) {
+    let layout = BindGroupLayoutDescriptor::new(
+        "create lightmap layout",
+        &BindGroupLayoutEntries::with_indices(
+            ShaderStages::FRAGMENT,
+            (
+                // view uniform
+                (0, uniform_buffer::<ViewUniform>(true)),
+                // sampler
+                (1, sampler(SamplerBindingType::Filtering)),
+                // point lights
+                (2, storage_buffer_read_only::<UniformPointLight>(false)),
+                (3, storage_buffer_read_only::<u32>(false)),
+                // round occluders
+                (4, storage_buffer_read_only::<UniformRoundOccluder>(false)),
+                // poly occluders
+                (5, storage_buffer_read_only::<UniformOccluder>(false)),
+                // vertices
+                (6, storage_buffer_read_only::<Vec2>(false)),
+                // bins
+                (7, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
+                // sprite stencil
                 (
-                    // view uniform
-                    (0, uniform_buffer::<ViewUniform>(true)),
-                    // sampler
-                    (1, sampler(SamplerBindingType::Filtering)),
-                    // point lights
-                    (2, storage_buffer_read_only::<UniformPointLight>(false)),
-                    (3, storage_buffer_read_only::<u32>(false)),
-                    // round occluders
-                    (4, storage_buffer_read_only::<UniformRoundOccluder>(false)),
-                    // poly occluders
-                    (5, storage_buffer_read_only::<UniformOccluder>(false)),
-                    // vertices
-                    (6, storage_buffer_read_only::<Vec2>(false)),
-                    // bins
-                    (7, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
-                    // sprite stencil
-                    (
-                        8,
-                        texture_2d(TextureSampleType::Float { filterable: false }),
-                    ),
-                    // sprite normal map
-                    (9, texture_2d(TextureSampleType::Float { filterable: true })),
-                    // config,
-                    (10, uniform_buffer::<UniformFireflyConfig>(false)),
-                    // bins,
+                    8,
+                    texture_2d(TextureSampleType::Float { filterable: false }),
                 ),
+                // sprite normal map
+                (9, texture_2d(TextureSampleType::Float { filterable: true })),
+                // config,
+                (10, uniform_buffer::<UniformFireflyConfig>(false)),
+                // bins,
             ),
-        );
+        ),
+    );
 
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-        let fullscreen_shader = world.resource::<FullscreenShader>();
-        let vertex_state = fullscreen_shader.to_vertex_state();
+    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let vertex_state = fullscreen_shader.to_vertex_state();
 
-        let pipeline_id =
-            world
-                .resource_mut::<PipelineCache>()
-                .queue_render_pipeline(RenderPipelineDescriptor {
-                    label: Some(Cow::Borrowed("lightmap creation pipeline")),
-                    layout: vec![layout.clone()],
-                    vertex: vertex_state,
-                    fragment: Some(FragmentState {
-                        shader: CREATE_LIGHTMAP_SHADER,
-                        targets: vec![Some(ColorTargetState {
-                            format: TextureFormat::Rgba16Float,
-                            blend: Some(BlendState {
-                                color: BlendComponent {
-                                    src_factor: BlendFactor::Src,
-                                    dst_factor: BlendFactor::Dst,
-                                    operation: BlendOperation::Max,
-                                },
-                                alpha: BlendComponent::REPLACE,
-                            }),
-                            write_mask: ColorWrites::ALL,
-                        })],
-                        shader_defs: default(),
-                        entry_point: Some(Cow::Borrowed("fragment")),
-                    }),
-                    push_constant_ranges: default(),
-                    primitive: default(),
-                    depth_stencil: default(),
-                    multisample: default(),
-                    zero_initialize_workgroup_memory: default(),
-                });
+    let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
+        label: Some(Cow::Borrowed("lightmap creation pipeline")),
+        layout: vec![layout.clone()],
+        vertex: vertex_state,
+        fragment: Some(FragmentState {
+            shader: CREATE_LIGHTMAP_SHADER,
+            targets: vec![Some(ColorTargetState {
+                format: TextureFormat::Rgba16Float,
+                blend: Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: BlendFactor::Src,
+                        dst_factor: BlendFactor::Dst,
+                        operation: BlendOperation::Max,
+                    },
+                    alpha: BlendComponent::REPLACE,
+                }),
+                write_mask: ColorWrites::ALL,
+            })],
+            shader_defs: default(),
+            entry_point: Some(Cow::Borrowed("fragment")),
+        }),
+        push_constant_ranges: default(),
+        primitive: default(),
+        depth_stencil: default(),
+        multisample: default(),
+        zero_initialize_workgroup_memory: default(),
+    });
 
-        Self {
-            layout,
-            sampler,
-            pipeline_id,
-        }
-    }
+    commands.insert_resource(LightmapCreationPipeline {
+        layout,
+        sampler,
+        pipeline_id,
+    });
 }
 
-impl FromWorld for LightmapApplicationPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let layout = render_device.create_bind_group_layout(
-            "apply lightmap layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    sampler(SamplerBindingType::Filtering),
-                    uniform_buffer::<UniformFireflyConfig>(false),
-                ),
+fn init_lightmap_application_pipeline(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    fullscreen_shader: Res<FullscreenShader>,
+    pipeline_cache: Res<PipelineCache>,
+) {
+    let layout = BindGroupLayoutDescriptor::new(
+        "apply lightmap layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                uniform_buffer::<UniformFireflyConfig>(false),
             ),
-        );
+        ),
+    );
 
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-        let fullscreen_shader = world.resource::<FullscreenShader>();
-        let vertex_state = fullscreen_shader.to_vertex_state();
+    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let vertex_state = fullscreen_shader.to_vertex_state();
 
-        let pipeline_id =
-            world
-                .resource_mut::<PipelineCache>()
-                .queue_render_pipeline(RenderPipelineDescriptor {
-                    label: Some(Cow::Borrowed("lightmap application pipeline")),
-                    layout: vec![layout.clone()],
-                    vertex: vertex_state,
-                    fragment: Some(FragmentState {
-                        shader: APPLY_LIGHTMAP_SHADER,
-                        targets: vec![Some(ColorTargetState {
-                            format: TextureFormat::bevy_default(),
-                            blend: None,
-                            write_mask: ColorWrites::ALL,
-                        })],
-                        shader_defs: default(),
-                        entry_point: Some(Cow::Borrowed("fragment")),
-                    }),
-                    push_constant_ranges: default(),
-                    primitive: default(),
-                    depth_stencil: default(),
-                    multisample: default(),
-                    zero_initialize_workgroup_memory: default(),
-                });
+    let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
+        label: Some(Cow::Borrowed("lightmap application pipeline")),
+        layout: vec![layout.clone()],
+        vertex: vertex_state,
+        fragment: Some(FragmentState {
+            shader: APPLY_LIGHTMAP_SHADER,
+            targets: vec![Some(ColorTargetState {
+                format: TextureFormat::bevy_default(),
+                blend: None,
+                write_mask: ColorWrites::ALL,
+            })],
+            shader_defs: default(),
+            entry_point: Some(Cow::Borrowed("fragment")),
+        }),
+        push_constant_ranges: default(),
+        primitive: default(),
+        depth_stencil: default(),
+        multisample: default(),
+        zero_initialize_workgroup_memory: default(),
+    });
 
-        Self {
-            layout,
-            sampler,
-            pipeline_id,
-        }
-    }
+    commands.insert_resource(LightmapApplicationPipeline {
+        layout,
+        sampler,
+        pipeline_id,
+    });
 }
 
 /// Pipeline that produces the stencil and normal textures from the sprite bindings.
 #[derive(Resource)]
 #[allow(dead_code)]
 pub struct SpritePipeline {
-    pub view_layout: BindGroupLayout,
-    pub material_layout: BindGroupLayout,
-    pub dummy_white_gpu_image: GpuImage,
+    pub view_layout: BindGroupLayoutDescriptor,
+    pub material_layout: BindGroupLayoutDescriptor,
 }
 
-impl FromWorld for SpritePipeline {
-    fn from_world(world: &mut World) -> Self {
-        let mut system_state: SystemState<(
-            Res<RenderDevice>,
-            Res<DefaultImageSampler>,
-            Res<RenderQueue>,
-        )> = SystemState::new(world);
-        let (render_device, default_sampler, render_queue) = system_state.get_mut(world);
-
-        let tonemapping_lut_entries = get_lut_bind_group_layout_entries();
-        let view_layout = render_device.create_bind_group_layout(
-            "sprite_view_layout",
-            &BindGroupLayoutEntries::with_indices(
-                ShaderStages::VERTEX_FRAGMENT,
+fn init_sprite_pipeline(mut commands: Commands) {
+    let tonemapping_lut_entries = get_lut_bind_group_layout_entries();
+    let view_layout = BindGroupLayoutDescriptor::new(
+        "sprite_view_layout",
+        &BindGroupLayoutEntries::with_indices(
+            ShaderStages::VERTEX_FRAGMENT,
+            (
+                (0, uniform_buffer::<ViewUniform>(true)),
                 (
-                    (0, uniform_buffer::<ViewUniform>(true)),
-                    (
-                        1,
-                        tonemapping_lut_entries[0].visibility(ShaderStages::FRAGMENT),
-                    ),
-                    (
-                        2,
-                        tonemapping_lut_entries[1].visibility(ShaderStages::FRAGMENT),
-                    ),
+                    1,
+                    tonemapping_lut_entries[0].visibility(ShaderStages::FRAGMENT),
+                ),
+                (
+                    2,
+                    tonemapping_lut_entries[1].visibility(ShaderStages::FRAGMENT),
                 ),
             ),
-        );
+        ),
+    );
 
-        let material_layout = render_device.create_bind_group_layout(
-            "sprite_material_layout",
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (
-                    // sprite texture
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    // normal map texture
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    // sampler
-                    sampler(SamplerBindingType::Filtering),
-                    // dummy normal bool
-                    uniform_buffer::<u32>(false),
-                ),
+    let material_layout = BindGroupLayoutDescriptor::new(
+        "sprite_material_layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                // sprite texture
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                // normal map texture
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                // sampler
+                sampler(SamplerBindingType::Filtering),
+                // dummy normal bool
+                uniform_buffer::<u32>(false),
             ),
-        );
-        let dummy_white_gpu_image = {
-            let image = Image::default();
-            let texture = render_device.create_texture(&image.texture_descriptor);
-            let sampler = match image.sampler {
-                ImageSampler::Default => (**default_sampler).clone(),
-                ImageSampler::Descriptor(ref descriptor) => {
-                    render_device.create_sampler(&descriptor.as_wgpu())
-                }
-            };
+        ),
+    );
 
-            let format_size = image.texture_descriptor.format.pixel_size().unwrap();
-            render_queue.write_texture(
-                texture.as_image_copy(),
-                image.data.as_ref().expect("Image has no data"),
-                TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(image.width() * format_size as u32),
-                    rows_per_image: None,
-                },
-                image.texture_descriptor.size,
-            );
-            let texture_view = texture.create_view(&TextureViewDescriptor::default());
-            GpuImage {
-                texture,
-                texture_view,
-                texture_format: image.texture_descriptor.format,
-                sampler,
-                size: image.texture_descriptor.size,
-                mip_level_count: image.texture_descriptor.mip_level_count,
-            }
-        };
-
-        SpritePipeline {
-            view_layout,
-            material_layout,
-            dummy_white_gpu_image,
-        }
-    }
+    commands.insert_resource(SpritePipeline {
+        view_layout,
+        material_layout,
+    });
 }
 
 impl SpecializedRenderPipeline for SpritePipeline {

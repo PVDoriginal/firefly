@@ -69,7 +69,7 @@ pub(crate) enum ExtractedSpriteKind {
     Single {
         anchor: Vec2,
         rect: Option<Rect>,
-        scaling_mode: Option<ScalingMode>,
+        scaling_mode: Option<SpriteScalingMode>,
         custom_size: Option<Vec2>,
     },
     /// Indexes into the list of [`ExtractedSlice`]s stored in the [`ExtractedSlices`] resource
@@ -247,9 +247,7 @@ impl Plugin for SpritesPlugin {
 
     fn finish(&self, app: &mut App) {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
-            render_app
-                .init_resource::<SpriteBatches>()
-                .init_resource::<SpritePipeline>();
+            render_app.init_resource::<SpriteBatches>();
         }
     }
 }
@@ -309,13 +307,13 @@ fn queue_sprites(
         view_entities.extend(
             visible_entities
                 .iter::<Sprite>()
-                .map(|(_, e)| e.index() as usize),
+                .map(|(_, e)| e.index_u32() as usize),
         );
 
         phase.items.reserve(extracted_sprites.sprites.len());
 
         for (index, extracted_sprite) in extracted_sprites.sprites.iter().enumerate() {
-            let view_index = extracted_sprite.main_entity.index();
+            let view_index = extracted_sprite.main_entity.index_u32();
 
             if !view_entities.contains(view_index as usize) {
                 continue;
@@ -421,7 +419,6 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteBatch {
 
         pass.set_index_buffer(
             sprite_meta.sprite_index_buffer.buffer().unwrap().slice(..),
-            0,
             IndexFormat::Uint32,
         );
         pass.set_vertex_buffer(

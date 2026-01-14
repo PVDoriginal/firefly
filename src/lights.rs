@@ -2,7 +2,7 @@ use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::WHITE,
     ecs::{
-        component::Tick,
+        change_detection::Tick,
         query::ROQueryItem,
         system::{
             SystemParamItem,
