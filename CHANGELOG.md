@@ -1,3 +1,13 @@
+# 0.18.0 
+## Major 
+  - Updated to Bevy 0.18.
+## Minor 
+  - A few minor performance optimizations. 
+
+# 0.17.2 
+## Major 
+  - Fixed a severe bug that caused bad memory allocation when too many occluders were clustered in the same area. 
+
 # 0.17.1 
 Update mainly focused on performance improvements. 
 
