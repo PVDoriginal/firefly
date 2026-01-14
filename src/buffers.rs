@@ -490,7 +490,7 @@ impl BinBuffer {
         for bin in 0..N_BINS {
             for index in 0..values.len() {
                 if values[index][bin].n_occluders == 0 {
-                    continue;
+                    break;
                 }
 
                 values[index][bin]
@@ -509,6 +509,7 @@ impl BinBuffer {
     /// Clear the buffer and add one empty set of bins.
     pub fn reset(&mut self) {
         self.buffer.clear();
+        self.counts = [0; N_BINS];
         self.push_empty();
     }
 

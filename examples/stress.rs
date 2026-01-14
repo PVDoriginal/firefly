@@ -18,10 +18,10 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 2.2;
-const OCCLUDER_FREQ: f32 = 0.1;
-const HEIGHT: f32 = 20000.0;
-const WIDTH: f32 = 40000.0;
+const LIGHT_FREQ: f32 = 1.5;
+const OCCLUDER_FREQ: f32 = 0.05;
+const HEIGHT: f32 = 25000.0;
+const WIDTH: f32 = 50000.0;
 
 const MOVE_FREQ: f32 = 1.0;
 

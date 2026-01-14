@@ -11,7 +11,7 @@ fn main() {
 
     app.add_plugins((DefaultPlugins, FireflyPlugin, FireflyGizmosPlugin));
     app.add_systems(Startup, setup);
-    app.add_systems(Update, (move_light, move_camera, despawn_debug));
+    app.add_systems(Update, (move_light, move_camera));
 
     app.run();
 }
@@ -199,17 +199,5 @@ fn move_camera(
     }
     if keys.pressed(KeyCode::KeyW) {
         camera.translation.y += time.delta_secs() * CAMERA_SPEED;
-    }
-}
-
-fn despawn_debug(
-    occluders: Query<Entity, With<Occluder2d>>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands,
-) {
-    if keys.pressed(KeyCode::Enter) {
-        if let Some(entity) = occluders.iter().last() {
-            commands.entity(entity).despawn();
-        }
     }
 }
