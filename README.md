@@ -12,7 +12,7 @@ I am working on it as part of my college thesis. It uses certain geometrical and
 My final goal is to have a lighting crate with features akin to the ones of more mature game engines, while 
 keeping performance as high as possible and minimizing the end-user API.
 
-Firefly already has most of the essential features of the respective 2d lighting pipelines of Unity and Godot. There are still 
+Firefly already has many of the essential features of the respective 2d lighting pipelines of Unity and Godot. There are still 
 many more planned though! 
 
 Short video showing off soft shadows and z-sorting: 
@@ -99,8 +99,9 @@ Also you can ask any questions over on [discord](https://discord.com/channels/69
 ## Bevy Compatibility 
 | bevy | bevy_firefly  |
 |------|---------------|
-| 0.16 | 0.16          |
+| 0.18 | 0.18          |
 | 0.17 | 0.17          |
+| 0.16 | 0.16          |
 
 ## Alternatives
 You can check out [bevy_light_2d](https://github.com/jgayfer/bevy_light_2d) and [bevy_lit](https://github.com/malbernaz/bevy_lit). They were both a big inspiration when starting out with this crate! 
