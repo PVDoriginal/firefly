@@ -26,7 +26,7 @@ use bevy::{
 
 use crate::{
     APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
-    buffers::{Bin, N_BINS},
+    buffers::{Bin, BinCounts, N_BINS},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder},

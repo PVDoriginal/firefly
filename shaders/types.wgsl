@@ -66,3 +66,7 @@ struct Bin {
     occluders: array<OccluderPointer, N_OCCLUDERS>,
     n_occluders: u32,
 }
+
+struct BinCounts {
+    counts: array<u32, N_BINS>,
+}

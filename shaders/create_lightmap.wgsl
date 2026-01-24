@@ -3,7 +3,7 @@
 
 #import firefly::types::{
     PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, 
-    FireflyConfig, Bin, N_OCCLUDERS, N_BINS, 
+    FireflyConfig, Bin, BinCounts, N_OCCLUDERS, N_BINS,
 }
 
 #import firefly::utils::{
@@ -37,12 +37,15 @@ var<storage> vertices: array<vec2f>;
 var<storage> bins: array<array<Bin, N_BINS>>;
 
 @group(0) @binding(8)
-var sprite_stencil: texture_2d<f32>;
+var<storage> bin_counts: BinCounts;
 
 @group(0) @binding(9)
-var normal_map: texture_2d<f32>;
+var sprite_stencil: texture_2d<f32>;
 
 @group(0) @binding(10)
+var normal_map: texture_2d<f32>;
+
+@group(0) @binding(11)
 var<uniform> config: FireflyConfig;
 
 
@@ -112,7 +115,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         let bin = u32(floor(((atan2(pos.y - light.pos.y, pos.x - light.pos.x) + PI) / PI2) * f32(N_BINS)));
 
-        for (var bin_set = 0u; bin_set < arrayLength(&bins); bin_set += 1) {
+        for (var bin_set = 0u; bin_set <= bin_counts.counts[bin]; bin_set += 1) {
             if bins[bin_set][bin].n_occluders == 0 {
                 // return vec4f(1, 0, 0, 1);
                 break;

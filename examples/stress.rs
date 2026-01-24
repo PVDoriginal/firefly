@@ -39,10 +39,7 @@ fn main() {
 
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                present_mode: bevy::window::PresentMode::Immediate,
-                ..default()
-            }),
+            primary_window: Some(Window { ..default() }),
             ..default()
         }),
         FireflyPlugin,

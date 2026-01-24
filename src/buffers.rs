@@ -14,7 +14,8 @@ use bevy::{
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
         render_resource::{
-            BindingResource, BufferUsages, RawBufferVec, ShaderType, encase::private::WriteInto,
+            BindingResource, BufferUsages, RawBufferVec, ShaderType, StorageBuffer,
+            encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
     },
@@ -445,7 +446,8 @@ pub struct BinBuffer {
     buffer: RawBufferVec<[Bin; N_BINS]>,
     // the number of bins for each bin interval,
     // used in case not all occluders fit in a single set of bins
-    counts: [usize; N_BINS],
+    counts: [u32; N_BINS],
+    bin_counts: StorageBuffer<BinCounts>,
 }
 
 impl Default for BinBuffer {
@@ -453,6 +455,7 @@ impl Default for BinBuffer {
         Self {
             buffer: RawBufferVec::<[Bin; N_BINS]>::new(BufferUsages::STORAGE),
             counts: [0; N_BINS],
+            bin_counts: StorageBuffer::<BinCounts>::default(),
         }
     }
 }
@@ -474,13 +477,31 @@ impl Default for Bin {
     }
 }
 
+#[derive(Clone, ShaderType)]
+pub struct BinCounts {
+    pub counts: [u32; N_BINS],
+}
+
+impl Default for BinCounts {
+    fn default() -> Self {
+        Self {
+            counts: [0; N_BINS],
+        }
+    }
+}
+
 impl BinBuffer {
     const PI2: f32 = PI * 2.0;
     const N_BINS: f32 = N_BINS as f32;
 
-    /// Get the binding of this buffer. It is guaranteed to exist.
-    pub fn binding(&self) -> BindingResource<'_> {
+    /// Get the binding of the bins. It is guaranteed to exist.
+    pub fn bin_binding(&self) -> BindingResource<'_> {
         self.buffer.binding().unwrap()
+    }
+
+    /// Get the binding of the number of each bin. It is guaranteed to exist.
+    pub fn bin_count_binding(&self) -> BindingResource<'_> {
+        self.bin_counts.binding().unwrap()
     }
 
     /// Write this buffer's data to the GPU. This function also sorts the
@@ -500,6 +521,11 @@ impl BinBuffer {
         }
 
         self.buffer.write_buffer(device, queue);
+
+        self.bin_counts.set(BinCounts {
+            counts: self.counts,
+        });
+        self.bin_counts.write_buffer(device, queue);
     }
 
     fn push_empty(&mut self) {
@@ -531,11 +557,11 @@ impl BinBuffer {
                 bin_index
             } as usize;
 
-            while self.counts[index] >= values.len() {
+            while self.counts[index] >= values.len() as u32 {
                 values.push([default(); N_BINS]);
             }
 
-            let bin = &mut values[self.counts[index]][index];
+            let bin = &mut values[self.counts[index] as usize][index];
 
             bin.occluders[bin.n_occluders as usize] = occluder;
             bin.n_occluders += 1;
