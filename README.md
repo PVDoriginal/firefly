@@ -5,33 +5,34 @@
 [![docs](https://docs.rs/bevy_firefly/badge.svg)](https://docs.rs/bevy_firefly/)
 [![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
 
-[Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [bevy game engine](https://bevy.org/).
+[Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [Bevy game engine](https://bevy.org/). 
 
-I am working on it as part of my college thesis. It uses certain geometrical and computational algorithms to take advantage of Bevy's ECS and put less strain on the GPU. 
+# Objective
 
-My final goal is to have a lighting crate with features akin to the ones of more mature game engines, while 
-keeping performance as high as possible and minimizing the end-user API.
+When I was working on a Bevy project, I found myself needing features that other 2d lighting crates did not yet provide. I needed an accessible 2d lighting solution that offers the same capabilities as engines such as Unity and Godot. So, as part of my bachelor thesis, I began work on Firely.
 
-Firefly already has many of the essential features of the respective 2d lighting pipelines of Unity and Godot. There are still 
-many more planned though! 
+My **main objectives** while making and maintaining Firefly are: 
+- **Minimal Setup.** this crate should be extremely easy to plug into any existing bevy app, and the API should feel minimal and intuitive.
+- **Consistent Maintenance.** I will keep this crate up-to-date with all new bevy versions and changes, until it is inevitably deprectated by another solution or upstreamed into bevy itself.
+- **Community Feedback.** I'm eagerly accepting any feature requests and bug reports. I do have my own backlog but any features requested by users will be prioritized.
+- **Power.** While Bevy has never had a proper 2d lighting solution similar to other game engines, I am dedicated to changing that. Firefly should offer users all the features that those engines do and more!
 
-Short video showing off soft shadows and z-sorting: 
+# Showcases 
+Here are some videos showcasing various features of Firefly. Credit for the character and assets goes to [Kimberly](https://github.com/Kaircha) and her upcoming game, Starlight!
+
+Soft shadows and z-sorting.
 
 https://github.com/user-attachments/assets/1984ef2a-0edd-4a40-93cb-a901057a9b74
 
-> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
-
-Here's the same game but with light banding and hard shadows:
+Same scene but with light banding and hard shadows.
 
 https://github.com/user-attachments/assets/6118f75e-b797-41bb-998e-381dc9d84cb9
 
-> Credit for the characters and assets to [Kimberly](https://github.com/Kaircha) and her upcoming game!
-
-Here's a video of the [crates example](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs), showcasing normal maps and z-sorting:
+Video of the [crates example](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs), showcasing normal maps and z-sorting:
 
 https://github.com/user-attachments/assets/fd9453ba-e42a-4155-b96b-889bfdceea48
 
-And here is a video of the [stress example](https://github.com/PVDoriginal/firefly/blob/main/examples/stress.rs).
+Video of the [stress example](https://github.com/PVDoriginal/firefly/blob/main/examples/stress.rs).
 
 https://github.com/user-attachments/assets/c9b8c716-a0c4-4604-8fbb-50d6bbbe8aad
 
@@ -65,7 +66,6 @@ fn setup(mut commands: Commands) {
       range: 100.0,
       ..default()
     },
-    Transform::default()
   ));
      
   commands.spawn((
@@ -77,8 +77,7 @@ fn setup(mut commands: Commands) {
 Check out the [examples](examples/) and the [crate documentation](https://docs.rs/bevy_firefly/) to learn more about using it.
 
 ## Features 
-Some of the existing features are: 
-  - Dynamic lights and occluders
+Some of the existing features are:
   - Point lights
   - Round and polygonal occluders
   - Soft shadows
@@ -90,6 +89,7 @@ Some of the existing features are:
 Some of the currently planned features are: 
   - Occluders casting sprite-based shadows
   - Mulitple lightmaps
+  - Dithering
   - Light textures
 
 Feel free to open an issue if you want to request any specific features or report any bugs!
@@ -103,5 +103,18 @@ Also you can ask any questions over on [discord](https://discord.com/channels/69
 | 0.17 | 0.17          |
 | 0.16 | 0.16          |
 
+## Limitations 
+Some notable limitations that Firefly currently has: 
+  - Multiple cameras aren't supported yet. Only one camera can render lights at one time.
+  - WebGPU only. I've chosen to drop WebGL2 support in favor or WebGPU and the many possibilities it offers, which means Firefly might not run on specific browsers / devices yet (although WebGPU support is rapidly growing).
+  - Firefly was mostly designed to work with Sprites, which means there is limited compatibility with 2d Meshes. While lights can be cast over them, they don't yet support normal maps or occlusion z-sorting. This will be changed very soon as Bevy's Sprite backend is being migrated to the mesh one.
+  - Occluder scaling isn't supported yet. 
+
+These aren't hard limitations though, and can be overcome with some effort. I just didn't have the time yet. If you want me to prioritize fixing any of them, feel free to open an issue.   
+
 ## Alternatives
-You can check out [bevy_light_2d](https://github.com/jgayfer/bevy_light_2d) and [bevy_lit](https://github.com/malbernaz/bevy_lit). They were both a big inspiration when starting out with this crate! 
+
+There are a few other 2d lighting solutions for Bevy that I'm aware of: 
+- [**bevy_magic_light**](https://github.com/zaycev/bevy-magic-light-2d). 
+- [**bevy_lit**](https://github.com/malbernaz/bevy_lit).  
+- [**bevy_light_2d**](https://github.com/jgayfer/bevy_light_2d). 
