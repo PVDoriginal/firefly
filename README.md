@@ -7,7 +7,7 @@
 
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [Bevy game engine](https://bevy.org/). 
 
-# Objective
+## Objective
 
 When I was working on a Bevy project, I found myself needing features that other 2d lighting crates did not yet provide. I needed an accessible 2d lighting solution that offers the same capabilities as engines such as Unity and Godot. So, as part of my bachelor thesis, I began work on Firely.
 
@@ -17,7 +17,7 @@ My **main objectives** while making and maintaining Firefly are:
 - **Community Feedback.** I'm eagerly accepting any feature requests and bug reports. I do have my own backlog but any features requested by users will be prioritized.
 - **Power.** While Bevy has never had a proper 2d lighting solution similar to other game engines, I am dedicated to changing that. Firefly should offer users all the features that those engines do and more!
 
-# Showcases 
+## Showcases 
 Here are some videos showcasing various features of Firefly. Credit for the character and assets goes to [Kimberly](https://github.com/Kaircha) and her upcoming game, Starlight!
 
 Soft shadows and z-sorting.
