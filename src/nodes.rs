@@ -1,7 +1,10 @@
 //! Module containg `Render Graph Nodes` used by Firefly.  
 
 use bevy::{
-    ecs::{query::QueryItem, system::lifetimeless::Read},
+    ecs::{
+        query::QueryItem,
+        system::lifetimeless::{Read, SResMut},
+    },
     prelude::*,
     render::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},

@@ -94,15 +94,19 @@ fn init_lightmap_creation_pipeline(
                 (6, storage_buffer_read_only::<Vec2>(false)),
                 // bins
                 (7, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
+                (8, storage_buffer_read_only::<BinCounts>(false)),
                 // sprite stencil
                 (
-                    8,
+                    9,
                     texture_2d(TextureSampleType::Float { filterable: false }),
                 ),
                 // sprite normal map
-                (9, texture_2d(TextureSampleType::Float { filterable: true })),
+                (
+                    10,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                ),
                 // config,
-                (10, uniform_buffer::<UniformFireflyConfig>(false)),
+                (11, uniform_buffer::<UniformFireflyConfig>(false)),
                 // bins,
             ),
         ),
