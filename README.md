@@ -13,7 +13,7 @@ When I was working on a Bevy project, I found myself needing features that other
 
 My **main objectives** while making and maintaining Firefly are: 
 - **Minimal Setup.** this crate should be extremely easy to plug into any existing bevy app, and the API should feel minimal and intuitive.
-- **Consistent Maintenance.** I will keep this crate up-to-date with all new bevy versions and changes, until it is inevitably deprectated by another solution or upstreamed into bevy itself.
+- **Consistent Maintenance.** I will keep this crate up-to-date with all new bevy versions and changes, until it is inevitably deprectated by another solution or upstreamed into Bevy itself.
 - **Community Feedback.** I'm eagerly accepting any feature requests and bug reports. I do have my own backlog but any features requested by users will be prioritized.
 - **Power.** While Bevy has never had a proper 2d lighting solution similar to other game engines, I am dedicated to changing that. Firefly should offer users all the features that those engines do and more!
 
@@ -37,11 +37,11 @@ Video of the [stress example](https://github.com/PVDoriginal/firefly/blob/main/e
 https://github.com/user-attachments/assets/c9b8c716-a0c4-4604-8fbb-50d6bbbe8aad
 
 ## Usage 
-To use this crate, simply run `cargo add bevy_firefly` or add firefly to your Cargo.toml file. 
+To use this crate, simply run `cargo add bevy_firefly` or add Firefly to your Cargo.toml file. 
 
-You can see all the firely versions [here](https://crates.io/crates/bevy_firefly/versions). 
+You can see all the Firefly versions [here](https://crates.io/crates/bevy_firefly/versions). 
 
-Here is a basic example of integrating firefly into a bevy app: 
+Here is a basic example of integrating Firefly into a bevy app: 
 
 ```Rs
 use bevy::prelude::*;
@@ -106,11 +106,11 @@ Also you can ask any questions over on [discord](https://discord.com/channels/69
 ## Limitations 
 Some notable limitations that Firefly currently has: 
   - Multiple cameras aren't supported yet. Only one camera can render lights at one time.
-  - WebGPU only. I've chosen to drop WebGL2 support in favor or WebGPU and the many possibilities it offers, which means Firefly might not run on specific browsers / devices yet (although WebGPU support is rapidly growing).
+  - WebGPU only. I've chosen to drop WebGL2 support in favor of WebGPU and the many possibilities it offers, which means Firefly might not run on specific browsers / devices yet (although WebGPU support is rapidly growing). I am willing to add and maintain a WebGL2 compatibility mode if there's a significant need for it though. 
   - Firefly was mostly designed to work with Sprites, which means there is limited compatibility with 2d Meshes. While lights can be cast over them, they don't yet support normal maps or occlusion z-sorting. This will be changed very soon as Bevy's Sprite backend is being migrated to the mesh one.
   - Occluder scaling isn't supported yet. 
 
-These aren't hard limitations though, and can be overcome with some effort. I just didn't have the time yet. If you want me to prioritize fixing any of them, feel free to open an issue.   
+These aren't hard limitations though, and can be overcome with some effort. I just didn't have the time yet. If you want me to prioritize fixing any of them, feel free to open an issue. 
 
 ## Alternatives
 
