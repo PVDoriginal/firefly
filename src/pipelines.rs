@@ -179,7 +179,7 @@ fn init_lightmap_application_pipeline(
         fragment: Some(FragmentState {
             shader: APPLY_LIGHTMAP_SHADER,
             targets: vec![Some(ColorTargetState {
-                format: TextureFormat::bevy_default(),
+                format: TextureFormat::Rgba16Float,
                 blend: None,
                 write_mask: ColorWrites::ALL,
             })],

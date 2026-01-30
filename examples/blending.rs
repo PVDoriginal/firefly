@@ -1,6 +1,9 @@
 use bevy::{
     color::palettes::css::{BLUE, RED},
+    core_pipeline::tonemapping::Tonemapping,
+    post_process::bloom::Bloom,
     prelude::*,
+    render::view::Hdr,
 };
 use bevy_firefly::prelude::*;
 
@@ -21,6 +24,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn((
         Camera2d,
+        // Tonemapping::AcesFitted,
+        Hdr::default(),
+        // Bloom::default(),
         Projection::Orthographic(proj),
         FireflyConfig {
             // normal maps need to be explicitly enabled
@@ -31,17 +37,19 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn((
         PointLight2d {
+            intensity: 4.0,
             color: Color::Srgba(RED),
             ..default()
         },
-        Transform::from_translation(vec3(-50.0, 0.0, 0.0)),
+        Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
     ));
 
     commands.spawn((
         PointLight2d {
+            intensity: 4.0,
             color: Color::Srgba(BLUE),
             ..default()
         },
-        Transform::from_translation(vec3(50.0, 0.0, 0.0)),
+        Transform::from_translation(vec3(30.0, 0.0, 0.0)),
     ));
 }

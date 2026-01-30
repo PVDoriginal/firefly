@@ -18,7 +18,6 @@ var<uniform> config: FireflyConfig;
 @fragment
 fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     var light_frag = blend(textureSample(light_map_texture, texture_sampler, vo.uv), vec4f(config.ambient_color, 0), config.ambient_brightness);
-    light_frag = min(light_frag, vec4f(1));
 
     if config.light_bands > 0 {
         light_frag = floor(light_frag * vec4f(config.light_bands)) / vec4f(config.light_bands);

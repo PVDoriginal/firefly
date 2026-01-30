@@ -91,12 +91,11 @@ impl Plugin for FireflyPlugin {
         render_app.add_render_graph_edges(
             Core2d,
             (
-                Node2d::MainTransparentPass,
+                Node2d::StartMainPassPostProcessing,
                 SpriteLabel,
-                Node2d::Tonemapping,
                 CreateLightmapLabel,
                 ApplyLightmapLabel,
-                Node2d::EndMainPassPostProcessing,
+                Node2d::Tonemapping,
             ),
         );
     }
