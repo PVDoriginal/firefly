@@ -4,7 +4,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     asset::load_internal_asset,
-    color::palettes::css::PINK,
+    color::palettes::css::{GREY, PINK, WHITE},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
@@ -105,15 +105,45 @@ impl Plugin for FireflyPlugin {
 ///
 /// Useful for debugging.
 pub struct FireflyGizmosPlugin;
+
 impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<FireflyGizmoStyle>();
         app.add_systems(Update, draw_gizmos);
     }
 }
 
-const GIZMO_COLOR: Color = bevy::prelude::Color::Srgba(PINK);
+/// Resource that can be manually inserted to change the look of Firefly gizmos.
+#[derive(Resource)]
+pub struct FireflyGizmoStyle {
+    pub light_outer_color: Color,
+    pub light_inner_color: Color,
+    pub occluder_color: Color,
+}
 
-fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder2d)>) {
+impl Default for FireflyGizmoStyle {
+    fn default() -> Self {
+        Self {
+            light_outer_color: Color::Srgba(GREY),
+            light_inner_color: Color::Srgba(WHITE),
+            occluder_color: Color::Srgba(PINK),
+        }
+    }
+}
+
+fn draw_gizmos(
+    mut gizmos: Gizmos,
+    style: Res<FireflyGizmoStyle>,
+    occluders: Query<(&GlobalTransform, &Occluder2d)>,
+    lights: Query<(&GlobalTransform, &PointLight2d)>,
+) {
+    for (transform, light) in lights {
+        let isometry = Isometry2d::from_translation(transform.translation().xy());
+
+        gizmos.circle_2d(isometry, light.inner_range, style.light_inner_color);
+        gizmos.circle_2d(isometry, light.range, style.light_outer_color);
+    }
+
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
             Occluder2dShape::Polygon { vertices, .. } => {
@@ -124,9 +154,13 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                 );
 
                 for line in vertices.windows(2) {
-                    gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
+                    gizmos.line_2d(line[0], line[1], style.occluder_color);
                 }
-                gizmos.line_2d(vertices[0], vertices[vertices.len() - 1], GIZMO_COLOR);
+                gizmos.line_2d(
+                    vertices[0],
+                    vertices[vertices.len() - 1],
+                    style.occluder_color,
+                );
             }
             Occluder2dShape::Polyline { vertices, .. } => {
                 let vertices = translate_vertices(
@@ -136,7 +170,7 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                 );
 
                 for line in vertices.windows(2) {
-                    gizmos.line_2d(line[0], line[1], GIZMO_COLOR);
+                    gizmos.line_2d(line[0], line[1], style.occluder_color);
                 }
             }
             Occluder2dShape::RoundRectangle {
@@ -156,28 +190,28 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                 gizmos.line_2d(
                     center + rotate(vec2(-width, height + radius)),
                     center + rotate(vec2(width, height + radius)),
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // right line
                 gizmos.line_2d(
                     center + rotate(vec2(width + radius, height)),
                     center + rotate(vec2(width + radius, -height)),
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // bottom line
                 gizmos.line_2d(
                     center + rotate(vec2(-width, -height - radius)),
                     center + rotate(vec2(width, -height - radius)),
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // left line
                 gizmos.line_2d(
                     center + rotate(vec2(-width - radius, height)),
                     center + rotate(vec2(-width - radius, -height)),
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // top-left arc
@@ -188,7 +222,7 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                     },
                     FRAC_PI_2,
                     radius,
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // top-right arc
@@ -201,7 +235,7 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                     },
                     FRAC_PI_2,
                     radius,
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // bottom-right arc
@@ -214,7 +248,7 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                     },
                     FRAC_PI_2,
                     radius,
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
 
                 // bottom-left arc
@@ -227,7 +261,7 @@ fn draw_gizmos(mut gizmos: Gizmos, occluders: Query<(&GlobalTransform, &Occluder
                     },
                     FRAC_PI_2,
                     radius,
-                    GIZMO_COLOR,
+                    style.occluder_color,
                 );
             }
         }
