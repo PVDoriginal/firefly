@@ -1,3 +1,10 @@
+# 0.18.1 (Unreleased)
+## Major 
+  - Added support for HDR and Tonemapping (lights actually look like lights now, yay!).
+
+## Minor
+  - Fixed a bug where despawned occluders sometimes still cast shadows. 
+
 # 0.18.0 
 ## Major 
   - Updated to Bevy 0.18.
