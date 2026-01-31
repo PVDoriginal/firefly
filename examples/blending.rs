@@ -1,7 +1,5 @@
 use bevy::{
     color::palettes::css::{BLUE, RED},
-    core_pipeline::tonemapping::Tonemapping,
-    post_process::bloom::Bloom,
     prelude::*,
     render::view::Hdr,
 };
@@ -18,15 +16,14 @@ fn main() {
     app.run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands) {
     let mut proj = OrthographicProjection::default_2d();
     proj.scale = 0.15;
 
     commands.spawn((
         Camera2d,
-        // Tonemapping::AcesFitted,
+        // Tonemapping::SomewhatBoringDisplayTransform,
         Hdr::default(),
-        // Bloom::default(),
         Projection::Orthographic(proj),
         FireflyConfig {
             // normal maps need to be explicitly enabled

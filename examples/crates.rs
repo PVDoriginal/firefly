@@ -1,4 +1,6 @@
-use bevy::{color::palettes::css::RED, prelude::*, sprite::Anchor, window::PrimaryWindow};
+use bevy::{
+    color::palettes::css::RED, prelude::*, render::view::Hdr, sprite::Anchor, window::PrimaryWindow,
+};
 use bevy_firefly::{data::NormalMode, prelude::*};
 
 fn main() {
@@ -21,6 +23,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn((
         Camera2d,
+        Hdr,
         Projection::Orthographic(proj),
         FireflyConfig {
             // normal maps need to be explicitly enabled
@@ -67,6 +70,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Sprite::from_image(asset_server.load("bonfire.png")),
         PointLight2d {
+            intensity: 3.,
             range: 100.,
             color: Color::srgb(1.0, 0.8, 0.6),
             ..default()
@@ -81,6 +85,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Anchor(vec2(0.0, -0.5 + 5.0 / 32.0)),
         Transform::from_translation(vec3(20., 0., 0.)),
         PointLight2d {
+            intensity: 5.,
             range: 100.,
             color: Color::srgb(0.8, 0.8, 1.0),
             offset: vec3(0., 22., 0.),

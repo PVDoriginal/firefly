@@ -1,6 +1,7 @@
 use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::WHITE,
+    core_pipeline::tonemapping::{DebandDither, Tonemapping},
     ecs::{
         change_detection::Tick,
         query::ROQueryItem,
@@ -19,7 +20,9 @@ use bevy::{
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
             ViewBinnedRenderPhases,
         },
-        render_resource::{BindGroup, ShaderType, StorageBuffer},
+        render_resource::{
+            BindGroup, PipelineCache, ShaderType, SpecializedRenderPipelines, StorageBuffer,
+        },
         sync_world::SyncToRenderWorld,
         view::{ExtractedView, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
     },
@@ -31,7 +34,7 @@ use crate::{
     buffers::{BinBuffer, BufferIndex},
     change::Changes,
     phases::LightmapPhase,
-    pipelines::LightmapCreationPipeline,
+    pipelines::{LightPipelineKey, LightmapCreationPipeline},
     visibility::VisibilityTimer,
 };
 
@@ -231,22 +234,61 @@ pub(crate) struct LightBindGroups {
     pub values: HashMap<Entity, BindGroup>,
 }
 
+#[derive(Component)]
+pub(crate) struct LightLut(pub BindGroup);
+
 fn queue_lights(
     light_draw_functions: Res<DrawFunctions<LightmapPhase>>,
-    lightmap_pipeline: Res<LightmapCreationPipeline>,
+    pipeline: Res<LightmapCreationPipeline>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<LightmapCreationPipeline>>,
     mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
-    views: Query<(&ExtractedView, &RenderVisibleEntities)>,
+    views: Query<(
+        &ExtractedView,
+        &RenderVisibleEntities,
+        &Msaa,
+        Option<&Tonemapping>,
+        Option<&DebandDither>,
+    )>,
+    pipeline_cache: Res<PipelineCache>,
 ) {
     let draw_lightmap_function = light_draw_functions.read().id::<DrawLightmap>();
 
-    for (view, visible_entities) in &views {
+    for (view, visible_entities, msaa, tonemapping, dither) in &views {
         let Some(lightmap_phase) = lightmap_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
+        let msaa_key = LightPipelineKey::from_msaa_samples(msaa.samples());
+        let mut view_key = LightPipelineKey::from_hdr(view.hdr) | msaa_key;
+
+        if !view.hdr {
+            if let Some(tonemapping) = tonemapping {
+                view_key |= LightPipelineKey::TONEMAP_IN_SHADER;
+                view_key |= match tonemapping {
+                    Tonemapping::None => LightPipelineKey::TONEMAP_METHOD_NONE,
+                    Tonemapping::Reinhard => LightPipelineKey::TONEMAP_METHOD_REINHARD,
+                    Tonemapping::ReinhardLuminance => {
+                        LightPipelineKey::TONEMAP_METHOD_REINHARD_LUMINANCE
+                    }
+                    Tonemapping::AcesFitted => LightPipelineKey::TONEMAP_METHOD_ACES_FITTED,
+                    Tonemapping::AgX => LightPipelineKey::TONEMAP_METHOD_AGX,
+                    Tonemapping::SomewhatBoringDisplayTransform => {
+                        LightPipelineKey::TONEMAP_METHOD_SOMEWHAT_BORING_DISPLAY_TRANSFORM
+                    }
+                    Tonemapping::TonyMcMapface => LightPipelineKey::TONEMAP_METHOD_TONY_MC_MAPFACE,
+                    Tonemapping::BlenderFilmic => LightPipelineKey::TONEMAP_METHOD_BLENDER_FILMIC,
+                };
+            }
+            if let Some(DebandDither::Enabled) = dither {
+                view_key |= LightPipelineKey::DEBAND_DITHER;
+            }
+        }
+
+        let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);
+
         for (render_entity, visible_entity) in visible_entities.iter::<PointLight2d>() {
             let batch_set_key = LightBatchSetKey {
-                pipeline: lightmap_pipeline.pipeline_id,
+                pipeline: pipeline,
                 draw_function: draw_lightmap_function,
             };
 
@@ -262,17 +304,17 @@ fn queue_lights(
     }
 }
 
-pub(crate) type DrawLightmap = (SetItemPipeline, SetLightTextureBindGroup<0>, DrawLightBatch);
+pub(crate) type DrawLightmap = (SetItemPipeline, SetLightTextureBindGroup, DrawLightBatch);
 
-pub(crate) struct SetLightTextureBindGroup<const I: usize>;
-impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup<I> {
+pub(crate) struct SetLightTextureBindGroup;
+impl<P: PhaseItem> RenderCommand<P> for SetLightTextureBindGroup {
     type Param = (SRes<LightBindGroups>, SRes<LightBatches>);
-    type ViewQuery = (Read<ExtractedView>, Read<ViewUniformOffset>);
+    type ViewQuery = (Read<ExtractedView>, Read<ViewUniformOffset>, Read<LightLut>);
     type ItemQuery = ();
 
     fn render<'w>(
         item: &P,
-        (view, view_uniform_offset): ROQueryItem<'w, '_, Self::ViewQuery>,
+        (view, view_uniform_offset, lut): ROQueryItem<'w, '_, Self::ViewQuery>,
         _entity: Option<()>,
         (image_bind_groups, batches): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
@@ -282,11 +324,9 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetLightTextureBindGroup
             return RenderCommandResult::Skip;
         };
 
-        pass.set_bind_group(
-            I,
-            image_bind_groups.values.get(&batch.id).unwrap(),
-            &[view_uniform_offset.offset],
-        );
+        pass.set_bind_group(0, &lut.0, &[view_uniform_offset.offset]);
+        pass.set_bind_group(1, image_bind_groups.values.get(&batch.id).unwrap(), &[]);
+
         RenderCommandResult::Success
     }
 }

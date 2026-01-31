@@ -1,8 +1,12 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
+#ifdef TONEMAP_IN_SHADER
+#import bevy_core_pipeline::tonemapping
+#endif
+
 #import firefly::types::{
-    PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, 
+    view, PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, 
     FireflyConfig, Bin, BinCounts, N_OCCLUDERS, N_BINS,
 }
 
@@ -12,42 +16,38 @@
     intersection_point, rect_intersection, rect_line_intersection, intersects_axis_edge, intersects_corner_arc
 }
 
-@group(0) @binding(0)
-var<uniform> view: View;
-
-@group(0) @binding(1)
+@group(1) @binding(0)
 var texture_sampler: sampler;
 
-@group(0) @binding(2)
+@group(1) @binding(1)
 var<storage> lights: array<PointLight>;
 
-@group(0) @binding(3)
+@group(1) @binding(2)
 var<storage> light_index: u32; 
 
-@group(0) @binding(4)
+@group(1) @binding(3)
 var<storage> round_occluders: array<RoundOccluder>;
 
-@group(0) @binding(5)
+@group(1) @binding(4)
 var<storage> poly_occluders: array<PolyOccluder>;
 
-@group(0) @binding(6)
+@group(1) @binding(5)
 var<storage> vertices: array<vec2f>;
 
-@group(0) @binding(7)
+@group(1) @binding(6)
 var<storage> bins: array<array<Bin, N_BINS>>;
 
-@group(0) @binding(8)
+@group(1) @binding(7)
 var<storage> bin_counts: BinCounts;
 
-@group(0) @binding(9)
+@group(1) @binding(8)
 var sprite_stencil: texture_2d<f32>;
 
-@group(0) @binding(10)
+@group(1) @binding(9)
 var normal_map: texture_2d<f32>;
 
-@group(0) @binding(11)
+@group(1) @binding(10)
 var<uniform> config: FireflyConfig;
-
 
 const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
@@ -177,6 +177,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         }
         res *= vec4f(shadow, 1);
     }
+
+#ifdef TONEMAP_IN_SHADER
+    res = tonemapping::tone_mapping(res, view.color_grading);
+#endif
+
     return res;
 }
 

@@ -1,10 +1,7 @@
 //! Module containg `Render Graph Nodes` used by Firefly.  
 
 use bevy::{
-    ecs::{
-        query::QueryItem,
-        system::lifetimeless::{Read, SResMut},
-    },
+    ecs::{query::QueryItem, system::lifetimeless::Read},
     prelude::*,
     render::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
@@ -18,8 +15,10 @@ use bevy::{
 };
 
 use crate::{
-    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture, phases::SpritePhase,
-    pipelines::LightmapApplicationPipeline, prepare::BufferedFireflyConfig,
+    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
+    phases::SpritePhase,
+    pipelines::{LightmapApplicationPipeline, SpecializedApplicationPipeline},
+    prepare::BufferedFireflyConfig,
 };
 
 /// Node used to create the lightmap.
@@ -74,25 +73,27 @@ impl ViewNode for CreateLightmapNode {
 
 impl ViewNode for ApplyLightmapNode {
     type ViewQuery = (
+        Read<SpecializedApplicationPipeline>,
         Read<BufferedFireflyConfig>,
         Read<ViewTarget>,
         Read<LightMapTexture>,
     );
+
     fn run<'w>(
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (config, view_target, light_map_texture): bevy::ecs::query::QueryItem<
+        (pipeline_id, config, view_target, light_map_texture): bevy::ecs::query::QueryItem<
             'w,
             '_,
             Self::ViewQuery,
         >,
         world: &'w World,
     ) -> std::result::Result<(), NodeRunError> {
-        let pipeline = world.resource::<LightmapApplicationPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
+        let pipeline = world.resource::<LightmapApplicationPipeline>();
 
-        let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline.pipeline_id) else {
+        let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline_id.0) else {
             return Ok(());
         };
 

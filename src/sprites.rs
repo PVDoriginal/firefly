@@ -223,7 +223,6 @@ impl Plugin for SpritesPlugin {
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
                 .init_resource::<ImageBindGroups>()
-                .init_resource::<SpecializedRenderPipelines<SpritePipeline>>()
                 .init_resource::<DrawFunctions<SpritePhase>>()
                 .init_resource::<SpriteMeta>()
                 .init_resource::<ExtractedSprites>()

@@ -6,10 +6,13 @@ use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BufferManager, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
-    lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightPointer},
+    lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
-    pipelines::{LightmapCreationPipeline, SpritePipeline},
+    pipelines::{
+        LightPipelineKey, LightmapApplicationPipeline, LightmapCreationPipeline,
+        SpecializedApplicationPipeline, SpritePipeline,
+    },
     sprites::{
         ExtractedSlices, ExtractedSpriteKind, ExtractedSprites, ImageBindGroups, SpriteAssetEvents,
         SpriteBatch, SpriteBatches, SpriteInstance, SpriteMeta, SpriteViewBindGroup,
@@ -29,8 +32,8 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroup, BindGroupEntries, PipelineCache, TextureDescriptor, TextureDimension,
-            TextureFormat, TextureUsages, UniformBuffer,
+            BindGroup, BindGroupEntries, PipelineCache, SpecializedRenderPipelines,
+            TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{FallbackImage, GpuImage, TextureCache},
@@ -63,6 +66,11 @@ impl Plugin for PreparePlugin {
             return;
         };
 
+        render_app.add_systems(
+            Render,
+            specialize_light_application_pipeline.in_set(RenderSystems::Prepare),
+        );
+
         render_app.add_systems(Render, prepare_data.in_set(RenderSystems::Prepare));
         render_app.add_systems(Render, prepare_config.in_set(RenderSystems::Prepare));
         render_app.add_systems(Render, prepare_lightmap.in_set(RenderSystems::Prepare));
@@ -70,11 +78,28 @@ impl Plugin for PreparePlugin {
         render_app.add_systems(
             Render,
             (
+                prepare_light_luts.in_set(RenderSystems::PrepareBindGroups),
                 prepare_sprite_view_bind_groups.in_set(RenderSystems::PrepareBindGroups),
-                (prepare_sprite_image_bind_groups.in_set(RenderSystems::PrepareBindGroups),)
-                    .chain(),
+                prepare_sprite_image_bind_groups.in_set(RenderSystems::PrepareBindGroups),
             ),
         );
+    }
+}
+
+fn specialize_light_application_pipeline(
+    views: Query<(Entity, &ExtractedView)>,
+    pipeline_cache: Res<PipelineCache>,
+    pipeline: Res<LightmapApplicationPipeline>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<LightmapApplicationPipeline>>,
+    mut commands: Commands,
+) {
+    for (entity, view) in views {
+        let key = LightPipelineKey::from_hdr(view.hdr);
+        let pipeline_id = pipelines.specialize(&pipeline_cache, &pipeline, key);
+
+        commands
+            .entity(entity)
+            .insert(SpecializedApplicationPipeline(pipeline_id));
     }
 }
 
@@ -124,9 +149,14 @@ fn prepare_lightmap(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     mut texture_cache: ResMut<TextureCache>,
-    view_targets: Query<(Entity, &ViewTarget)>,
+    view_targets: Query<(Entity, &ViewTarget, &ExtractedView)>,
 ) {
-    for (entity, view_target) in &view_targets {
+    for (entity, view_target, view) in &view_targets {
+        let format = match view.hdr {
+            true => ViewTarget::TEXTURE_FORMAT_HDR,
+            false => TextureFormat::bevy_default(),
+        };
+
         let light_map_texture = texture_cache.get(
             &render_device,
             TextureDescriptor {
@@ -135,7 +165,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba16Float,
+                format,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
@@ -200,7 +230,6 @@ pub(crate) fn prepare_data(
     lightmap_pipeline: Res<LightmapCreationPipeline>,
     mut light_bind_groups: ResMut<LightBindGroups>,
     mut batches: ResMut<LightBatches>,
-    view_uniforms: Res<ViewUniforms>,
     round_occluders: Res<BufferManager<UniformRoundOccluder>>,
     poly_occluders: Res<BufferManager<UniformOccluder>>,
     light_buffer: Res<BufferManager<UniformPointLight>>,
@@ -344,7 +373,6 @@ pub(crate) fn prepare_data(
                             "light bind group",
                             &pipeline_cache.get_bind_group_layout(&lightmap_pipeline.layout),
                             &BindGroupEntries::sequential((
-                                view_uniforms.uniforms.binding().unwrap(),
                                 &lightmap_pipeline.sampler,
                                 light_buffer.binding(),
                                 light_pointer.0.binding().unwrap(),
@@ -505,6 +533,34 @@ fn push_vertices(
     }
 
     push_slice(&slice);
+}
+
+fn prepare_light_luts(
+    mut commands: Commands,
+    view_uniforms: Res<ViewUniforms>,
+    render_device: Res<RenderDevice>,
+    light_pipeline: Res<LightmapCreationPipeline>,
+    views: Query<(Entity, &Tonemapping), With<ExtractedView>>,
+    tonemapping_luts: Res<TonemappingLuts>,
+    images: Res<RenderAssets<GpuImage>>,
+    fallback_image: Res<FallbackImage>,
+    pipeline_cache: Res<PipelineCache>,
+) {
+    for (entity, tonemapping) in &views {
+        let lut_bindings =
+            get_lut_bindings(&images, &tonemapping_luts, tonemapping, &fallback_image);
+        let view_bind_group = render_device.create_bind_group(
+            "light_lut_bind_group",
+            &pipeline_cache.get_bind_group_layout(&light_pipeline.lut_layout),
+            &BindGroupEntries::with_indices((
+                (0, view_uniforms.uniforms.binding().unwrap()),
+                (1, lut_bindings.0),
+                (2, lut_bindings.1),
+            )),
+        );
+
+        commands.entity(entity).insert(LightLut(view_bind_group));
+    }
 }
 
 fn prepare_sprite_view_bind_groups(

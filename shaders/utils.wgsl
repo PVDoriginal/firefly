@@ -1,8 +1,6 @@
 #define_import_path firefly::utils
 
-#import bevy_render::view::View
-
-@group(0) @binding(0) var<uniform> view: View;
+#import firefly::types::view
 
 fn world_to_ndc(world_position: vec2<f32>) -> vec2<f32> {
     return (view.clip_from_world * vec4(world_position, 0.0, 1.0)).xy;
