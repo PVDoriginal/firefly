@@ -3,7 +3,6 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    asset::load_internal_asset,
     color::palettes::css::{GREY, PINK, WHITE},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
@@ -34,37 +33,6 @@ pub struct FireflyPlugin;
 
 impl Plugin for FireflyPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
-            CREATE_LIGHTMAP_SHADER,
-            "../shaders/create_lightmap.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            APPLY_LIGHTMAP_SHADER,
-            "../shaders/apply_lightmap.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            TYPES_SHADER,
-            "../shaders/types.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            UTILS_SHADER,
-            "../shaders/utils.wgsl",
-            Shader::from_wgsl
-        );
-        load_internal_asset!(
-            app,
-            SPRITE_SHADER,
-            "../shaders/sprite.wgsl",
-            Shader::from_wgsl
-        );
-
         app.add_plugins((
             PipelinePlugin,
             PreparePlugin,

@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 
 use bevy::{
+    asset::{embedded_asset, load_embedded_asset},
     core_pipeline::{FullscreenShader, tonemapping::get_lut_bind_group_layout_entries},
     mesh::{PrimitiveTopology, VertexBufferLayout, VertexFormat},
     prelude::*,
@@ -20,12 +21,11 @@ use bevy::{
         renderer::RenderDevice,
         view::{ViewTarget, ViewUniform},
     },
-    shader::ShaderDefVal,
+    shader::{ShaderDefVal, load_shader_library},
     sprite_render::SpritePipelineKey,
 };
 
 use crate::{
-    APPLY_LIGHTMAP_SHADER, CREATE_LIGHTMAP_SHADER, SPRITE_SHADER,
     buffers::{Bin, BinCounts, N_BINS},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
@@ -37,6 +37,13 @@ pub struct PipelinePlugin;
 
 impl Plugin for PipelinePlugin {
     fn build(&self, app: &mut App) {
+        load_shader_library!(app, "../shaders/types.wgsl");
+        load_shader_library!(app, "../shaders/utils.wgsl");
+
+        embedded_asset!(app, "../shaders/create_lightmap.wgsl");
+        embedded_asset!(app, "../shaders/apply_lightmap.wgsl");
+        embedded_asset!(app, "../shaders/sprite.wgsl");
+
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
@@ -64,12 +71,14 @@ pub struct LightmapCreationPipeline {
     pub lut_layout: BindGroupLayoutDescriptor,
     pub sampler: Sampler,
     pub vertex_state: VertexState,
+    pub shader: Handle<Shader>,
 }
 
 fn init_lightmap_creation_pipeline(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     fullscreen_shader: Res<FullscreenShader>,
+    asset_server: Res<AssetServer>,
 ) {
     let layout = BindGroupLayoutDescriptor::new(
         "create lightmap layout",
@@ -131,6 +140,7 @@ fn init_lightmap_creation_pipeline(
         lut_layout,
         sampler,
         vertex_state,
+        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/create_lightmap.wgsl"),
     });
 }
 
@@ -239,7 +249,7 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
             layout: vec![self.lut_layout.clone(), self.layout.clone()],
             vertex: self.vertex_state.clone(),
             fragment: Some(FragmentState {
-                shader: CREATE_LIGHTMAP_SHADER,
+                shader: self.shader.clone(),
                 targets: vec![Some(ColorTargetState {
                     format,
                     blend: Some(BlendState {
@@ -270,6 +280,7 @@ pub struct LightmapApplicationPipeline {
     pub layout: BindGroupLayoutDescriptor,
     pub sampler: Sampler,
     pub vertex_state: VertexState,
+    pub shader: Handle<Shader>,
 }
 
 #[derive(Component)]
@@ -279,6 +290,7 @@ fn init_lightmap_application_pipeline(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     fullscreen_shader: Res<FullscreenShader>,
+    asset_server: Res<AssetServer>,
 ) {
     let layout = BindGroupLayoutDescriptor::new(
         "apply lightmap layout",
@@ -300,6 +312,7 @@ fn init_lightmap_application_pipeline(
         layout,
         sampler,
         vertex_state,
+        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/apply_lightmap.wgsl"),
     });
 }
 
@@ -317,7 +330,7 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
             layout: vec![self.layout.clone()],
             vertex: self.vertex_state.clone(),
             fragment: Some(FragmentState {
-                shader: APPLY_LIGHTMAP_SHADER,
+                shader: self.shader.clone(),
                 targets: vec![Some(ColorTargetState {
                     format,
                     blend: None,
@@ -341,9 +354,10 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
 pub struct SpritePipeline {
     pub view_layout: BindGroupLayoutDescriptor,
     pub material_layout: BindGroupLayoutDescriptor,
+    pub shader: Handle<Shader>,
 }
 
-fn init_sprite_pipeline(mut commands: Commands) {
+fn init_sprite_pipeline(mut commands: Commands, asset_server: Res<AssetServer>) {
     let tonemapping_lut_entries = get_lut_bind_group_layout_entries();
     let view_layout = BindGroupLayoutDescriptor::new(
         "sprite_view_layout",
@@ -383,6 +397,7 @@ fn init_sprite_pipeline(mut commands: Commands) {
     commands.insert_resource(SpritePipeline {
         view_layout,
         material_layout,
+        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/sprite.wgsl"),
     });
 }
 
@@ -474,13 +489,13 @@ impl SpecializedRenderPipeline for SpritePipeline {
 
         RenderPipelineDescriptor {
             vertex: VertexState {
-                shader: SPRITE_SHADER,
+                shader: self.shader.clone(),
                 entry_point: Some("vertex".into()),
                 shader_defs: shader_defs.clone(),
                 buffers: vec![instance_rate_vertex_buffer_layout],
             },
             fragment: Some(FragmentState {
-                shader: SPRITE_SHADER,
+                shader: self.shader.clone(),
                 shader_defs,
                 entry_point: Some("fragment".into()),
                 targets: vec![

@@ -88,7 +88,6 @@
 //! - Light textures.
 
 use bevy::{
-    asset::uuid_handle,
     prelude::*,
     render::{render_graph::RenderLabel, texture::CachedTexture},
 };
@@ -150,9 +149,3 @@ pub struct ApplyLightmapLabel;
 /// Useful if you want to add your own render passes before / after it.
 #[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct SpriteLabel;
-
-const CREATE_LIGHTMAP_SHADER: Handle<Shader> = uuid_handle!("6e9647ff-b9f8-41ce-8d83-9bd91ae31898");
-const APPLY_LIGHTMAP_SHADER: Handle<Shader> = uuid_handle!("72c4f582-83b6-47b6-a200-b9f0e408df72");
-const TYPES_SHADER: Handle<Shader> = uuid_handle!("dac0fb7e-a64f-4923-8e31-6912f3fc8551");
-const UTILS_SHADER: Handle<Shader> = uuid_handle!("1471f256-f404-4388-bb2f-ca6b8047ef7e");
-const SPRITE_SHADER: Handle<Shader> = uuid_handle!("00f40f01-5069-4f1c-a69c-a6bd5ca3983e");
