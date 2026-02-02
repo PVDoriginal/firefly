@@ -115,7 +115,7 @@ fn prepare_config(
             ambient_brightness: config.ambient_brightness,
 
             light_bands: match config.light_bands {
-                None => 0,
+                None => 0.0,
                 Some(x) => x,
             },
 

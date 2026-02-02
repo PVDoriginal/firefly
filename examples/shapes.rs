@@ -1,4 +1,4 @@
-use bevy::{color::palettes::css::RED, prelude::*, window::PrimaryWindow};
+use bevy::{color::palettes::css::RED, prelude::*, render::view::Hdr, window::PrimaryWindow};
 use bevy_firefly::prelude::*;
 
 // A simple example showcasing the different occluder shapes.
@@ -24,10 +24,11 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Camera2d,
         Projection::Orthographic(projection),
+        Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
             softness: None,
-            light_bands: Some(4),
+            light_bands: Some(0.7),
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
@@ -37,7 +38,7 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
-            intensity: 1.0,
+            intensity: 3.0,
             range: 250.,
             ..default()
         },

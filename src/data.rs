@@ -28,14 +28,15 @@ pub struct FireflyConfig {
     /// **Default:** 0.
     pub ambient_brightness: f32,
 
-    /// Whether you want to use light bands or not.
+    /// Light bands will divide the lightmap into brackets of the given size.
     ///
-    /// Light bands divide the lightmap's texture into a certain number of bands, creating a stylized look.
+    /// E.g. with `light_bands: Some(0.3)`, all color channels in the `[0-0.3]` interval will be the same color,
+    /// in `[0.3-0.6]` another color, and so on.
     ///
     /// **Performance Impact:** None.
     ///
     /// **Default:** None.
-    pub light_bands: Option<u32>,
+    pub light_bands: Option<f32>,
 
     /// Whether you want to use soft shadows or not.
     ///
@@ -117,7 +118,7 @@ impl Default for FireflyConfig {
 pub struct UniformFireflyConfig {
     pub ambient_color: Vec3,
     pub ambient_brightness: f32,
-    pub light_bands: u32,
+    pub light_bands: f32,
     pub softness: f32,
     pub z_sorting: u32,
     pub normal_mode: u32,

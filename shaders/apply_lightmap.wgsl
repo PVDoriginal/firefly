@@ -20,7 +20,7 @@ fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     var light_frag = blend(textureSample(light_map_texture, texture_sampler, vo.uv), vec4f(config.ambient_color, 0), config.ambient_brightness);
 
     if config.light_bands > 0 {
-        light_frag = floor(light_frag * vec4f(config.light_bands)) / vec4f(config.light_bands);
+        light_frag = floor(light_frag / vec4f(config.light_bands)) * config.light_bands + config.light_bands * 0.5;
     }
 
     // return light_frag;

@@ -31,7 +31,6 @@
 //!             range: 100.0,
 //!             ..default()
 //!         },
-//!         Transform::default()
 //!     ));
 //!     
 //!     // spawn a circle occluder

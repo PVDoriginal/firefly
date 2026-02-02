@@ -59,7 +59,7 @@ struct RoundOccluder {
 struct FireflyConfig {
     ambient_color: vec3f,
     ambient_brightness: f32, 
-    light_bands: u32,
+    light_bands: f32,
     softness: f32,
     z_sorting: u32,
     // 0 - none, 1 - simple, 2 - topdown
