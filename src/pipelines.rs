@@ -12,8 +12,8 @@ use bevy::{
         render_resource::{
             BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendComponent, BlendFactor,
             BlendOperation, BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            FragmentState, FrontFace, PolygonMode, PrimitiveState, RenderPipelineDescriptor,
-            Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            FragmentState, FrontFace, MultisampleState, PolygonMode, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedRenderPipeline, SpecializedRenderPipelines, TextureFormat,
             TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{sampler, storage_buffer_read_only, texture_2d, uniform_buffer},
@@ -100,10 +100,7 @@ fn init_lightmap_creation_pipeline(
                 (6, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
                 (7, storage_buffer_read_only::<BinCounts>(false)),
                 // sprite stencil
-                (
-                    8,
-                    texture_2d(TextureSampleType::Float { filterable: false }),
-                ),
+                (8, texture_2d(TextureSampleType::Float { filterable: true })),
                 // sprite normal map
                 (9, texture_2d(TextureSampleType::Float { filterable: true })),
                 // config,
@@ -342,7 +339,10 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
             push_constant_ranges: default(),
             primitive: default(),
             depth_stencil: default(),
-            multisample: default(),
+            multisample: MultisampleState {
+                count: key.msaa_samples(),
+                ..default()
+            },
             zero_initialize_workgroup_memory: default(),
         }
     }

@@ -540,6 +540,7 @@ fn prepare_light_luts(
     view_uniforms: Res<ViewUniforms>,
     render_device: Res<RenderDevice>,
     light_pipeline: Res<LightmapCreationPipeline>,
+    // light_pipelines: Res<SpecializedRenderPipelines<LightmapCreationPipeline>>,
     views: Query<(Entity, &Tonemapping), With<ExtractedView>>,
     tonemapping_luts: Res<TonemappingLuts>,
     images: Res<RenderAssets<GpuImage>>,

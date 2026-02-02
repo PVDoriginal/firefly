@@ -61,7 +61,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     let normal = textureSample(normal_map, texture_sampler, in.uv);
-    let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
+    let stencil = textureSample(sprite_stencil, texture_sampler, in.uv);
+    // let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
