@@ -77,6 +77,7 @@ fn setup(mut commands: Commands) {
 Check out the [examples](examples/) and the [crate documentation](https://docs.rs/bevy_firefly/) to learn more about using it.
 
 ## Features 
+
 Some of the existing features are:
   - Point lights
   - Round and polygonal occluders
@@ -92,18 +93,28 @@ Some of the currently planned features are:
   - Dithering
   - Light textures
 
+Check out my [milestone goals](https://github.com/users/PVDoriginal/projects/7/views/2) to see what features are currently planned based on the Bevy release cycle. 
+
 Feel free to open an issue if you want to request any specific features or report any bugs!
 
-Also you can ask any questions over on [discord](https://discord.com/channels/691052431525675048/1447681362722033816)! 
+Also you can ask any questions over on [discord](https://discord.com/channels/691052431525675048/1447681362722033816)! You can also follow the thread to be kept up-to-date with new features. 
 
 ## Bevy Compatibility 
+
 | bevy | bevy_firefly  |
 |------|---------------|
 | 0.18 | 0.18          |
 | 0.17 | 0.17          |
 | 0.16 | 0.16          |
 
-## Limitations 
+Each minor Firefly version is compatible with that specific Bevy version (e.g. Firefly 0.18.x should work with Bevy 0.18.0, 0.18.1, and so on). 
+
+The Firefly patch version is unrelated to Bevy's (e.g. Firefly 0.18.1 is not related to Bevy 0.18.1 and still works with any Bevy 0.18 version).
+
+Unlike Bevy, Firefly can have breaking API changes in every release. 
+
+## Current Limitations 
+
 Some notable limitations that Firefly currently has: 
   - Multiple cameras aren't supported yet. Only one camera can render lights at one time.
   - WebGPU only. I've chosen to drop WebGL2 support in favor of WebGPU and the many possibilities it offers, which means Firefly might not run on specific browsers / devices yet (although WebGPU support is rapidly growing). I am willing to add and maintain a WebGL2 compatibility mode if there's a significant need for it though. 
