@@ -136,7 +136,7 @@ impl Default for PointLight2d {
             range: 100.,
             inner_range: 0.,
             falloff: Falloff::InverseSquare,
-            falloff_intensity: 1.0,
+            falloff_intensity: 0.0,
             angle: 360.0,
             cast_shadows: true,
             offset: Vec3::ZERO,
