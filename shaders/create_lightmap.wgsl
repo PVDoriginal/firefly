@@ -13,7 +13,8 @@
 #import firefly::utils::{
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
-    intersection_point, rect_intersection, rect_line_intersection, intersects_axis_edge, intersects_corner_arc
+    intersection_point, rect_intersection, rect_line_intersection, intersects_axis_edge, intersects_corner_arc,
+    rotate_90, rotate_90_cc,
 }
 
 @group(1) @binding(0)
@@ -138,14 +139,14 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                         }
                     }
 
-                    let result = round_check(pos, index); 
+                    // let result = round_check(pos, index); 
     
-                    if result.occluded == true {
-                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
-                    }                    
-                    else if config.softness > 0 && result.extreme_angle < soft_angle {
-                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
-                    }
+                    // if result.occluded == true {
+                    //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
+                    // }                    
+                    // else if config.softness > 0 && result.extreme_angle < soft_angle {
+                    //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
+                    // }
                 }
                 // poly occluder
                 else {
@@ -159,11 +160,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                     let result = is_occluded(pos, bins[bin_set][bin].occluders[i]); 
 
-                    if result.occluded == true {
-                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity);
-                    }                    
-                    else if config.softness > 0 && result.extreme_angle < soft_angle {
-                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
+                    if result > 0.0 {
+                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * result);
                     }
                 }
 
@@ -186,11 +184,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     return res;
 }
 
-struct OcclusionResult {
-    occluded: bool, 
-    extreme_angle: f32,
-}
-
 fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     let light = lights[light_index];
 
@@ -203,7 +196,7 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     return angle;
 }
 
-fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> OcclusionResult {
+fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> f32 {
     let light = lights[light_index];
 
     let term = (pointer.index & 1610612736u) >> 29;
@@ -220,58 +213,69 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer) -> OcclusionResult {
         maybe_prev = bs_vertex_reverse(angle, pointer.min_v, pointer.length, term);
     }
 
-    var extreme_angle = 0f;
-    if config.softness > 0 {
-        extreme_angle = min(
-            get_extreme_angle(pos, vertices[pointer.min_v]),  
-            get_extreme_angle(pos, vertices[pointer.min_v + pointer.length - 1])
-        );
-    }
-
-    if maybe_prev < 0 || maybe_prev >= i32(pointer.length) {
-        return OcclusionResult(
-            false, 
-            extreme_angle,
-        );
-    }
-
-    let prev = u32(maybe_prev);
-
-    if rev == 0 {
-        if prev + 1 >= pointer.length  {
-            return OcclusionResult(
-                false,
-                extreme_angle,
-            );
-        }
+    var is_occluded = false;
+    let out_of_bounds = (maybe_prev < 0 || maybe_prev + 1 >= i32(pointer.length));
     
-        if same_orientation(vertices[pointer.min_v + prev], vertices[pointer.min_v + prev + 1], pos, light.pos) {
-            return OcclusionResult(
-                false,
-                extreme_angle,
-            );
+    if !out_of_bounds {
+        if rev == 0 {
+            is_occluded = !same_orientation(vertices[pointer.min_v + u32(maybe_prev)], vertices[pointer.min_v + u32(maybe_prev) + 1], pos, light.pos);
         }
+        else {
+            is_occluded = !same_orientation(vertices[pointer.min_v - u32(maybe_prev)], vertices[pointer.min_v - u32(maybe_prev) - 1], pos, light.pos);
+        }
+    }
+
+    if config.softness > 0 && (is_occluded || out_of_bounds){
+        if rev == 0 {
+            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v + pointer.length - 1], out_of_bounds);
+        }
+        else {
+            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v - pointer.length + 1], out_of_bounds);
+        }
+    }
+    
+    if is_occluded {
+        return 1.0;
     }
     else {
-        if prev - 1 < 0  {
-            return OcclusionResult(
-                false,
-                extreme_angle,
-            );
-        }
-    
-        if same_orientation(vertices[pointer.min_v - prev], vertices[pointer.min_v - prev - 1], pos, light.pos) {
-            return OcclusionResult(
-                false,
-                extreme_angle,
-            );
-        }
+        return 0.0;
     }
+}
+
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, out_of_bounds: bool) -> f32 {
+    let light = lights[light_index];
+
+    let left1 = normalize(extreme_left - light.pos + rotate_90(normalize(extreme_left - light.pos)) * light.inner_range); 
+    let left2 = normalize(extreme_left - light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * light.inner_range); 
+
+    let right1 = normalize(extreme_right - light.pos + rotate_90(normalize(extreme_right - light.pos)) * light.inner_range); 
+    let right2 = normalize(extreme_right - light.pos + rotate_90_cc(normalize(extreme_right - light.pos)) * light.inner_range); 
+
+    var left_multi = 1.0; 
+    var right_multi = 1.0;
+
+    let left_middle = normalize(pos - extreme_left);
+    let right_middle = normalize(pos - extreme_right);
     
-    return OcclusionResult(
-        true, 
-        0f,
-    );
+    if acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
+        left_multi = min(left_multi, acos(dot(left_middle, left2)) / acos(dot(left1, left2)));
+    }
+
+    if acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
+        right_multi = min(right_multi, acos(dot(right_middle, right1)) / acos(dot(right1, right2)));
+    }
+
+    let final_res = min(left_multi, right_multi);
+
+    if final_res < 1.0 {
+        return final_res;
+    }
+
+    if acos(dot(left_middle, left1)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right2)) < acos(dot(right_middle, right1)) {
+        return 1.0;
+    }
+
+    return 0.0;
 }
 
 fn angle(p: vec2f) -> f32 {
@@ -398,82 +402,82 @@ fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
 // }
 
 // checks if pixel is blocked by round occluder
-fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
-    let light = lights[light_index];
+// fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
+//     let light = lights[light_index];
 
-    let occ = round_occluders[occluder];
-    let half_w = occ.width * 0.5;
-    let half_h = occ.height * 0.5;
-    let radius = occ.radius;
+//     let occ = round_occluders[occluder];
+//     let half_w = occ.width * 0.5;
+//     let half_h = occ.height * 0.5;
+//     let radius = occ.radius;
 
-    let relative_pos = pos - occ.pos; 
-    let relative_light = light.pos - occ.pos; 
+//     let relative_pos = pos - occ.pos; 
+//     let relative_light = light.pos - occ.pos; 
 
-    var rot = round_occluders[occluder].rot;
+//     var rot = round_occluders[occluder].rot;
     
-    if (rot > PI2) {
-        rot = rot - PI2 * floor(rot / PI2);
-    }
+//     if (rot > PI2) {
+//         rot = rot - PI2 * floor(rot / PI2);
+//     }
 
-    let c = cos(occ.rot);
-    let s = sin(occ.rot);
+//     let c = cos(occ.rot);
+//     let s = sin(occ.rot);
 
-    let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
-    let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
+//     let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
+//     let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
 
-    var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
+//     var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
 
-    var extreme_angle = 10.0;
+//     var extreme_angle = 10.0;
 
-    if !rect_line_intersection(p_local, l_local, rect) {
+//     if !rect_line_intersection(p_local, l_local, rect) {
 
-        if config.softness > 0 {
-            extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
-        }
+//         if config.softness > 0 {
+//             extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
+//         }
 
-        return OcclusionResult(false, extreme_angle);
-    }
+//         return OcclusionResult(false, extreme_angle);
+//     }
 
-    if (occ.width > 0) {
-        // top edge
-        if intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false) {
-            return OcclusionResult(true, 0.0);
-        }
+//     if (occ.width > 0) {
+//         // top edge
+//         if intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false) {
+//             return OcclusionResult(true, 0.0);
+//         }
 
-        // bottom edge
-        if intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false) {
-            return OcclusionResult(true, 0.0);
-        }
-    }
+//         // bottom edge
+//         if intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false) {
+//             return OcclusionResult(true, 0.0);
+//         }
+//     }
 
-    if (occ.height > 0) {
-        // right edge
-        if intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true) {
-            return OcclusionResult(true, 0.0);
-        }
+//     if (occ.height > 0) {
+//         // right edge
+//         if intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true) {
+//             return OcclusionResult(true, 0.0);
+//         }
 
-        // left edge
-        if intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true) {
-            return OcclusionResult(true, 0.0);
-        }
-    }
+//         // left edge
+//         if intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true) {
+//             return OcclusionResult(true, 0.0);
+//         }
+//     }
 
-    if (radius > 0) {
-        let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
-        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-        for(var i = 0u; i < 4u; i++) {
-            if intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]) { 
-                return OcclusionResult(true, 0.0); 
-            }
-        }
-    }
+//     if (radius > 0) {
+//         let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
+//         let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
+//         for(var i = 0u; i < 4u; i++) {
+//             if intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]) { 
+//                 return OcclusionResult(true, 0.0); 
+//             }
+//         }
+//     }
 
-    if config.softness > 0 {
-        extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
-    }
+//     if config.softness > 0 {
+//         extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
+//     }
 
-    return OcclusionResult(false, extreme_angle);
-}
+//     return OcclusionResult(false, extreme_angle);
+// }
 
 fn get_round_extreme_angle(half_w: f32, half_h: f32, p_local: vec2f, l_local: vec2f, radius: f32) -> f32 {
     var extreme_angle = 10.0;

@@ -27,8 +27,8 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            softness: None,
-            light_bands: Some(0.7),
+            softness: Some(0.5),
+            // light_bands: Some(0.7),
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
@@ -39,7 +39,8 @@ fn setup(mut commands: Commands) {
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 3.0,
-            range: 250.,
+            inner_range: 30.,
+            range: 450.,
             ..default()
         },
         Transform::default(),
@@ -71,6 +72,11 @@ fn setup(mut commands: Commands) {
             vec2(-289., 99.),
         ])
         .unwrap(),
+        Transform::default(),
+    ));
+
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
         Transform::default(),
     ));
 

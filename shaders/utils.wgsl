@@ -119,6 +119,14 @@ fn rotate(p: vec2f, r: vec2f) -> vec2f {
     return vec2f(p.x * r.x - p.y * r.y, p.x * r.y + p.y * r.x);
 }
 
+fn rotate_90(p: vec2f) -> vec2f {
+    return vec2f(-p.y, p.x); 
+}
+
+fn rotate_90_cc(p: vec2f) -> vec2f{
+    return vec2f(p.y, -p.x);
+}
+
 const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
 const PIDIV2: f32 = 1.57079632679; 
