@@ -1,7 +1,7 @@
 [package]
 name = "bevy_firefly"
 
-version = "0.18.0"
+version = "0.18.1-alpha"
 description = "2d lighting crate for the Bevy game engine"
 
 exclude = ["examples/*", "assets/*"]
