@@ -1,9 +1,4 @@
-# 0.18.1 (Unreleased)
-## Major 
-  - Added support for HDR and Tonemapping (lights actually look like lights now, yay!).
-
-## Minor
-  - Fixed a bug where despawned occluders sometimes still cast shadows. 
+Newer release notes have been moved to their own [folder](https://github.com/PVDoriginal/firefly/tree/main/release-notes).
 
 # 0.18.0 
 ## Major 
