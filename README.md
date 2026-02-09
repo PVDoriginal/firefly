@@ -7,6 +7,11 @@
 
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [Bevy game engine](https://bevy.org/). 
 
+## Important Note - HDR !
+HDR support is planned as being part of the next big update that I'm working on, `0.18.1`. However, mainly due to the Bevy Jam having started and the full update still being far from done, I've released a `0.18.1-alpha` version 
+which just adds HDR support and a couple of other things. Check out the [release notes](https://github.com/PVDoriginal/firefly/blob/main/release-notes/0.18.1-alpha.md) for more details. I'm adding this here because cargo seems to still default to 
+`0.18.0` as the newest version, so you'll need to manually change it to have access to HDR. It is a pretty huge visual improvement with almost no performance cost! 
+
 ## Objective
 
 When I was working on a Bevy project, I found myself needing features that other 2d lighting crates did not yet provide. I needed an accessible 2d lighting solution that offers the same capabilities as engines such as Unity and Godot. So, as part of my bachelor thesis, I began work on Firely.
