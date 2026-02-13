@@ -595,7 +595,8 @@ pub struct OccluderPointer {
     /// In the case of polygonal occluders, there is additional data positioned on the consecutive bits:
     ///
     /// - A `term` variable that takes 2 bits, describing the terminator format of this chain. This is 1
-    /// if the chain ends looping over the atan2 seam, 2 if it starts like that, and 0 otherwise.
+    /// if the chain ends looping over the atan2 seam, 2 if it starts like that, 3 if the chain starts or ends at the
+    /// limit of the occlusion edge but could've looped over, and 0 otherwise.
     ///
     /// - A `rev` variable that takes 1 bit and specifies if the chain is made of vertices in the same order as they're
     /// stored in (clockwise) or not. This is used for when a light is inside the perimeter of an occluder and the

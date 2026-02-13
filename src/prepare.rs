@@ -432,6 +432,17 @@ fn push_vertices(
     rev: bool,
     poly: bool,
 ) {
+    let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
+        index: i as u32,
+        angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
+    });
+
+    let vertices: Vec<_> = if !rev {
+        vertices.collect()
+    } else {
+        vertices.rev().collect()
+    };
+
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
             let rev: u32 = match rev {
@@ -439,8 +450,36 @@ fn push_vertices(
                 false => 0,
             };
 
+            let term = if slice.term != 0 {
+                slice.term
+            } else {
+                let mut term = 0;
+
+                if slice.start == 0 {
+                    let vertex = vertices[vertices.len() - 1].angle;
+                    let last = vertices[vertices.len() - 2].angle;
+
+                    let loops = (vertex - last).abs() > PI;
+
+                    if (!loops && vertex > last) || (loops && vertex < last) {
+                        term = 3;
+                    }
+                } else if slice.start + slice.length == vertices.len() as u32 {
+                    let vertex = vertices[1].angle;
+                    let last = vertices[0].angle;
+
+                    let loops = (vertex - last).abs() > PI;
+
+                    if (!loops && vertex > last) || (loops && vertex < last) {
+                        term = 3;
+                    }
+                }
+
+                term
+            };
+
             let index = match poly {
-                true => (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32,
+                true => (1 << 31) | (term << 29) | (rev << 28) | index as u32,
                 false => (0 << 31) | index as u32,
             };
 
@@ -462,17 +501,6 @@ fn push_vertices(
                 _ => {}
             }
         }
-    };
-
-    let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
-        index: i as u32,
-        angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
-    });
-
-    let vertices: Vec<_> = if !rev {
-        vertices.collect()
-    } else {
-        vertices.rev().collect()
     };
 
     let mut last: Option<&Vertex> = None;
