@@ -150,6 +150,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 }
                 // poly occluder
                 else {
+                    res.r = 1.0;
+
                     let index = (bins[bin_set][bin].occluders[i].index << 4) >> 4; 
 
                     if stencil.a > 0.1 {
@@ -207,11 +209,16 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
 
     var maybe_prev = 0; 
 
+    var left_extreme = pointer.length & 2147483648u;
+    var right_extreme = pointer.length & 1073741824u;
+
+    let length = pointer.length & 1073741823u;
+
     if rev == 0 {
-        maybe_prev = bs_vertex_forward(angle, pointer.min_v, pointer.length, term);
+        maybe_prev = bs_vertex_forward(angle, pointer.min_v, length, term);
     }
     else {
-        maybe_prev = bs_vertex_reverse(angle, pointer.min_v, pointer.length, term);
+        maybe_prev = bs_vertex_reverse(angle, pointer.min_v, length, term);
     }
 
     var is_occluded = false;
@@ -226,7 +233,7 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
     if maybe_prev < 0 {
         bounds = 1u; 
     }
-    else if maybe_prev + 1 >= i32(pointer.length) {
+    else if maybe_prev + 1 >= i32(length) {
         bounds = 2u;
     }
 
@@ -252,45 +259,49 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
 
     if config.softness > 0 && (is_occluded || out_of_bounds){
         if rev == 0 {
-            var term2 = 0u;
-            if term == 3 && pointer.min_v == occluder.vertex_start {
-                term2 = 1u;
+
+            if dot(light.pos - vertices[pointer.min_v + length - 1], vertices[pointer.min_v + length - 2] - vertices[pointer.min_v + length - 1]) < 0 
+            && same_orientation(vertices[pointer.min_v + length - 2], vertices[pointer.min_v + length - 1], pos, light.pos) {
+                right_extreme = 0;
             }
-            if term == 3 && pointer.min_v + pointer.length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
-                term2 = 2u;
+            if dot(light.pos - vertices[pointer.min_v], vertices[pointer.min_v + 1] - vertices[pointer.min_v]) < 0  
+            && same_orientation(vertices[pointer.min_v], vertices[pointer.min_v + 1], pos, light.pos) {
+                left_extreme = 0;
             }
 
-            var prev = vec2<f32>(0.0);
             var next = vec2<f32>(0.0);
+            var prev = vec2<f32>(0.0);
 
-            if !out_of_bounds {
+            // if !out_of_bounds {
 
-                if pointer.min_v == occluder.vertex_start {
-                    prev = vertices[occluder.vertex_start + occluder.n_vertices - 2];
-                }
-                else {
-                    prev = vertices[pointer.min_v - 1];
-                }
-
-                if pointer.min_v + pointer.length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
-                    next = vertices[occluder.vertex_start + 1];
-                }
-                else {
-                    next = vertices[pointer.min_v + pointer.length];
-                }
-                
-                // if orientation(vertices[pointer.min_v], prev, pos) > 0 && orientation(vertices[pointer.min_v + pointer.length - 1], next, pos) < 0 {
-                //     return 1.0;
-                // }
-
-                // if orientation(vertices[pointer.min_v + pointer.length - 1], next, pos) < 0 {
-                //     return 1.0;
-                // }
+            if pointer.min_v == occluder.vertex_start {
+                prev = vertices[occluder.vertex_start + occluder.n_vertices - 2];
             }
-            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v + pointer.length - 1], bounds, term, term2);
+            else {
+                prev = vertices[pointer.min_v - 1];
+            }
+
+            if pointer.min_v + pointer.length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
+                next = vertices[occluder.vertex_start + 1];
+            }
+            else {
+                next = vertices[pointer.min_v + pointer.length];
+            }
+            
+            // if dot(light.pos )
+
+            // if orientation(vertices[pointer.min_v], prev, pos) > 0 && orientation(vertices[pointer.min_v + pointer.length - 1], next, pos) < 0 {
+            //     return 1.0;
+            // }
+
+            // if orientation(vertices[pointer.min_v + pointer.length - 1], next, pos) < 0 {
+            //     return 1.0;
+            // }
+            
+            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v + length - 1], bounds, left_extreme, right_extreme);
         }
         else {
-            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v - pointer.length + 1], bounds, term, 0u);
+            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v - length + 1], bounds, 0u, 0u);
         }
     }
     
@@ -302,7 +313,7 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
     }
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32, term: u32, term2: u32) -> f32 {
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32, check_left: u32, check_right: u32) -> f32 {
     let light = lights[light_index];
 
     let left_range = min(light.inner_range, distance(extreme_left, light.pos)); 
@@ -323,14 +334,14 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
 
     var ok = false;
 
-    if bounds != 2 && term2 != 1 && term != 2 && acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
+    if check_left != 0u && acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left1, left2));
 
         ok = ok || true;
         // return 1.0;
     }
 
-    if bounds != 1 && term2 != 2 && term != 1 && acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
+    if check_right != 0u && acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right2));
 
         ok = ok || true; 
@@ -348,7 +359,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     }
 
     if acos(dot(left_middle, left1)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right2)) < acos(dot(right_middle, right1)) {
-        return 1.0;
+        return 0.0;
     }
 
     return 0.0;
@@ -391,7 +402,9 @@ fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
     var low = 0i; 
     var high = i32(length) - 1;
 
-    if angle < angle_term(vertices[start + u32(low)], u32(low), length, term) {
+    let min_angle = angle_term(vertices[start + u32(low)], u32(low), length, term); 
+
+    if angle < min_angle {
         return -1;
     }
 

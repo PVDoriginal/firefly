@@ -1,6 +1,6 @@
 //! Module that prepares BindGroups for GPU use.
 
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
@@ -325,6 +325,7 @@ pub(crate) fn prepare_data(
                                 bins,
                                 vertices,
                                 light.pos,
+                                light.inner_range,
                                 0,
                                 occluder_index.index as u32,
                                 softness,
@@ -355,6 +356,7 @@ pub(crate) fn prepare_data(
                                 bins,
                                 occluder.vertices(),
                                 light.pos,
+                                light.inner_range,
                                 vertex_index.index as u32,
                                 occluder_index.index as u32,
                                 softness,
@@ -425,6 +427,7 @@ fn push_vertices(
     bins: &mut BinBuffer,
     occluder_vertices: Vec<Vec2>,
     light_pos: Vec2,
+    light_radius: f32,
     start_vertex: u32,
     index: u32,
     softness: f32,
@@ -432,6 +435,7 @@ fn push_vertices(
     rev: bool,
     poly: bool,
 ) {
+    println!("----------");
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
         angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
@@ -445,61 +449,191 @@ fn push_vertices(
 
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
+            info!("pushing slice!");
+
             let rev: u32 = match rev {
                 true => 1,
                 false => 0,
             };
 
-            let term = if slice.term != 0 {
-                slice.term
-            } else {
-                let mut term = 0;
+            let mut left_extreme = true;
+            let mut right_extreme = true;
+
+            if rev == 0 {
+                // let last = if slice.start == 0 {
+                //     vertices[vertices.len() - 2].angle
+                // } else {
+                //     vertices[slice.start as usize - 1].angle
+                // };
+
+                // let vertex = vertices[slice.start as usize].angle;
+
+                // let loops = (vertex - last).abs() > PI;
+
+                // if (!loops && vertex > last) || (loops && vertex < last) {
+                //     left_extreme = false;
+                // }
+
+                // let last = vertices[slice.start as usize + slice.length as usize - 1].angle;
+
+                // let vertex = if slice.start + slice.length == vertices.len() as u32 {
+                //     vertices[1].angle
+                // } else {
+                //     vertices[slice.start as usize + slice.length as usize].angle
+                // };
+
+                // let loops = (vertex - last).abs() > PI;
+
+                // if (!loops && vertex > last) || (loops && vertex < last) {
+                //     right_extreme = false;
+                // }
 
                 if slice.start == 0 {
-                    let vertex = vertices[vertices.len() - 1].angle;
                     let last = vertices[vertices.len() - 2].angle;
+                    let vertex = vertices[0].angle;
 
                     let loops = (vertex - last).abs() > PI;
 
                     if (!loops && vertex > last) || (loops && vertex < last) {
-                        term = 3;
-                    }
-                } else if slice.start + slice.length == vertices.len() as u32 {
-                    let vertex = vertices[1].angle;
-                    let last = vertices[0].angle;
-
-                    let loops = (vertex - last).abs() > PI;
-
-                    if (!loops && vertex > last) || (loops && vertex < last) {
-                        term = 3;
+                        left_extreme = false;
                     }
                 }
 
-                term
-            };
+                if slice.start + slice.length == vertices.len() as u32 {
+                    let last = vertices[0].angle;
+                    let vertex = vertices[1].angle;
+
+                    let loops = (vertex - last).abs() > PI;
+
+                    if (!loops && vertex > last) || (loops && vertex < last) {
+                        right_extreme = false;
+                    }
+                }
+
+                if slice.term == 1 {
+                    right_extreme = false;
+                }
+
+                if slice.term == 2 {
+                    left_extreme = false;
+                }
+
+                // if slice.start == 0 {
+                //     let vertex = vertices[vertices.len() - 1].angle;
+                //     let last = vertices[vertices.len() - 2].angle;
+
+                //     let loops = (vertex - last).abs() > PI;
+
+                //     if (!loops && vertex > last) || (loops && vertex < last) {
+                //         left_extreme = false;
+                //     }
+                // } else if slice.start + slice.length == vertices.len() as u32 {
+                //     let vertex = vertices[1].angle;
+                //     let last = vertices[0].angle;
+
+                //     let loops = (vertex - last).abs() > PI;
+
+                //     if (!loops && vertex > last) || (loops && vertex < last) {
+                //         right_extreme = false;
+                //     }
+                // }
+
+                // if left_extreme && slice.start != 0 && slice.term == 2 {
+                //     let vertex = vertices[slice.start as usize].angle;
+                //     let last = vertices[slice.start as usize - 1].angle;
+
+                //     let loops = (vertex - last).abs() > PI;
+
+                //     if (!loops && vertex > last) || (loops && vertex < last) {
+                //         left_extreme = false;
+                //     }
+                // } else if right_extreme
+                //     && slice.start + slice.length != vertices.len() as u32
+                //     && slice.term == 1
+                // {
+                //     let vertex = vertices[(slice.start + slice.length) as usize].angle;
+                //     let last = vertices[(slice.start + slice.length - 1) as usize].angle;
+
+                //     let loops = (vertex - last).abs() > PI;
+
+                //     if (!loops && vertex > last) || (loops && vertex < last) {
+                //         right_extreme = false;
+                //     }
+                // }
+            }
 
             let index = match poly {
-                true => (1 << 31) | (term << 29) | (rev << 28) | index as u32,
+                true => (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32,
                 false => (0 << 31) | index as u32,
             };
+
+            let l = if left_extreme { 1 } else { 0 };
+            let r = if right_extreme { 1 } else { 0 };
+
+            let length = (l << 31) | (r << 30) | slice.length;
 
             let occluder = OccluderPointer {
                 index,
                 min_v: slice.start + start_vertex,
-                length: slice.length,
+                length,
                 distance,
             };
 
-            match slice.term {
-                0 => bins.add_occluder(
-                    occluder,
-                    slice.start_angle - softness,
-                    slice.end_angle + softness,
-                ),
-                1 => bins.add_occluder(occluder, slice.start_angle - softness, PI),
-                2 => bins.add_occluder(occluder, -PI, slice.end_angle + softness),
-                _ => {}
-            }
+            let left = occluder_vertices[vertices[slice.start as usize].index as usize];
+
+            let angle_left = (light_pos - left)
+                .normalize()
+                .dot(
+                    (light_pos
+                        + Vec2::from_angle(FRAC_PI_2)
+                            .rotate(left - light_pos)
+                            .normalize()
+                            * light_radius
+                        - left)
+                        .normalize(),
+                )
+                .acos();
+
+            let right = if rev == 0 {
+                occluder_vertices
+                    [vertices[slice.start as usize + slice.length as usize - 1].index as usize]
+            } else {
+                occluder_vertices
+                    [vertices[slice.start as usize - slice.length as usize].index as usize]
+            };
+
+            let angle_right = (light_pos - right)
+                .normalize()
+                .dot(
+                    (light_pos
+                        + Vec2::from_angle(FRAC_PI_2)
+                            .rotate(right - light_pos)
+                            .normalize()
+                            * light_radius
+                        - right)
+                        .normalize(),
+                )
+                .acos();
+
+            warn!("left: {angle_left}");
+            warn!("right: {angle_right}");
+
+            bins.add_occluder(
+                occluder,
+                slice.start_angle - angle_left,
+                slice.end_angle + angle_right,
+            );
+
+            // match slice.term {
+            //     0 => bins.add_occluder(
+            //         occluder,
+            //         slice.start_angle - softness,
+            //         slice.end_angle + softness,
+            //     ),
+            //     1 => bins.add_occluder(occluder, -PI /*slice.start_angle - softness*/, PI),
+            //     2 => bins.add_occluder(occluder, -PI, PI /*slice.end_angle + softness*/),
+            //     _ => {}
+            // }
         }
     };
 
