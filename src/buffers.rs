@@ -7,7 +7,11 @@
 //! Vertices for Polygonal Occluders are stored in a global [`VertexBuffer`].
 
 use core::f32;
-use std::{collections::VecDeque, f32::consts::PI};
+use std::{
+    array,
+    collections::VecDeque,
+    f32::consts::{PI, TAU},
+};
 
 use bevy::{
     prelude::*,
@@ -467,63 +471,45 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 /// The amount of bins that each [`Bins`] will have.
 pub const N_BINS: usize = 128;
 
-/// The amount of occluder per bin.
-pub const N_OCCLUDERS: usize = 32;
-
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 /// This is the most important acceleration structure used by Firefly. It is used in a custom
 /// type of angular sweep with BVH-inspired elements.
 #[derive(Component)]
 pub struct BinBuffer {
-    buffer: RawBufferVec<[Bin; N_BINS]>,
-    // the number of bins for each bin interval,
-    // used in case not all occluders fit in a single set of bins
-    counts: [u32; N_BINS],
-    bin_counts: StorageBuffer<BinCounts>,
+    /// List of all Occluders that will be written to the GPU.
+    buffer: RawBufferVec<OccluderPointer>,
+    /// Indices describing where each bin starts, written to the GPU. The extra value at the end is the maximum index / length.  
+    bin_indices: StorageBuffer<BinIndices>,
+    /// Data stored on the CPU.
+    occluders: [Vec<Vec<OccluderPointer>>; N_BINS],
+}
+
+/// Wrapper for the bin indices, so it can impl Default.
+#[repr(C)]
+#[derive(Pod, Zeroable, Clone, Copy, ShaderType)]
+pub struct BinIndices {
+    indices: [u32; N_BINS + 1],
+}
+
+impl Default for BinIndices {
+    fn default() -> Self {
+        BinIndices {
+            indices: [0; N_BINS + 1],
+        }
+    }
 }
 
 impl Default for BinBuffer {
     fn default() -> Self {
         Self {
-            buffer: RawBufferVec::<[Bin; N_BINS]>::new(BufferUsages::STORAGE),
-            counts: [0; N_BINS],
-            bin_counts: StorageBuffer::<BinCounts>::default(),
-        }
-    }
-}
-
-/// A bin containing occluders.
-#[repr(C)]
-#[derive(Zeroable, Pod, Clone, Copy, ShaderType)]
-pub struct Bin {
-    pub occluders: [OccluderPointer; N_OCCLUDERS],
-    pub n_occluders: u32,
-}
-
-impl Default for Bin {
-    fn default() -> Self {
-        Self {
-            occluders: [default(); N_OCCLUDERS],
-            n_occluders: 0,
-        }
-    }
-}
-
-#[derive(Clone, ShaderType)]
-pub struct BinCounts {
-    pub counts: [u32; N_BINS],
-}
-
-impl Default for BinCounts {
-    fn default() -> Self {
-        Self {
-            counts: [0; N_BINS],
+            buffer: RawBufferVec::<OccluderPointer>::new(BufferUsages::STORAGE),
+            bin_indices: StorageBuffer::<BinIndices>::default(),
+            occluders: array::from_fn(|_| default()),
         }
     }
 }
 
 impl BinBuffer {
-    const PI2: f32 = PI * 2.0;
     const N_BINS: f32 = N_BINS as f32;
 
     /// Get the binding of the bins. It is guaranteed to exist.
@@ -531,100 +517,101 @@ impl BinBuffer {
         self.buffer.binding().unwrap()
     }
 
-    /// Get the binding of the number of each bin. It is guaranteed to exist.
-    pub fn bin_count_binding(&self) -> BindingResource<'_> {
-        self.bin_counts.binding().unwrap()
+    /// Get the binding of the end index of each bin. It is guaranteed to exist.
+    pub fn bin_indices_binding(&self) -> BindingResource<'_> {
+        self.bin_indices.binding().unwrap()
     }
 
     /// Write this buffer's data to the GPU. This function also sorts the
     /// occluders by distance enabling early-stopping in GPU checks.
     pub fn write(&mut self, device: &RenderDevice, queue: &RenderQueue) {
-        let values = self.buffer.values_mut();
-        for bin in 0..N_BINS {
-            for index in 0..values.len() {
-                if values[index][bin].n_occluders == 0 {
-                    break;
-                }
+        let mut bin_indices = [0; N_BINS + 1];
 
-                values[index][bin]
-                    .occluders
-                    .sort_unstable_by(|a, b| a.distance.total_cmp(&b.distance));
-            }
+        let mut count = 1;
+
+        let values = self.buffer.values_mut();
+        for (index, bin) in self.occluders.iter_mut().enumerate() {
+            bin.sort_unstable_by(|a, b| a[0].distance.total_cmp(&b[0].distance));
+            let bin: Vec<_> = bin.iter().flatten().map(|x| *x).collect();
+
+            values.extend_from_slice(&bin);
+
+            bin_indices[index] = count as u32;
+            count += bin.len();
         }
+        bin_indices[N_BINS] = count as u32;
 
         self.buffer.write_buffer(device, queue);
 
-        self.bin_counts.set(BinCounts {
-            counts: self.counts,
+        self.bin_indices.set(BinIndices {
+            indices: bin_indices,
         });
-        self.bin_counts.write_buffer(device, queue);
-    }
-
-    fn push_empty(&mut self) {
-        self.buffer.push([default(); N_BINS]);
+        self.bin_indices.write_buffer(device, queue);
     }
 
     /// Clear the buffer and add one empty set of bins.
     pub fn reset(&mut self) {
         self.buffer.clear();
-        self.counts = [0; N_BINS];
-        self.push_empty();
+        self.buffer.push(OccluderPointer::default());
+
+        self.occluders = array::from_fn(|_| default());
     }
 
-    /// Add an occluder to this buffer.
-    pub fn add_occluder(&mut self, occluder: OccluderPointer, min_angle: f32, max_angle: f32) {
-        let min_bin = (((min_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
-        let max_bin = (((max_angle + PI) / Self::PI2) * Self::N_BINS).floor() as i32;
+    /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
+    pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
+        let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
-        let mut bin_index = min_bin;
+        for edge in edges {
+            let min_bin = (((edge.min_angle + PI) / TAU) * Self::N_BINS).floor() as i32;
+            let max_bin = (((edge.max_angle + PI) / TAU) * Self::N_BINS).floor() as i32;
 
-        loop {
-            let values = self.buffer.values_mut();
+            let mut bin_index = min_bin;
 
-            let index = if bin_index < 0 {
-                bin_index + N_BINS as i32
-            } else if bin_index >= N_BINS as i32 {
-                bin_index - N_BINS as i32
-            } else {
-                bin_index
-            } as usize;
+            loop {
+                let index = if bin_index < 0 {
+                    bin_index + N_BINS as i32
+                } else if bin_index >= N_BINS as i32 {
+                    bin_index - N_BINS as i32
+                } else {
+                    bin_index
+                } as usize;
 
-            while self.counts[index] >= values.len() as u32 {
-                values.push([default(); N_BINS]);
+                if self.occluders[index].len() == lengths[index] {
+                    self.occluders[index].push(vec![edge.pointer]);
+                } else {
+                    self.occluders[index][lengths[index]].push(edge.pointer);
+                }
+
+                // if bin_index == max_bin {
+                //     break;
+                // }
+
+                if index == (max_bin % N_BINS as i32) as usize {
+                    break;
+                }
+
+                bin_index += 1;
             }
-
-            let bin = &mut values[self.counts[index] as usize][index];
-
-            bin.occluders[bin.n_occluders as usize] = occluder;
-            bin.n_occluders += 1;
-
-            // if bin.n_occluders > 1 {
-            //     info!(
-            //         "adding occluder of {min_angle} - {max_angle} to bin {bin_index} of {}. bin.n_occcluders: {}",
-            //         self.counts[bin_index], bin.n_occluders
-            //     );
-            // }
-
-            if bin.n_occluders == N_OCCLUDERS as u32 {
-                self.counts[index] += 1;
-            }
-
-            if bin_index == max_bin {
-                break;
-            }
-
-            bin_index += 1;
         }
     }
 }
 
+/// CPU struct describing an occluder or edge.
+pub struct OccluderData {
+    pub pointer: OccluderPointer,
+    pub min_angle: f32,
+    pub max_angle: f32,
+}
+
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  
 #[repr(C)]
-#[derive(Pod, Zeroable, Clone, Copy, ShaderType)]
+#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType)]
 pub struct OccluderPointer {
     /// The index's first bit is the type of occluder: 0 for round, 1 for polygonal.
+    pub index: u32,
+    /// The index of the first vertex of the path in the global vertex buffer, in case the occluder is polygonal.
     ///
-    /// In the case of polygonal occluders, there is additional data positioned on the consecutive bits:
+    /// There is also additional information encoded at the left of this value:
     ///
     /// - A `term` variable that takes 2 bits, describing the terminator format of this chain. This is 1
     /// if the chain ends looping over the atan2 seam, 2 if it starts like that, 3 if the chain starts or ends at the
@@ -633,26 +620,19 @@ pub struct OccluderPointer {
     /// - A `rev` variable that takes 1 bit and specifies if the chain is made of vertices in the same order as they're
     /// stored in (clockwise) or not. This is used for when a light is inside the perimeter of an occluder and the
     /// edges need to be reversed.
-    pub index: u32,
-    /// Only used for polygonal occluders, the index of the first vertex of the chain in the global vertex buffer.
     pub min_v: u32,
-    /// Only used for polygonal occluders, the length of the vertex chain.
+    /// The length of the vertex edge, in case the occluder is polygonal.
+    ///
+    /// There is also additional information encoded at the left of this value:
+    ///
+    /// - A `left extreme` bool that says whether the left end of this path should be considered for soft shadows as an extreme vertex.
+    ///
+    /// - A `right extreme` bool, same as above, but for the right end of the path.
     pub length: u32,
     /// The minimum distance from the occluder to the light source. This is used to accelerate GPU computations,
     /// because a point can't be blocked by this occluder if it's distance is greater than the point's own
-    /// distance to the light soruce.
+    /// distance to the light source.
     pub distance: f32,
-}
-
-impl Default for OccluderPointer {
-    fn default() -> Self {
-        Self {
-            index: 0,
-            min_v: 0,
-            length: 0,
-            distance: f32::MAX,
-        }
-    }
 }
 
 /// A global buffer in which all visible vertices are stored.

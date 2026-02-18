@@ -26,7 +26,7 @@ use bevy::{
 };
 
 use crate::{
-    buffers::{Bin, BinCounts, N_BINS},
+    buffers::{BinIndices, OccluderPointer},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder},
@@ -96,16 +96,16 @@ fn init_lightmap_creation_pipeline(
                 (4, storage_buffer_read_only::<UniformOccluder>(false)),
                 // vertices
                 (5, storage_buffer_read_only::<Vec2>(false)),
+                // occluders
+                (6, storage_buffer_read_only::<OccluderPointer>(false)),
                 // bins
-                (6, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
-                (7, storage_buffer_read_only::<BinCounts>(false)),
+                (7, storage_buffer_read_only::<BinIndices>(false)),
                 // sprite stencil
                 (8, texture_2d(TextureSampleType::Float { filterable: true })),
                 // sprite normal map
                 (9, texture_2d(TextureSampleType::Float { filterable: true })),
                 // config,
                 (10, uniform_buffer::<UniformFireflyConfig>(false)),
-                // bins,
             ),
         ),
     );

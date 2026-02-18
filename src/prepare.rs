@@ -1,10 +1,11 @@
 //! Module that prepares BindGroups for GPU use.
 
-use std::f32::consts::{FRAC_PI_2, PI, TAU};
+use core::f32;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    buffers::{BinBuffer, BufferManager, OccluderPointer, VertexBuffer},
+    buffers::{BinBuffer, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
@@ -276,11 +277,6 @@ pub(crate) fn prepare_data(
 
                     bins.reset();
 
-                    let softness = match camera.5.softness {
-                        None => 0.0,
-                        Some(x) => x.clamp(0.0, 1.0),
-                    };
-
                     for (occluder, round_index, poly_index) in &occluders {
                         if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
                             continue;
@@ -328,7 +324,6 @@ pub(crate) fn prepare_data(
                                 light.inner_range,
                                 0,
                                 occluder_index.index as u32,
-                                softness,
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 false,
@@ -359,7 +354,6 @@ pub(crate) fn prepare_data(
                                 light.inner_range,
                                 vertex_index.index as u32,
                                 occluder_index.index as u32,
-                                softness,
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 true,
@@ -382,7 +376,7 @@ pub(crate) fn prepare_data(
                                 poly_occluders.binding(),
                                 vertices.binding(),
                                 bins.bin_binding(),
-                                bins.bin_count_binding(),
+                                bins.bin_indices_binding(),
                                 &camera.2.0.default_view,
                                 &camera.3.0.default_view,
                                 camera.4.0.binding().unwrap(),
@@ -430,12 +424,10 @@ fn push_vertices(
     light_radius: f32,
     start_vertex: u32,
     index: u32,
-    softness: f32,
     distance: f32,
     rev: bool,
     poly: bool,
 ) {
-    println!("----------");
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
         angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
@@ -447,10 +439,15 @@ fn push_vertices(
         vertices.rev().collect()
     };
 
+    let index = match poly {
+        true => (1 << 31) | index as u32,
+        false => (0 << 31) | index as u32,
+    };
+
+    let mut edges: Vec<OccluderData> = vec![];
+
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
-            info!("pushing slice!");
-
             let rev: u32 = match rev {
                 true => 1,
                 false => 0,
@@ -460,34 +457,6 @@ fn push_vertices(
             let mut right_extreme = true;
 
             if rev == 0 {
-                // let last = if slice.start == 0 {
-                //     vertices[vertices.len() - 2].angle
-                // } else {
-                //     vertices[slice.start as usize - 1].angle
-                // };
-
-                // let vertex = vertices[slice.start as usize].angle;
-
-                // let loops = (vertex - last).abs() > PI;
-
-                // if (!loops && vertex > last) || (loops && vertex < last) {
-                //     left_extreme = false;
-                // }
-
-                // let last = vertices[slice.start as usize + slice.length as usize - 1].angle;
-
-                // let vertex = if slice.start + slice.length == vertices.len() as u32 {
-                //     vertices[1].angle
-                // } else {
-                //     vertices[slice.start as usize + slice.length as usize].angle
-                // };
-
-                // let loops = (vertex - last).abs() > PI;
-
-                // if (!loops && vertex > last) || (loops && vertex < last) {
-                //     right_extreme = false;
-                // }
-
                 if slice.start == 0 {
                     let last = vertices[vertices.len() - 2].angle;
                     let vertex = vertices[0].angle;
@@ -517,67 +486,13 @@ fn push_vertices(
                 if slice.term == 2 {
                     left_extreme = false;
                 }
-
-                // if slice.start == 0 {
-                //     let vertex = vertices[vertices.len() - 1].angle;
-                //     let last = vertices[vertices.len() - 2].angle;
-
-                //     let loops = (vertex - last).abs() > PI;
-
-                //     if (!loops && vertex > last) || (loops && vertex < last) {
-                //         left_extreme = false;
-                //     }
-                // } else if slice.start + slice.length == vertices.len() as u32 {
-                //     let vertex = vertices[1].angle;
-                //     let last = vertices[0].angle;
-
-                //     let loops = (vertex - last).abs() > PI;
-
-                //     if (!loops && vertex > last) || (loops && vertex < last) {
-                //         right_extreme = false;
-                //     }
-                // }
-
-                // if left_extreme && slice.start != 0 && slice.term == 2 {
-                //     let vertex = vertices[slice.start as usize].angle;
-                //     let last = vertices[slice.start as usize - 1].angle;
-
-                //     let loops = (vertex - last).abs() > PI;
-
-                //     if (!loops && vertex > last) || (loops && vertex < last) {
-                //         left_extreme = false;
-                //     }
-                // } else if right_extreme
-                //     && slice.start + slice.length != vertices.len() as u32
-                //     && slice.term == 1
-                // {
-                //     let vertex = vertices[(slice.start + slice.length) as usize].angle;
-                //     let last = vertices[(slice.start + slice.length - 1) as usize].angle;
-
-                //     let loops = (vertex - last).abs() > PI;
-
-                //     if (!loops && vertex > last) || (loops && vertex < last) {
-                //         right_extreme = false;
-                //     }
-                // }
             }
-
-            let index = match poly {
-                true => (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32,
-                false => (0 << 31) | index as u32,
-            };
 
             let l = if left_extreme { 1 } else { 0 };
             let r = if right_extreme { 1 } else { 0 };
 
+            let min_v = (slice.term << 30) | (rev << 29) | (slice.start + start_vertex);
             let length = (l << 31) | (r << 30) | slice.length;
-
-            let occluder = OccluderPointer {
-                index,
-                min_v: slice.start + start_vertex,
-                length,
-                distance,
-            };
 
             let left = occluder_vertices[vertices[slice.start as usize].index as usize];
 
@@ -615,25 +530,16 @@ fn push_vertices(
                 )
                 .acos();
 
-            warn!("left: {angle_left}");
-            warn!("right: {angle_right}");
-
-            bins.add_occluder(
-                occluder,
-                slice.start_angle - angle_left,
-                slice.end_angle + angle_right,
-            );
-
-            // match slice.term {
-            //     0 => bins.add_occluder(
-            //         occluder,
-            //         slice.start_angle - softness,
-            //         slice.end_angle + softness,
-            //     ),
-            //     1 => bins.add_occluder(occluder, -PI /*slice.start_angle - softness*/, PI),
-            //     2 => bins.add_occluder(occluder, -PI, PI /*slice.end_angle + softness*/),
-            //     _ => {}
-            // }
+            edges.push(OccluderData {
+                pointer: OccluderPointer {
+                    index,
+                    min_v,
+                    length,
+                    distance,
+                },
+                min_angle: slice.start_angle - angle_left,
+                max_angle: slice.end_angle + angle_right,
+            });
         }
     };
 
@@ -695,6 +601,8 @@ fn push_vertices(
     }
 
     push_slice(&slice);
+
+    bins.add_occluder(edges);
 }
 
 fn prepare_light_luts(

@@ -67,15 +67,9 @@ struct FireflyConfig {
     normal_attenuation: f32,
 }
 
-// Should correspond to the values in buffers.rs!
+// Should correspond to the value in buffers.rs!
 const N_BINS: u32 = 128;
-const N_OCCLUDERS: u32 = 32; 
 
-struct Bin {
-    occluders: array<OccluderPointer, N_OCCLUDERS>,
-    n_occluders: u32,
-}
-
-struct BinCounts {
-    counts: array<u32, N_BINS>,
+struct BinIndices {
+    indices: array<u32, N_BINS>,
 }

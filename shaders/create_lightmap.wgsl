@@ -7,7 +7,7 @@
 
 #import firefly::types::{
     view, PointLight, LightingData, PolyOccluder, RoundOccluder, OccluderPointer, 
-    FireflyConfig, Bin, BinCounts, N_OCCLUDERS, N_BINS,
+    FireflyConfig, BinIndices, N_BINS,
 }
 
 #import firefly::utils::{
@@ -36,10 +36,10 @@ var<storage> poly_occluders: array<PolyOccluder>;
 var<storage> vertices: array<vec2f>;
 
 @group(1) @binding(6)
-var<storage> bins: array<array<Bin, N_BINS>>;
+var<storage> occluders: array<OccluderPointer>;
 
 @group(1) @binding(7)
-var<storage> bin_counts: BinCounts;
+var<storage> bin_indices: BinIndices;
 
 @group(1) @binding(8)
 var sprite_stencil: texture_2d<f32>;
@@ -117,60 +117,63 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         let bin = u32(floor(((atan2(pos.y - light.pos.y, pos.x - light.pos.x) + PI) / PI2) * f32(N_BINS)));
 
-        for (var bin_set = 0u; bin_set <= bin_counts.counts[bin]; bin_set += 1) {
-            if bins[bin_set][bin].n_occluders == 0 {
-                // return vec4f(1, 0, 0, 1);
-                break;
+        let left = bin_indices.indices[bin]; 
+        let right = bin_indices.indices[bin + 1];
+
+        for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
+            let pointer = occluders[pointer_index];
+            
+            if pointer.distance > dist { break; }
+            
+            let occluder_type = pointer.index & 2147483648u;
+            let occluder_index = pointer.index & 2147483647u;
+
+            // round occluder
+            if occluder_type == 0 {
+                if stencil.a > 0.1 {
+                    if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= round_occluders[occluder_index].z {
+                        continue;
+                    }
+                }
+
+                let result = round_check(pos, occluder_index); 
+
+                if result.occluded == true {
+                    shadow = shadow_blend(shadow, round_occluders[occluder_index].color, round_occluders[occluder_index].opacity);
+                }                    
+                // else if config.softness > 0 && result.extreme_angle < soft_angle {
+                //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
+                // }
             }
+            // poly occluder
+            else {
+                res.r = 1.0;
 
-            for (var i = 0u; i < bins[bin_set][bin].n_occluders; i += 1) {
-
-                if bins[bin_set][bin].occluders[i].distance > dist { break; }
-
-                let occluder_type = bins[bin_set][bin].occluders[i].index & 2147483648u;
-
-                // round occluder
-                if occluder_type == 0 {
-                    let index = bins[bin_set][bin].occluders[i].index;
-                    
-                    if stencil.a > 0.1 {
-                        if config.z_sorting == 1 && round_occluders[index].z_sorting == 1 && stencil.g >= round_occluders[index].z {
-                            continue;
-                        }
-                    }
-
-                    let result = round_check(pos, index); 
-    
-                    if result.occluded == true {
-                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
-                    }                    
-                    // else if config.softness > 0 && result.extreme_angle < soft_angle {
-                    //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
-                    // }
-                }
-                // poly occluder
-                else {
-                    res.r = 1.0;
-
-                    let index = (bins[bin_set][bin].occluders[i].index << 4) >> 4; 
-
-                    if stencil.a > 0.1 {
-                        if config.z_sorting == 1 && poly_occluders[index].z_sorting == 1 && stencil.g >= poly_occluders[index].z {
-                            continue;
-                        }
-                    }
-
-                    let result = is_occluded(pos, bins[bin_set][bin].occluders[i], index); 
-
-                    if result > 0.0 {
-                        shadow = shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * result);
+                if stencil.a > 0.1 {
+                    if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z {
+                        continue;
                     }
                 }
 
-                if dot(shadow, shadow) < 0.0001 {
-                    break;
+                let term = (pointer.min_v & 3221225472u) >> 30u;
+
+                // if term == 2u {
+                //     return vec4f(0, 1, 0, 1);
+                // }
+                let rev = (pointer.min_v & 536870912u) >> 29u;
+                let min_v = pointer.min_v & 536870911u;
+
+                let left_extreme = (pointer.length & 2147483648u) != 0u;
+                let right_extreme = (pointer.length & 1073741824u) != 0u;
+                let length = pointer.length & 1073741823u;
+
+                let result = poly_check(pos, occluder_index, term, rev, min_v, left_extreme, right_extreme, length); 
+
+                if result > 0.0 {
+                    shadow = shadow_blend(shadow, poly_occluders[occluder_index].color, poly_occluders[occluder_index].opacity * result);
                 }
             }
+            
 
             if dot(shadow, shadow) < 0.0001 {
                 break;
@@ -198,27 +201,19 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     return angle;
 }
 
-fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
+fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extreme: bool, right_extreme: bool, length: u32) -> f32 {
     let light = lights[light_index];
     let occluder = poly_occluders[index];
-
-    let term = (pointer.index & 1610612736u) >> 29;
-    let rev = (pointer.index & 268435456u) >> 28;
 
     let angle = atan2(pos.y - light.pos.y, pos.x - light.pos.x);
 
     var maybe_prev = 0; 
 
-    var left_extreme = pointer.length & 2147483648u;
-    var right_extreme = pointer.length & 1073741824u;
-
-    let length = pointer.length & 1073741823u;
-
     if rev == 0 {
-        maybe_prev = bs_vertex_forward(angle, pointer.min_v, length, term);
+        maybe_prev = bs_vertex_forward(angle, min_v, length, term);
     }
     else {
-        maybe_prev = bs_vertex_reverse(angle, pointer.min_v, length, term);
+        maybe_prev = bs_vertex_reverse(angle, min_v, length, term);
     }
 
     var is_occluded = false;
@@ -250,23 +245,28 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
 
     if !out_of_bounds {
         if rev == 0 {
-            is_occluded = !same_orientation(vertices[pointer.min_v + u32(maybe_prev)], vertices[pointer.min_v + u32(maybe_prev) + 1], pos, light.pos);
+            is_occluded = !same_orientation(vertices[min_v + u32(maybe_prev)], vertices[min_v + u32(maybe_prev) + 1], pos, light.pos);
         }
         else {
-            is_occluded = !same_orientation(vertices[pointer.min_v - u32(maybe_prev)], vertices[pointer.min_v - u32(maybe_prev) - 1], pos, light.pos);
+            is_occluded = !same_orientation(vertices[min_v - u32(maybe_prev)], vertices[min_v - u32(maybe_prev) - 1], pos, light.pos);
         }
     }
 
     if config.softness > 0 && (is_occluded || out_of_bounds){
         if rev == 0 {
 
-            if dot(light.pos - vertices[pointer.min_v + length - 1], vertices[pointer.min_v + length - 2] - vertices[pointer.min_v + length - 1]) < 0 
-            && same_orientation(vertices[pointer.min_v + length - 2], vertices[pointer.min_v + length - 1], pos, light.pos) {
-                right_extreme = 0;
+            var check_left = left_extreme; 
+            var check_right = right_extreme;
+
+            if check_left 
+            && dot(light.pos - vertices[min_v + length - 1], vertices[min_v + length - 2] - vertices[min_v + length - 1]) < 0 
+            && same_orientation(vertices[min_v + length - 2], vertices[min_v + length - 1], pos, light.pos) {
+                check_left = false;
             }
-            if dot(light.pos - vertices[pointer.min_v], vertices[pointer.min_v + 1] - vertices[pointer.min_v]) < 0  
-            && same_orientation(vertices[pointer.min_v], vertices[pointer.min_v + 1], pos, light.pos) {
-                left_extreme = 0;
+            if check_right 
+            && dot(light.pos - vertices[min_v], vertices[min_v + 1] - vertices[min_v]) < 0  
+            && same_orientation(vertices[min_v], vertices[min_v + 1], pos, light.pos) {
+                check_right = false;
             }
 
             var next = vec2<f32>(0.0);
@@ -274,18 +274,18 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
 
             // if !out_of_bounds {
 
-            if pointer.min_v == occluder.vertex_start {
+            if min_v == occluder.vertex_start {
                 prev = vertices[occluder.vertex_start + occluder.n_vertices - 2];
             }
             else {
-                prev = vertices[pointer.min_v - 1];
+                prev = vertices[min_v - 1];
             }
 
-            if pointer.min_v + pointer.length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
+            if min_v + length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
                 next = vertices[occluder.vertex_start + 1];
             }
             else {
-                next = vertices[pointer.min_v + pointer.length];
+                next = vertices[min_v + length];
             }
             
             // if dot(light.pos )
@@ -298,10 +298,10 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
             //     return 1.0;
             // }
             
-            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v + length - 1], bounds, left_extreme, right_extreme);
+            return get_softness_multi(pos, vertices[min_v], vertices[min_v + length - 1], bounds, check_left, check_right);
         }
         else {
-            return get_softness_multi(pos, vertices[pointer.min_v], vertices[pointer.min_v - length + 1], bounds, 0u, 0u);
+            return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds, false, false);
         }
     }
     
@@ -313,7 +313,7 @@ fn is_occluded(pos: vec2f, pointer: OccluderPointer, index: u32) -> f32 {
     }
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32, check_left: u32, check_right: u32) -> f32 {
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32, left_extreme: bool, right_extreme: bool) -> f32 {
     let light = lights[light_index];
 
     let left_range = min(light.inner_range, distance(extreme_left, light.pos)); 
@@ -334,14 +334,14 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
 
     var ok = false;
 
-    if check_left != 0u && acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
+    if left_extreme && acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left1, left2));
 
         ok = ok || true;
         // return 1.0;
     }
 
-    if check_right != 0u && acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
+    if right_extreme && acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right2));
 
         ok = ok || true; 

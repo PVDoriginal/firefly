@@ -27,7 +27,7 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            softness: Some(0.5),
+            softness: None,
             // light_bands: Some(0.7),
             ..default()
         },
@@ -47,20 +47,20 @@ fn setup(mut commands: Commands) {
     ));
 
     // occluders
-    // commands.spawn((
-    //     Occluder2d::rectangle(22.0, 14.0),
-    //     Transform::from_translation(vec3(-322., 164., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(22.0, 14.0),
+        Transform::from_translation(vec3(-322., 164., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-166., 56., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-166., 56., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-417., 106., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-417., 106., 0.)),
+    ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
@@ -80,20 +80,20 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polyline(vec![
-    //         vec2(-97., 108.),
-    //         vec2(-58., 163.),
-    //         vec2(-25., 105.),
-    //         vec2(-109., 53.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polyline(vec![
+            vec2(-97., 108.),
+            vec2(-58., 163.),
+            vec2(-25., 105.),
+            vec2(-109., 53.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
@@ -111,15 +111,15 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::circle(23.),
-    //     Transform::from_translation(vec3(-216., -33., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::circle(23.),
+        Transform::from_translation(vec3(-216., -33., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(69., 10.),
-    //     Transform::from_translation(vec3(-387., 81., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(69., 10.),
+        Transform::from_translation(vec3(-387., 81., 0.)),
+    ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
@@ -133,41 +133,41 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::round_rectangle(53., 38., 23.),
-    //     Transform::from_translation(vec3(-58., -1., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::round_rectangle(53., 38., 23.),
+        Transform::from_translation(vec3(-58., -1., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(16., 76.),
-    //     Transform::from_translation(vec3(-18., 211., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(16., 76.),
+        Transform::from_translation(vec3(-18., 211., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 20.),
-    //     Transform::from_translation(vec3(-335., 133., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 20.),
+        Transform::from_translation(vec3(-335., 133., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(15., 40.),
-    //     Transform::from_translation(vec3(-258., 278., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(15., 40.),
+        Transform::from_translation(vec3(-258., 278., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-203., 91., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-203., 91., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::capsule(65., 11.),
-    //     Transform::from_translation(vec3(-127., -102., 0.))
-    //         .with_rotation(Quat::from_rotation_z(0.5)),
-    // ));
+    commands.spawn((
+        Occluder2d::capsule(65., 11.),
+        Transform::from_translation(vec3(-127., -102., 0.))
+            .with_rotation(Quat::from_rotation_z(0.5)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-109., 210., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-109., 210., 0.)),
+    ));
 }
 
 fn move_light(
