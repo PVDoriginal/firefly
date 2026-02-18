@@ -481,7 +481,7 @@ pub struct BinBuffer {
     /// Indices describing where each bin starts, written to the GPU. The extra value at the end is the maximum index / length.  
     bin_indices: StorageBuffer<BinIndices>,
     /// Data stored on the CPU.
-    occluders: [Vec<Vec<OccluderPointer>>; N_BINS],
+    occluders: [Vec<OccluderPointer>; N_BINS],
 }
 
 /// Wrapper for the bin indices, so it can impl Default.
@@ -531,9 +531,8 @@ impl BinBuffer {
 
         let values = self.buffer.values_mut();
         for (index, bin) in self.occluders.iter_mut().enumerate() {
-            bin.sort_unstable_by(|a, b| a[0].distance.total_cmp(&b[0].distance));
-            let bin: Vec<_> = bin.iter().flatten().map(|x| *x).collect();
-
+            bin.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+            // let bin: Vec<_> = bin.iter().flatten().map(|x| *x).co
             values.extend_from_slice(&bin);
 
             bin_indices[index] = count as u32;
@@ -559,7 +558,7 @@ impl BinBuffer {
 
     /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
     pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
-        let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
+        // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
         for edge in edges {
             let min_bin = (((edge.min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
@@ -576,11 +575,11 @@ impl BinBuffer {
                 //     bin_index
                 // } as usize;
 
-                if self.occluders[index].len() == lengths[index] {
-                    self.occluders[index].push(vec![edge.pointer]);
-                } else {
-                    self.occluders[index][lengths[index]].push(edge.pointer);
-                }
+                // if self.occluders[index].len() == lengths[index] {
+                self.occluders[index].push(edge.pointer);
+                // } else {
+                //     self.occluders[index][lengths[index]].push(edge.pointer);
+                // }
 
                 // if bin_index == max_bin {
                 //     break;
