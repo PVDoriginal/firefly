@@ -327,6 +327,7 @@ pub(crate) fn prepare_data(
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 false,
+                                camera.5.softness.is_some(),
                             );
                         } else {
                             let Some(occluder_index) = poly_index.occluder else {
@@ -357,6 +358,7 @@ pub(crate) fn prepare_data(
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 true,
+                                camera.5.softness.is_some(),
                             );
                         }
                     }
@@ -427,6 +429,7 @@ fn push_vertices(
     distance: f32,
     rev: bool,
     poly: bool,
+    soft_shadows: bool,
 ) {
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
@@ -494,41 +497,54 @@ fn push_vertices(
             let min_v = (slice.term << 30) | (rev << 29) | (slice.start + start_vertex);
             let length = (l << 31) | (r << 30) | slice.length;
 
-            let left = occluder_vertices[vertices[slice.start as usize].index as usize];
-
-            let angle_left = (light_pos - left)
-                .normalize()
-                .dot(
-                    (light_pos
-                        + Vec2::from_angle(FRAC_PI_2)
-                            .rotate(left - light_pos)
-                            .normalize()
-                            * light_radius
-                        - left)
-                        .normalize(),
-                )
-                .acos();
-
-            let right = if rev == 0 {
-                occluder_vertices
-                    [vertices[slice.start as usize + slice.length as usize - 1].index as usize]
+            let angle_left = if !soft_shadows {
+                0.0
             } else {
-                occluder_vertices
-                    [vertices[slice.start as usize - slice.length as usize].index as usize]
+                let left = occluder_vertices[vertices[slice.start as usize].index as usize];
+                (light_pos - left)
+                    .normalize()
+                    .dot(
+                        (light_pos
+                            + Vec2::from_angle(FRAC_PI_2)
+                                .rotate(left - light_pos)
+                                .normalize()
+                                * light_radius
+                            - left)
+                            .normalize(),
+                    )
+                    .acos()
             };
 
-            let angle_right = (light_pos - right)
-                .normalize()
-                .dot(
-                    (light_pos
-                        + Vec2::from_angle(FRAC_PI_2)
-                            .rotate(right - light_pos)
-                            .normalize()
-                            * light_radius
-                        - right)
-                        .normalize(),
-                )
-                .acos();
+            let angle_right = if !soft_shadows {
+                0.0
+            } else {
+                let right = occluder_vertices
+                    [vertices[slice.start as usize + slice.length as usize - 1].index as usize];
+                (light_pos - right)
+                    .normalize()
+                    .dot(
+                        (light_pos
+                            + Vec2::from_angle(FRAC_PI_2)
+                                .rotate(right - light_pos)
+                                .normalize()
+                                * light_radius
+                            - right)
+                            .normalize(),
+                    )
+                    .acos()
+            };
+
+            let start_angle = if slice.term == 2 {
+                -PI
+            } else {
+                (slice.start_angle - angle_left).max(-PI)
+            };
+
+            let end_angle = if slice.term == 1 {
+                PI
+            } else {
+                (slice.end_angle + angle_right).min(PI)
+            };
 
             edges.push(OccluderData {
                 pointer: OccluderPointer {
@@ -537,8 +553,8 @@ fn push_vertices(
                     length,
                     distance,
                 },
-                min_angle: slice.start_angle - angle_left,
-                max_angle: slice.end_angle + angle_right,
+                min_angle: start_angle,
+                max_angle: end_angle,
             });
         }
     };

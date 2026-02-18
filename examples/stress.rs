@@ -19,12 +19,12 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 1.8;
-const OCCLUDER_FREQ: f32 = 0.12;
+const LIGHT_FREQ: f32 = 0.6;
+const OCCLUDER_FREQ: f32 = 0.04;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
-const MOVE_FREQ: f32 = 0.3;
+const MOVE_FREQ: f32 = 1.0;
 
 impl Default for Timers {
     fn default() -> Self {

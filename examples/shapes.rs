@@ -27,7 +27,7 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            softness: None,
+            softness: Some(0.5),
             // light_bands: Some(0.7),
             ..default()
         },
@@ -133,10 +133,10 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    commands.spawn((
-        Occluder2d::round_rectangle(53., 38., 23.),
-        Transform::from_translation(vec3(-58., -1., 0.)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::round_rectangle(53., 38., 23.),
+    //     Transform::from_translation(vec3(-58., -1., 0.)),
+    // ));
 
     commands.spawn((
         Occluder2d::rectangle(16., 76.),
@@ -148,26 +148,26 @@ fn setup(mut commands: Commands) {
         Transform::from_translation(vec3(-335., 133., 0.)),
     ));
 
-    commands.spawn((
-        Occluder2d::rectangle(15., 40.),
-        Transform::from_translation(vec3(-258., 278., 0.)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::rectangle(15., 40.),
+    //     Transform::from_translation(vec3(-258., 278., 0.)),
+    // ));
 
-    commands.spawn((
-        Occluder2d::rectangle(10., 10.),
-        Transform::from_translation(vec3(-203., 91., 0.)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::rectangle(10., 10.),
+    //     Transform::from_translation(vec3(-203., 91., 0.)),
+    // ));
 
-    commands.spawn((
-        Occluder2d::capsule(65., 11.),
-        Transform::from_translation(vec3(-127., -102., 0.))
-            .with_rotation(Quat::from_rotation_z(0.5)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::capsule(65., 11.),
+    //     Transform::from_translation(vec3(-127., -102., 0.))
+    //         .with_rotation(Quat::from_rotation_z(0.5)),
+    // ));
 
-    commands.spawn((
-        Occluder2d::rectangle(10., 10.),
-        Transform::from_translation(vec3(-109., 210., 0.)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::rectangle(10., 10.),
+    //     Transform::from_translation(vec3(-109., 210., 0.)),
+    // ));
 }
 
 fn move_light(

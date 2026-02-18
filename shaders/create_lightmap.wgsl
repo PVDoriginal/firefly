@@ -120,6 +120,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         let left = bin_indices.indices[bin]; 
         let right = bin_indices.indices[bin + 1];
 
+        if left >= right {
+            return vec4f(0, 0, 1, 1);
+        }
+
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
             

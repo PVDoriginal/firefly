@@ -562,19 +562,19 @@ impl BinBuffer {
         let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
         for edge in edges {
-            let min_bin = (((edge.min_angle + PI) / TAU) * Self::N_BINS).floor() as i32;
-            let max_bin = (((edge.max_angle + PI) / TAU) * Self::N_BINS).floor() as i32;
+            let min_bin = (((edge.min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
+            let max_bin = (((edge.max_angle + PI) / TAU) * Self::N_BINS)
+                .floor()
+                .min(Self::N_BINS - 1.0) as usize;
 
-            let mut bin_index = min_bin;
-
-            loop {
-                let index = if bin_index < 0 {
-                    bin_index + N_BINS as i32
-                } else if bin_index >= N_BINS as i32 {
-                    bin_index - N_BINS as i32
-                } else {
-                    bin_index
-                } as usize;
+            for index in min_bin..(max_bin + 1) {
+                // let index = if bin_index < 0 {
+                //     bin_index + N_BINS as i32
+                // } else if bin_index >= N_BINS as i32 {
+                //     bin_index - N_BINS as i32
+                // } else {
+                //     bin_index
+                // } as usize;
 
                 if self.occluders[index].len() == lengths[index] {
                     self.occluders[index].push(vec![edge.pointer]);
@@ -586,11 +586,11 @@ impl BinBuffer {
                 //     break;
                 // }
 
-                if index == (max_bin % N_BINS as i32) as usize {
-                    break;
-                }
+                // if index == (max_bin % N_BINS as i32) as usize {
+                //     break;
+                // }
 
-                bin_index += 1;
+                // bin_index += 1;
             }
         }
     }
