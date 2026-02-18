@@ -139,11 +139,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                         }
                     }
 
-                    // let result = round_check(pos, index); 
+                    let result = round_check(pos, index); 
     
-                    // if result.occluded == true {
-                    //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
-                    // }                    
+                    if result.occluded == true {
+                        shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity);
+                    }                    
                     // else if config.softness > 0 && result.extreme_angle < soft_angle {
                     //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
                     // }
@@ -477,83 +477,88 @@ fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
 //     return ans;
 // }
 
+struct OcclusionResult {
+    occluded: bool, 
+    extreme_angle: f32,
+}
+
 // checks if pixel is blocked by round occluder
-// fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
-//     let light = lights[light_index];
+fn round_check(pos: vec2f, occluder: u32) -> OcclusionResult {
+    let light = lights[light_index];
 
-//     let occ = round_occluders[occluder];
-//     let half_w = occ.width * 0.5;
-//     let half_h = occ.height * 0.5;
-//     let radius = occ.radius;
+    let occ = round_occluders[occluder];
+    let half_w = occ.width * 0.5;
+    let half_h = occ.height * 0.5;
+    let radius = occ.radius;
 
-//     let relative_pos = pos - occ.pos; 
-//     let relative_light = light.pos - occ.pos; 
+    let relative_pos = pos - occ.pos; 
+    let relative_light = light.pos - occ.pos; 
 
-//     var rot = round_occluders[occluder].rot;
+    var rot = round_occluders[occluder].rot;
     
-//     if (rot > PI2) {
-//         rot = rot - PI2 * floor(rot / PI2);
-//     }
+    if (rot > PI2) {
+        rot = rot - PI2 * floor(rot / PI2);
+    }
 
-//     let c = cos(occ.rot);
-//     let s = sin(occ.rot);
+    let c = cos(occ.rot);
+    let s = sin(occ.rot);
 
-//     let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
-//     let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
+    let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
+    let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
 
-//     var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
+    var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
 
-//     var extreme_angle = 10.0;
+    var extreme_angle = 10.0;
 
-//     if !rect_line_intersection(p_local, l_local, rect) {
+    if !rect_line_intersection(p_local, l_local, rect) {
 
-//         if config.softness > 0 {
-//             extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
-//         }
+        if config.softness > 0 {
+            extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
+        }
 
-//         return OcclusionResult(false, extreme_angle);
-//     }
+        return OcclusionResult(false, extreme_angle);
+    }
 
-//     if (occ.width > 0) {
-//         // top edge
-//         if intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false) {
-//             return OcclusionResult(true, 0.0);
-//         }
+    if (occ.width > 0) {
+        // top edge
+        if intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false) {
+            return OcclusionResult(true, 0.0);
+        }
 
-//         // bottom edge
-//         if intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false) {
-//             return OcclusionResult(true, 0.0);
-//         }
-//     }
+        // bottom edge
+        if intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false) {
+            return OcclusionResult(true, 0.0);
+        }
+    }
 
-//     if (occ.height > 0) {
-//         // right edge
-//         if intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true) {
-//             return OcclusionResult(true, 0.0);
-//         }
+    if (occ.height > 0) {
+        // right edge
+        if intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true) {
+            return OcclusionResult(true, 0.0);
+        }
 
-//         // left edge
-//         if intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true) {
-//             return OcclusionResult(true, 0.0);
-//         }
-//     }
+        // left edge
+        if intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true) {
+            return OcclusionResult(true, 0.0);
+        }
+    }
 
-//     if (radius > 0) {
-//         let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
-//         let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-//         for(var i = 0u; i < 4u; i++) {
-//             if intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]) { 
-//                 return OcclusionResult(true, 0.0); 
-//             }
-//         }
-//     }
+    if (radius > 0) {
+        let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
+        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
+        for(var i = 0u; i < 4u; i++) {
+            if intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]) { 
+                return OcclusionResult(true, 0.0); 
+            }
+        }
+    }
 
-//     if config.softness > 0 {
-//         extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
-//     }
+    if config.softness > 0 {
+        extreme_angle = get_round_extreme_angle(half_w, half_h, p_local, l_local, radius);
+    }
 
-//     return OcclusionResult(false, extreme_angle);
-// }
+    return OcclusionResult(false, extreme_angle);
+}
 
 fn get_round_extreme_angle(half_w: f32, half_h: f32, p_local: vec2f, l_local: vec2f, radius: f32) -> f32 {
     var extreme_angle = 10.0;

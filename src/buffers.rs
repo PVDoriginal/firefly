@@ -192,7 +192,8 @@ fn prepare_lights(
             height: light.height,
         };
 
-        let new_index = light_manager.set_value(&light, index.0, changed);
+        let new_index =
+            light_manager.set_value(&light, index.0, changed, &render_device, &render_queue);
         index.0 = Some(new_index);
     }
 
@@ -242,7 +243,13 @@ fn prepare_occluders(
             // assert_eq!(std::mem::size_of::<UniformRoundOccluder>(), 64);
             // assert_eq!(std::mem::align_of::<UniformRoundOccluder>(), 16);
 
-            let new_index = round_manager.set_value(&value, round_index.0, changed);
+            let new_index = round_manager.set_value(
+                &value,
+                round_index.0,
+                changed,
+                &render_device,
+                &render_queue,
+            );
             round_index.0 = Some(new_index);
         } else {
             let vertex_index = vertex_buffer.write_vertices(
@@ -268,7 +275,13 @@ fn prepare_occluders(
                 _pad1: [0, 0, 0],
             };
 
-            let new_index = poly_manager.set_value(&value, poly_index.occluder, changed);
+            let new_index = poly_manager.set_value(
+                &value,
+                poly_index.occluder,
+                changed,
+                &render_device,
+                &render_queue,
+            );
             poly_index.occluder = Some(new_index);
         }
     }
@@ -277,6 +290,9 @@ fn prepare_occluders(
     poly_manager.flush(&render_device, &render_queue);
     vertex_buffer.pass(&render_device, &render_queue);
 }
+
+/// The max number of elements that will be written in a single command by [`BufferManager`].
+const MAX_SINGLE_WRITE_LENGTH: usize = 64;
 
 /// This resource is a wrapper around [`RawBufferVec`] that reserves and distributes VRAM slots to
 /// a set of entities that are intended to be transferred to the GPU. It is currently used for Occluders and Lights.
@@ -343,6 +359,8 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         value: &T,
         index: Option<BufferIndex>,
         changed: bool,
+        device: &RenderDevice,
+        queue: &RenderQueue,
     ) -> BufferIndex {
         if !changed
             && let Some(index) = index
@@ -368,8 +386,18 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
             self.buffer.set(index as u32, *value);
         }
 
-        self.write_min = self.write_min.min(index);
-        self.write_max = self.write_max.max(index);
+        let next_min = self.write_min.min(index);
+        let next_max = self.write_max.max(index);
+
+        if next_max - next_min > MAX_SINGLE_WRITE_LENGTH {
+            self.write(device, queue);
+
+            self.write_min = index;
+            self.write_max = index;
+        } else {
+            self.write_min = next_min;
+            self.write_max = next_max;
+        }
 
         BufferIndex {
             index,
@@ -377,8 +405,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         }
     }
 
-    /// Flush the changes at the end of a render frame. This writes all changes to the GPU.
-    pub fn flush(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+    fn write(&mut self, device: &RenderDevice, queue: &RenderQueue) {
         if self.write_min != usize::MAX {
             if self.write_max >= self.buffer.capacity() {
                 self.buffer.reserve(
@@ -401,6 +428,11 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         //     self.buffer.capacity(),
         //     self.free_indices.len(),
         // );
+    }
+
+    /// Flush the changes at the end of a render frame. This writes all changes to the GPU.
+    pub fn flush(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+        self.write(device, queue);
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
         if self.free_indices.len() > 500

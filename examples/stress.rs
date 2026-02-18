@@ -8,6 +8,7 @@ use bevy::{
         LogDiagnosticsPlugin, LogDiagnosticsState, SystemInformationDiagnosticsPlugin,
     },
     prelude::*,
+    window::PresentMode,
 };
 use bevy_firefly::prelude::*;
 use rand::{Rng, rng, seq::IndexedRandom};
@@ -18,12 +19,12 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 0.3;
-const OCCLUDER_FREQ: f32 = 0.04;
+const LIGHT_FREQ: f32 = 1.8;
+const OCCLUDER_FREQ: f32 = 0.12;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
 
-const MOVE_FREQ: f32 = 1.0;
+const MOVE_FREQ: f32 = 0.3;
 
 impl Default for Timers {
     fn default() -> Self {
@@ -39,7 +40,10 @@ fn main() {
 
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window { ..default() }),
+            primary_window: Some(Window {
+                present_mode: PresentMode::Immediate,
+                ..default()
+            }),
             ..default()
         }),
         FireflyPlugin,
