@@ -9,7 +9,7 @@
 use core::f32;
 use std::{
     array,
-    collections::VecDeque,
+    collections::{BinaryHeap, VecDeque},
     f32::consts::{PI, TAU},
 };
 
@@ -481,7 +481,7 @@ pub struct BinBuffer {
     /// Indices describing where each bin starts, written to the GPU. The extra value at the end is the maximum index / length.  
     bin_indices: StorageBuffer<BinIndices>,
     /// Data stored on the CPU.
-    occluders: [Vec<OccluderPointer>; N_BINS],
+    occluders: [BinaryHeap<OccluderPointer>; N_BINS],
 }
 
 /// Wrapper for the bin indices, so it can impl Default.
@@ -531,9 +531,7 @@ impl BinBuffer {
 
         let values = self.buffer.values_mut();
         for (index, bin) in self.occluders.iter_mut().enumerate() {
-            bin.sort_by(|a, b| a.distance.total_cmp(&b.distance));
-            // let bin: Vec<_> = bin.iter().flatten().map(|x| *x).co
-            values.extend_from_slice(&bin);
+            values.extend_from_slice(&bin.clone().into_sorted_vec());
 
             bin_indices[index] = count as u32;
             count += bin.len();
@@ -567,29 +565,7 @@ impl BinBuffer {
                 .min(Self::N_BINS - 1.0) as usize;
 
             for index in min_bin..(max_bin + 1) {
-                // let index = if bin_index < 0 {
-                //     bin_index + N_BINS as i32
-                // } else if bin_index >= N_BINS as i32 {
-                //     bin_index - N_BINS as i32
-                // } else {
-                //     bin_index
-                // } as usize;
-
-                // if self.occluders[index].len() == lengths[index] {
                 self.occluders[index].push(edge.pointer);
-                // } else {
-                //     self.occluders[index][lengths[index]].push(edge.pointer);
-                // }
-
-                // if bin_index == max_bin {
-                //     break;
-                // }
-
-                // if index == (max_bin % N_BINS as i32) as usize {
-                //     break;
-                // }
-
-                // bin_index += 1;
             }
         }
     }
@@ -632,6 +608,26 @@ pub struct OccluderPointer {
     /// because a point can't be blocked by this occluder if it's distance is greater than the point's own
     /// distance to the light source.
     pub distance: f32,
+}
+
+impl PartialEq for OccluderPointer {
+    fn eq(&self, other: &Self) -> bool {
+        self.distance == other.distance
+    }
+}
+
+impl Eq for OccluderPointer {}
+
+impl PartialOrd for OccluderPointer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (self.distance).partial_cmp(&other.distance)
+    }
+}
+
+impl Ord for OccluderPointer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.distance).total_cmp(&other.distance)
+    }
 }
 
 /// A global buffer in which all visible vertices are stored.
