@@ -79,6 +79,9 @@
 //! - **Light Banding**: You can enable [light bands](crate::prelude::FireflyConfig::light_bands) on [FireflyConfig](crate::prelude::FireflyConfig) to
 //! reduce the lightmap to a certain number of 'bands', creating a stylized look.
 //!
+//! - **Debug**: The [FireflyGizmosPlugin](crate::prelude::FireflyGizmosPlugin) shows the exact range and shape of lights and occluders. It can be configured
+//! via the [FireflyGizmoStyle](crate::prelude::FireflyGizmoStyle) resource.
+//!
 //! # Upcoming Features
 //!
 //! Here are some of the features that are currently planned:
@@ -111,7 +114,7 @@ mod utils;
 pub(crate) use phases::*;
 
 pub mod prelude {
-    pub use crate::app::{FireflyGizmosPlugin, FireflyPlugin};
+    pub use crate::app::{FireflyGizmosPlugin, FireflyGizmoStyle, FireflyPlugin};
     pub use crate::data::{FireflyConfig, NormalMode};
     pub use crate::lights::{Falloff, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
