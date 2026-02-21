@@ -49,6 +49,7 @@
 //! - [Polylines](crate::occluders::Occluder2d::polyline).
 //! - [Polygons](crate::occluders::Occluder2d::polygon) (concave and convex).
 //! - Round shapes such as [circles](crate::occluders::Occluder2d::circle), [capsules](crate::occluders::Occluder2d::capsule), [round rectangles](crate::occluders::Occluder2d::round_rectangle).
+//! - [Splines](crate::occluders::Occluder2d::spline) are sampled into [polylines](crate::occluders::Occluder2d::polyline).
 //!
 //! Occluders have an [opacity](crate::occluders::Occluder2d::opacity), ranging from transprent to fully opaque, and can cast [colored shadows](crate::occluders::Occluder2d::opacity).   
 //!

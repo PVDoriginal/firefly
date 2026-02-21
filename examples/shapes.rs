@@ -158,6 +158,23 @@ fn setup(mut commands: Commands) {
         Occluder2d::rectangle(10., 10.),
         Transform::from_translation(vec3(-109., 210., 0.)),
     ));
+
+    commands.spawn((
+        Occluder2d::spline(
+            CubicCardinalSpline::new_catmull_rom(vec![
+                vec2(0., 0.),
+                vec2(100., 0.),
+                vec2(120., 150.),
+                vec2(54., 120.),
+                vec2(0., 170.),
+            ])
+            .to_curve()
+            .unwrap(),
+            10,
+        )
+        .unwrap(),
+        Transform::from_translation(vec3(-410., -200., 0.)),
+    ));
 }
 
 fn move_light(

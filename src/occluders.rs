@@ -134,6 +134,19 @@ impl Occluder2d {
             .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polyline { vertices })))
     }
 
+    /// Construct a polyline occluder from the given spline.
+    ///
+    /// The spline is sampled and converted to a polyline, as such
+    /// having self-intersections can cause unexpected behavior.
+    /// The control points should be relative to the entity's translation.
+    ///
+    /// # Failure
+    /// This returns None if the provided spline contains no segments.
+    pub fn spline(spline: CubicCurve<Vec2>, samples_per_segment: usize) -> Option<Self> {
+        let samples = samples_per_segment * spline.segments().len();
+        Self::polyline(spline.iter_positions(samples).collect())
+    }
+
     /// Construct a rectangle occluder from width and height.
     pub fn rectangle(width: f32, height: f32) -> Self {
         Self::round_rectangle(width, height, 0.)
