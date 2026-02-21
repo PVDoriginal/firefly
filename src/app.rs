@@ -71,7 +71,7 @@ impl Plugin for FireflyPlugin {
 
 /// Plugin that shows gizmos for firefly occluders.
 ///
-/// Useful for debugging.
+/// Useful for debugging. Insert the [`FireflyGizmoStyle`] resource to configure.
 pub struct FireflyGizmosPlugin;
 
 impl Plugin for FireflyGizmosPlugin {
