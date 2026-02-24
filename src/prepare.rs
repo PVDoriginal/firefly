@@ -469,6 +469,15 @@ fn push_vertices(
                     if (!loops && vertex > last) || (loops && vertex < last) {
                         left_extreme = false;
                     }
+                } else if slice.term == 2 {
+                    let last = vertices[slice.start as usize - 1].angle;
+                    let vertex = vertices[slice.start as usize].angle;
+
+                    let loops = (vertex - last).abs() > PI;
+
+                    if (!loops && vertex > last) || (loops && vertex < last) {
+                        left_extreme = false;
+                    }
                 }
 
                 if slice.start + slice.length == vertices.len() as u32 {
@@ -480,14 +489,15 @@ fn push_vertices(
                     if (!loops && vertex > last) || (loops && vertex < last) {
                         right_extreme = false;
                     }
-                }
+                } else if slice.term == 1 {
+                    let last = vertices[(slice.start + slice.length) as usize - 1].angle;
+                    let vertex = vertices[(slice.start + slice.length) as usize].angle;
 
-                if slice.term == 1 {
-                    right_extreme = false;
-                }
+                    let loops = (vertex - last).abs() > PI;
 
-                if slice.term == 2 {
-                    left_extreme = false;
+                    if (!loops && vertex > last) || (loops && vertex < last) {
+                        right_extreme = false;
+                    }
                 }
             }
 

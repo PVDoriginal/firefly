@@ -262,16 +262,16 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
             var check_left = left_extreme; 
             var check_right = right_extreme;
 
-            if check_left 
-            && dot(light.pos - vertices[min_v + length - 1], vertices[min_v + length - 2] - vertices[min_v + length - 1]) < 0 
-            && same_orientation(vertices[min_v + length - 2], vertices[min_v + length - 1], pos, light.pos) {
-                check_left = false;
-            }
-            if check_right 
-            && dot(light.pos - vertices[min_v], vertices[min_v + 1] - vertices[min_v]) < 0  
-            && same_orientation(vertices[min_v], vertices[min_v + 1], pos, light.pos) {
-                check_right = false;
-            }
+            // if check_left 
+            // && dot(light.pos - vertices[min_v + length - 1], vertices[min_v + length - 2] - vertices[min_v + length - 1]) < 0 
+            // && same_orientation(vertices[min_v + length - 2], vertices[min_v + length - 1], pos, light.pos) {
+            //     check_left = false;
+            // }
+            // if check_right 
+            // && dot(light.pos - vertices[min_v], vertices[min_v + 1] - vertices[min_v]) < 0  
+            // && same_orientation(vertices[min_v], vertices[min_v + 1], pos, light.pos) {
+            //     check_right = false;
+            // }
 
             var next = vec2<f32>(0.0);
             var prev = vec2<f32>(0.0);

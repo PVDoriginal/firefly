@@ -80,9 +80,9 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    commands.spawn((
-        Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
-    ));
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
+    // ));
 
     commands.spawn((
         Occluder2d::polyline(vec![
