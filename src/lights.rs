@@ -39,7 +39,8 @@ use crate::{
 };
 
 /// Point light with adjustable fields.
-#[derive(Component, Clone, Reflect)]
+#[derive(Debug, Component, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[require(
     SyncToRenderWorld,
     Transform,
@@ -120,7 +121,8 @@ pub struct LightHeight(pub f32);
 /// An enum for the falloff type of a light.
 ///
 /// **Default:** [InverseSquare](Falloff::InverseSquare).  
-#[derive(Clone, Copy, Reflect)]
+#[derive(Debug, Clone, Copy, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Falloff {
     /// The intensity decreases inversely proportial to the square distance towards the inner light source.  
     InverseSquare,

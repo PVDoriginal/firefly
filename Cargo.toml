@@ -20,6 +20,11 @@ bitflags = "2.10.0"
 bytemuck = "1.24.0"
 fixedbitset = "0.5.7"
 
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+serde = ["dep:serde", "bevy/serialize"]
+
 [dev-dependencies]
 rand = "0.9.2"
 bevy = { version = "0.18" }

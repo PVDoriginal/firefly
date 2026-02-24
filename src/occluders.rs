@@ -21,7 +21,8 @@ use crate::{buffers::BufferIndex, change::Changes};
 /// Can be moved around or rotated by their transform.
 ///
 /// Only z-axis rotations are allowed, any other type of rotation can cause unexpected behavior and bugs.
-#[derive(Component, Clone, Reflect, Default)]
+#[derive(Debug, Component, Clone, Reflect, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[require(
     SyncToRenderWorld,
     Transform,
@@ -337,7 +338,8 @@ pub(crate) struct UniformVertex {
 
 /// The internal shape of an [`Occluder`](crate::prelude::Occluder2d). This is intended to be generated automatically through
 /// the occluder's constructor methods and not added by hand.   
-#[derive(Reflect, Clone, Debug, PartialEq)]
+#[derive(Debug, Reflect, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Occluder2dShape {
     Polygon {
         vertices: Vec<Vec2>,

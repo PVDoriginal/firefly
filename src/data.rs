@@ -15,7 +15,8 @@ pub(crate) struct ExtractedWorldData {
 ///
 /// # Panics
 /// Panics if added to multiple cameras at once.
-#[derive(Component, ExtractComponent, Clone, Reflect)]
+#[derive(Debug, Component, ExtractComponent, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[require(Transform)]
 pub struct FireflyConfig {
     /// Ambient light that will be added over all other lights.  
@@ -80,7 +81,8 @@ pub struct FireflyConfig {
 /// In order to fully use normal maps, you will need to add the [NormalMap](crate::prelude::NormalMap) component to Sprites.
 ///
 /// **Default:** [None](NormalMapMode::None).
-#[derive(Clone, Reflect)]
+#[derive(Debug, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NormalMode {
     /// No normal maps will be used in rendering.
     None,
