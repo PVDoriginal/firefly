@@ -279,28 +279,14 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             //     check_right = false;
             // }
 
-            var next = vec2<f32>(0.0);
-            var prev = vec2<f32>(0.0);
-
-            // if !out_of_bounds {
-
-            if min_v == occluder.start_vertex {
-                prev = vertices[occluder.start_vertex + occluder.n_vertices - 2];
-            }
-            else {
-                prev = vertices[min_v - 1];
-            }
-
-            if min_v + length - 1 == occluder.start_vertex + occluder.n_vertices - 1 {
-                next = vertices[occluder.start_vertex + 1];
-            }
-            else {
-                next = vertices[min_v + length];
-            }
+            let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
+            let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
             
-            // if dot(light.pos )
+            let prev = select(min_v - 1, occluder.start_vertex + occluder.n_vertices - 1, min_v - 1 < occluder.start_vertex); 
+            let next = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
 
-            // if orientation(vertices[pointer.min_v], prev, pos) > 0 && orientation(vertices[pointer.min_v + pointer.length - 1], next, pos) < 0 {
+            
+            // if orientation(vertices[min_v], vertices[prev], pos) > 0 && orientation(vertices[last], vertices[next], pos) < 0 {
             //     return 1.0;
             // }
 
@@ -308,12 +294,11 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             //     return 1.0;
             // }
             
-            let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
-            return get_softness_multi(pos, vertices[min_v], vertices[min_v + length - 1 - select(0, occluder.n_vertices, loops)], bounds);
+            return get_softness_multi(pos, vertices[min_v], vertices[last], vertices[prev], vertices[next], bounds);
         }
-        else {
-            return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds);
-        }
+        // else {
+        //     return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds);
+        // }
     }
     
     if is_occluded {
@@ -324,19 +309,32 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
     }
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32) -> f32 {
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, prev: vec2<f32>, next: vec2<f32>, bounds: u32) -> f32 {
     let light = lights[light_index];
 
     let left_range = min(light.inner_range, distance(extreme_left, light.pos)); 
 
     let left1 = normalize(extreme_left - light.pos + rotate_90(normalize(extreme_left - light.pos)) * left_range); 
-    let left2 = normalize(extreme_left - light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * left_range); 
+    let left2 = normalize(extreme_left - light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * left_range);
+ 
+    let left_side = normalize(prev - extreme_left);
 
+    var left_max = left1; 
+    if acos(dot(left1, left2)) > acos(dot(left_side, left2)) {
+        left_max = left_side;
+    }
 
     let right_range = min(light.inner_range, distance(extreme_right, light.pos));
 
     let right1 = normalize(extreme_right - light.pos + rotate_90(normalize(extreme_right - light.pos)) * right_range); 
     let right2 = normalize(extreme_right - light.pos + rotate_90_cc(normalize(extreme_right - light.pos)) * right_range); 
+
+    var right_side = normalize(next - extreme_right);
+
+    var right_max = right2; 
+    if acos(dot(right1, right2)) > acos(dot(right1, right_side)) {
+        right_max = right_side;
+    }
 
     var left_multi = 1.0; 
     var right_multi = 1.0;
@@ -346,21 +344,21 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
 
     var ok = false;
 
-    if acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) 
+    if acos(dot(left_middle, left_max)) < acos(dot(left_max, left2)) && acos(dot(left_middle, left2)) < acos(dot(left_max, left2)) 
         && (orientation(extreme_left, extreme_right, pos) < 0 || dot(normalize(pos - extreme_left), normalize(extreme_right - extreme_left)) < 0)
         // && (distance(pos, extreme_left) < distance(pos, extreme_right) || orientation(extreme_left, extreme_right, pos) < 0)
         {
-        left_multi = acos(dot(left_middle, left2)) / acos(dot(left1, left2));
+        left_multi = acos(dot(left_middle, left2)) / acos(dot(left_max, left2));
 
         ok = ok || true;
         // return 1.0;
     }
 
-    if acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2))
+    if acos(dot(right_middle, right_max)) < acos(dot(right1, right_max)) && acos(dot(right_middle, right1)) < acos(dot(right1, right_max))
         && (orientation(extreme_right, extreme_left, pos) > 0 || dot(normalize(pos - extreme_right), normalize(extreme_left - extreme_right)) < 0) 
         // && (distance(pos, extreme_left) > distance(pos, extreme_right) || orientation(extreme_right, extreme_left, pos) > 0)
         {
-        right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right2));
+        right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right_max));
 
         ok = ok || true; 
         // return 1.0;
@@ -376,7 +374,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
         return 0.0;
     }
 
-    if acos(dot(left_middle, left1)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right2)) < acos(dot(right_middle, right1)) {
+    if acos(dot(left_middle, left_max)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right_max)) < acos(dot(right_middle, right1)) {
         return 1.0;
     }
 
