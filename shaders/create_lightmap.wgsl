@@ -374,11 +374,11 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
         return 0.0;
     }
 
-    if acos(dot(left_middle, left_max)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right_max)) < acos(dot(right_middle, right1)) {
-        return 1.0;
-    }
+    // if acos(dot(left_middle, left_max)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right_max)) < acos(dot(right_middle, right1)) {
+    //     return 1.0;
+    // }
 
-    return 0.0;
+    return 1.0;
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
