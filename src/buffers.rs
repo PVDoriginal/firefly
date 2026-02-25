@@ -558,15 +558,37 @@ impl BinBuffer {
     pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
-        for edge in edges {
-            let min_bin = (((edge.min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
-            let max_bin = (((edge.max_angle + PI) / TAU) * Self::N_BINS)
-                .floor()
-                .min(Self::N_BINS - 1.0) as usize;
+        info!("");
+        info!("");
+        info!("");
+        info!("");
 
-            for index in min_bin..(max_bin + 1) {
-                self.occluders[index].push(edge.pointer);
+        for edge in edges {
+            let mut min_bin = edge.min_angle.map_or(0, |angle| {
+                (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
+            });
+
+            let mut max_bin = edge.max_angle.map_or(N_BINS as i32 - 1, |angle| {
+                (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
+            });
+
+            if min_bin < 0 {
+                self.add_to_bins((min_bin + N_BINS as i32) as usize, N_BINS - 1, edge.pointer);
+                min_bin = 0;
             }
+            if max_bin > N_BINS as i32 - 1 {
+                self.add_to_bins(0, (max_bin - N_BINS as i32) as usize, edge.pointer);
+                max_bin = N_BINS as i32 - 1;
+            }
+
+            self.add_to_bins(min_bin as usize, max_bin as usize, edge.pointer);
+        }
+    }
+
+    fn add_to_bins(&mut self, min_bin: usize, max_bin: usize, pointer: OccluderPointer) {
+        info!("writing buffers {min_bin} to {max_bin}");
+        for index in min_bin..(max_bin + 1) {
+            self.occluders[index].push(pointer);
         }
     }
 }
@@ -574,8 +596,8 @@ impl BinBuffer {
 /// CPU struct describing an occluder or edge.
 pub struct OccluderData {
     pub pointer: OccluderPointer,
-    pub min_angle: f32,
-    pub max_angle: f32,
+    pub min_angle: Option<f32>,
+    pub max_angle: Option<f32>,
 }
 
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  

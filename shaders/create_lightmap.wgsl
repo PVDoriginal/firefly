@@ -119,9 +119,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         let left = bin_indices.indices[bin]; 
         let right = bin_indices.indices[bin + 1];
 
-        if left >= right {
-            return vec4f(0, 0, 1, 1);
-        }
+        // if left >= right {
+        //     return vec4f(0, 0, 1, 1);
+        // }
 
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
@@ -150,7 +150,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
             // poly occluder
             else {
-                res.r = 1.0;
+                // res.r = 1.0;
 
                 if stencil.a > 0.1 {
                     if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z {
@@ -346,14 +346,20 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
 
     var ok = false;
 
-    if acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
+    if acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) 
+        && (orientation(extreme_left, extreme_right, pos) < 0 || dot(normalize(pos - extreme_left), normalize(extreme_right - extreme_left)) < 0)
+        // && (distance(pos, extreme_left) < distance(pos, extreme_right) || orientation(extreme_left, extreme_right, pos) < 0)
+        {
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left1, left2));
 
         ok = ok || true;
         // return 1.0;
     }
 
-    if acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
+    if acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2))
+        && (orientation(extreme_right, extreme_left, pos) > 0 || dot(normalize(pos - extreme_right), normalize(extreme_left - extreme_right)) < 0) 
+        // && (distance(pos, extreme_left) > distance(pos, extreme_right) || orientation(extreme_right, extreme_left, pos) > 0)
+        {
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right2));
 
         ok = ok || true; 
@@ -371,7 +377,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     }
 
     if acos(dot(left_middle, left1)) < acos(dot(left_middle, left2)) && acos(dot(right_middle, right2)) < acos(dot(right_middle, right1)) {
-        return 0.0;
+        return 1.0;
     }
 
     return 0.0;

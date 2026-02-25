@@ -535,8 +535,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: (slice.start_angle - angle_left).max(-PI),
-                        max_angle: (slice.end_angle + angle_right).min(PI),
+                        min_angle: Some(slice.start_angle - angle_left),
+                        max_angle: Some(slice.end_angle + angle_right),
                     });
                 }
                 Some(split) => {
@@ -548,8 +548,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: (slice.start_angle - angle_left).max(-PI),
-                        max_angle: PI,
+                        min_angle: Some(slice.start_angle - angle_left),
+                        max_angle: None,
                     });
                     edges.push(OccluderData {
                         pointer: OccluderPointer {
@@ -559,8 +559,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: -PI,
-                        max_angle: (slice.end_angle + angle_right).min(PI),
+                        min_angle: None,
+                        max_angle: Some(slice.end_angle + angle_right),
                     });
                 }
             }
