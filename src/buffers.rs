@@ -589,20 +589,15 @@ pub struct OccluderPointer {
     /// There is also additional information encoded at the left of this value:
     ///
     /// - A `term` variable that takes 2 bits, describing the terminator format of this chain. This is 1
-    /// if the chain ends looping over the atan2 seam, 2 if it starts like that, 3 if the chain starts or ends at the
-    /// limit of the occlusion edge but could've looped over, and 0 otherwise.
+    /// if the chain ends looping over the atan2 seam, 2 if it starts like that, and 0 otherwise.
     ///
     /// - A `rev` variable that takes 1 bit and specifies if the chain is made of vertices in the same order as they're
     /// stored in (clockwise) or not. This is used for when a light is inside the perimeter of an occluder and the
     /// edges need to be reversed.
     pub min_v: u32,
+    /// In case this edge loops over the atan2 seam, this will dicate the length after which that happens.
+    pub split: u32,
     /// The length of the vertex edge, in case the occluder is polygonal.
-    ///
-    /// There is also additional information encoded at the left of this value:
-    ///
-    /// - A `left extreme` bool that says whether the left end of this path should be considered for soft shadows as an extreme vertex.
-    ///
-    /// - A `right extreme` bool, same as above, but for the right end of the path.
     pub length: u32,
     /// The minimum distance from the occluder to the light source. This is used to accelerate GPU computations,
     /// because a point can't be blocked by this occluder if it's distance is greater than the point's own

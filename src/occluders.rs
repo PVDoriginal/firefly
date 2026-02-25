@@ -111,10 +111,8 @@ impl Occluder2d {
     /// # Failure
     /// This returns None if the provided list doesn't contain at least 2 vertices.
     pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
-        normalize_vertices(vertices).and_then(|mut vertices| {
-            vertices.push(vertices[0]);
-            Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
-        })
+        normalize_vertices(vertices)
+            .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polygon { vertices })))
     }
 
     /// Construct a polyline occluder from the given points.

@@ -404,16 +404,19 @@ pub(crate) fn prepare_data(
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct OccluderSlice {
-    pub start: u32,
+    pub start_index: usize,
+    pub start_vertex: u32,
+
+    pub split: Option<u32>,
     pub length: u32,
-    pub term: u32,
 
     pub start_angle: f32,
     pub end_angle: f32,
 }
 
+#[derive(Debug)]
 struct Vertex {
     pub index: u32,
     pub angle: f32,
@@ -431,16 +434,33 @@ fn push_vertices(
     poly: bool,
     soft_shadows: bool,
 ) {
+    info!("start vertex: {start_vertex}");
+
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
         angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
     });
 
-    let vertices: Vec<_> = if !rev {
+    let mut vertices: Vec<_> = if !rev {
         vertices.collect()
     } else {
         vertices.rev().collect()
     };
+
+    loop {
+        let last = vertices.last().unwrap().angle;
+        let vertex = vertices.first().unwrap().angle;
+
+        let loops = (vertex - last).abs() > PI;
+
+        if (!loops && vertex < last) || (loops && vertex > last) {
+            break;
+        }
+
+        vertices.rotate_right(1);
+
+        info!("{vertices:?}");
+    }
 
     let index = match poly {
         true => (1 << 31) | index as u32,
@@ -448,7 +468,8 @@ fn push_vertices(
     };
 
     let mut edges: Vec<OccluderData> = vec![];
-
+    info!("");
+    info!("---------");
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
             let rev: u32 = match rev {
@@ -456,61 +477,20 @@ fn push_vertices(
                 false => 0,
             };
 
-            let mut left_extreme = true;
-            let mut right_extreme = true;
+            info!("pushing {slice:?}!");
 
-            if rev == 0 {
-                if slice.start == 0 {
-                    let last = vertices[vertices.len() - 2].angle;
-                    let vertex = vertices[0].angle;
+            info!(
+                "slice start: {}, slice length: {}",
+                slice.start_vertex, slice.length
+            );
 
-                    let loops = (vertex - last).abs() > PI;
-
-                    if (!loops && vertex > last) || (loops && vertex < last) {
-                        left_extreme = false;
-                    }
-                } else if slice.term == 2 {
-                    let last = vertices[slice.start as usize - 1].angle;
-                    let vertex = vertices[slice.start as usize].angle;
-
-                    let loops = (vertex - last).abs() > PI;
-
-                    if (!loops && vertex > last) || (loops && vertex < last) {
-                        left_extreme = false;
-                    }
-                }
-
-                if slice.start + slice.length == vertices.len() as u32 {
-                    let last = vertices[0].angle;
-                    let vertex = vertices[1].angle;
-
-                    let loops = (vertex - last).abs() > PI;
-
-                    if (!loops && vertex > last) || (loops && vertex < last) {
-                        right_extreme = false;
-                    }
-                } else if slice.term == 1 {
-                    let last = vertices[(slice.start + slice.length) as usize - 1].angle;
-                    let vertex = vertices[(slice.start + slice.length) as usize].angle;
-
-                    let loops = (vertex - last).abs() > PI;
-
-                    if (!loops && vertex > last) || (loops && vertex < last) {
-                        right_extreme = false;
-                    }
-                }
-            }
-
-            let l = if left_extreme { 1 } else { 0 };
-            let r = if right_extreme { 1 } else { 0 };
-
-            let min_v = (slice.term << 30) | (rev << 29) | (slice.start + start_vertex);
-            let length = (l << 31) | (r << 30) | slice.length;
+            let min_v = (rev << 29) | slice.start_vertex + start_vertex;
+            let length = slice.length;
 
             let angle_left = if !soft_shadows {
                 0.0
             } else {
-                let left = occluder_vertices[vertices[slice.start as usize].index as usize];
+                let left = occluder_vertices[vertices[slice.start_index as usize].index as usize];
                 (light_pos - left)
                     .normalize()
                     .dot(
@@ -528,8 +508,9 @@ fn push_vertices(
             let angle_right = if !soft_shadows {
                 0.0
             } else {
-                let right = occluder_vertices
-                    [vertices[slice.start as usize + slice.length as usize - 1].index as usize];
+                let right = occluder_vertices[vertices
+                    [slice.start_index as usize + slice.length as usize - 1]
+                    .index as usize];
                 (light_pos - right)
                     .normalize()
                     .dot(
@@ -544,35 +525,52 @@ fn push_vertices(
                     .acos()
             };
 
-            let start_angle = if slice.term == 2 {
-                -PI
-            } else {
-                (slice.start_angle - angle_left).max(-PI)
-            };
-
-            let end_angle = if slice.term == 1 {
-                PI
-            } else {
-                (slice.end_angle + angle_right).min(PI)
-            };
-
-            edges.push(OccluderData {
-                pointer: OccluderPointer {
-                    index,
-                    min_v,
-                    length,
-                    distance,
-                },
-                min_angle: start_angle,
-                max_angle: end_angle,
-            });
+            match slice.split {
+                None => {
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v,
+                            split: 0,
+                            length,
+                            distance,
+                        },
+                        min_angle: (slice.start_angle - angle_left).max(-PI),
+                        max_angle: (slice.end_angle + angle_right).min(PI),
+                    });
+                }
+                Some(split) => {
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v: (1 << 30) | min_v,
+                            split,
+                            length,
+                            distance,
+                        },
+                        min_angle: (slice.start_angle - angle_left).max(-PI),
+                        max_angle: PI,
+                    });
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v: (2 << 30) | min_v,
+                            split,
+                            length,
+                            distance,
+                        },
+                        min_angle: -PI,
+                        max_angle: (slice.end_angle + angle_right).min(PI),
+                    });
+                }
+            }
         }
     };
 
     let mut last: Option<&Vertex> = None;
     let mut slice: OccluderSlice = default();
 
-    for vertex in &vertices {
+    for (index, vertex) in vertices.iter().enumerate() {
         if let Some(last) = last {
             let loops = (vertex.angle - last.angle).abs() > PI;
 
@@ -580,44 +578,32 @@ fn push_vertices(
             if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
                 push_slice(&slice);
                 slice = OccluderSlice {
-                    start: vertex.index,
+                    start_index: index,
+                    start_vertex: vertex.index,
+                    split: None,
                     length: 1,
-                    term: 0,
                     start_angle: vertex.angle,
                     end_angle: vertex.angle,
                 };
             }
             // if the next vertex is increasing, simple case
             else if !loops && vertex.angle > last.angle {
-                if slice.length == 0 {
-                    slice.start = vertex.index;
-                }
                 slice.length += 1;
                 slice.end_angle = vertex.angle;
             }
             // if the next vertex is increasing and loops over
             else {
-                if slice.length == 0 {
-                    slice.start = vertex.index;
-                }
+                slice.split = Some(slice.length);
                 slice.length += 1;
-                slice.term = 1;
 
-                push_slice(&slice);
-
-                slice = OccluderSlice {
-                    start: last.index,
-                    length: 2,
-                    term: 2,
-                    start_angle: last.angle,
-                    end_angle: vertex.angle,
-                };
+                slice.end_angle = vertex.angle;
             }
         } else {
             slice = OccluderSlice {
-                start: vertex.index,
+                start_index: index,
+                start_vertex: vertex.index,
+                split: None,
                 length: 1,
-                term: 0,
                 start_angle: vertex.angle,
                 end_angle: vertex.angle,
             };
@@ -626,6 +612,7 @@ fn push_vertices(
         last = Some(vertex);
     }
 
+    info!("final slice: {slice:?}");
     push_slice(&slice);
 
     bins.add_occluder(edges);

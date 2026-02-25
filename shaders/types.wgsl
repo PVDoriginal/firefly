@@ -27,7 +27,7 @@ struct PointLight {
 }
 
 struct PolyOccluder {
-    vertex_start: u32,
+    start_vertex: u32,
     n_vertices: u32,
     z: f32,
     @size(16)
@@ -37,8 +37,9 @@ struct PolyOccluder {
 }
 
 struct OccluderPointer {
-    index: u32, 
+    index: u32,
     min_v: u32,
+    split: u32, 
     length: u32, 
     distance: f32,
 }

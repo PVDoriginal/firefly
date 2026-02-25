@@ -63,7 +63,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     let normal = textureSample(normal_map, texture_sampler, in.uv);
     let stencil = textureSample(sprite_stencil, texture_sampler, in.uv);
-    // let stencil = textureLoad(sprite_stencil, vec2<i32>(in.uv * vec2<f32>(textureDimensions(sprite_stencil))), 0);
     let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
@@ -161,17 +160,17 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 let term = (pointer.min_v & 3221225472u) >> 30u;
 
-                // if term == 2u {
-                //     return vec4f(0, 1, 0, 1);
-                // }
                 let rev = (pointer.min_v & 536870912u) >> 29u;
-                let min_v = pointer.min_v & 536870911u;
 
-                let left_extreme = (pointer.length & 2147483648u) != 0u;
-                let right_extreme = (pointer.length & 1073741824u) != 0u;
+                let min_v = pointer.min_v & 536870911u;
+                let split = pointer.split;
                 let length = pointer.length & 1073741823u;
 
-                let result = poly_check(pos, occluder_index, term, rev, min_v, left_extreme, right_extreme, length); 
+                // if split == 0 {
+                //     return vec4<f32>(0, 1, 0, 1);
+                // }
+
+                let result = poly_check(pos, occluder_index, term, rev, min_v, split, length); 
 
                 if result > 0.0 {
                     shadow = shadow_blend(shadow, poly_occluders[occluder_index].color, poly_occluders[occluder_index].opacity * result);
@@ -205,7 +204,7 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     return angle;
 }
 
-fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extreme: bool, right_extreme: bool, length: u32) -> f32 {
+fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32) -> f32 {
     let light = lights[light_index];
     let occluder = poly_occluders[index];
 
@@ -213,11 +212,28 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
 
     var maybe_prev = 0; 
 
+    // if min_v + split - 1 >= occluder.start_vertex + occluder.n_vertices {
+    //     return 0.0;
+    // }
+
+    var start = min_v; 
+    var len = length; 
+
     if rev == 0 {
-        maybe_prev = bs_vertex_forward(angle, min_v, length, term);
+
+        if term == 1 {
+            len = split + 1;
+        }
+        else if term == 2 {
+            start = min_v + split - 1;
+            len = length - split + 1;
+        }
+
+        maybe_prev = bs_vertex_forward(angle, start, len, term, occluder.start_vertex, occluder.n_vertices);
     }
     else {
-        maybe_prev = bs_vertex_reverse(angle, min_v, length, term);
+        maybe_prev = -1;
+        // maybe_prev = bs_vertex_reverse(angle, min_v, length, term, occluder.n_vertices);
     }
 
     var is_occluded = false;
@@ -228,28 +244,22 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
     // 2 - right out of bounds 
 
     var bounds = 0u;
-
+    
     if maybe_prev < 0 {
         bounds = 1u; 
     }
-    else if maybe_prev + 1 >= i32(length) {
+    else if maybe_prev + 1 >= i32(len) {
         bounds = 2u;
     }
 
     let out_of_bounds = bounds != 0u;
 
-    // if 1 > 0 {
-    //     if out_of_bounds {
-    //         return 1.0;
-    //     }
-    //     else {
-    //         return 0.0;
-    //     }
-    // }
-
     if !out_of_bounds {
         if rev == 0 {
-            is_occluded = !same_orientation(vertices[min_v + u32(maybe_prev)], vertices[min_v + u32(maybe_prev) + 1], pos, light.pos);
+            let v1 = vertices[start + u32(maybe_prev) - select(0, occluder.n_vertices, start + u32(maybe_prev) >= occluder.start_vertex + occluder.n_vertices)];
+            let v2 = vertices[start + u32(maybe_prev) + 1 - select(0, occluder.n_vertices, start + u32(maybe_prev) + 1 >= occluder.start_vertex + occluder.n_vertices)];
+
+            is_occluded = !same_orientation(v1, v2, pos, light.pos);
         }
         else {
             is_occluded = !same_orientation(vertices[min_v - u32(maybe_prev)], vertices[min_v - u32(maybe_prev) - 1], pos, light.pos);
@@ -258,10 +268,6 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
 
     if config.softness > 0 && (is_occluded || out_of_bounds){
         if rev == 0 {
-
-            var check_left = left_extreme; 
-            var check_right = right_extreme;
-
             // if check_left 
             // && dot(light.pos - vertices[min_v + length - 1], vertices[min_v + length - 2] - vertices[min_v + length - 1]) < 0 
             // && same_orientation(vertices[min_v + length - 2], vertices[min_v + length - 1], pos, light.pos) {
@@ -278,15 +284,15 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
 
             // if !out_of_bounds {
 
-            if min_v == occluder.vertex_start {
-                prev = vertices[occluder.vertex_start + occluder.n_vertices - 2];
+            if min_v == occluder.start_vertex {
+                prev = vertices[occluder.start_vertex + occluder.n_vertices - 2];
             }
             else {
                 prev = vertices[min_v - 1];
             }
 
-            if min_v + length - 1 == occluder.vertex_start + occluder.n_vertices - 1 {
-                next = vertices[occluder.vertex_start + 1];
+            if min_v + length - 1 == occluder.start_vertex + occluder.n_vertices - 1 {
+                next = vertices[occluder.start_vertex + 1];
             }
             else {
                 next = vertices[min_v + length];
@@ -302,10 +308,11 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
             //     return 1.0;
             // }
             
-            return get_softness_multi(pos, vertices[min_v], vertices[min_v + length - 1], bounds, check_left, check_right);
+            let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
+            return get_softness_multi(pos, vertices[min_v], vertices[min_v + length - 1 - select(0, occluder.n_vertices, loops)], bounds);
         }
         else {
-            return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds, false, false);
+            return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds);
         }
     }
     
@@ -317,13 +324,14 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, left_extr
     }
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32, left_extreme: bool, right_extreme: bool) -> f32 {
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, bounds: u32) -> f32 {
     let light = lights[light_index];
 
     let left_range = min(light.inner_range, distance(extreme_left, light.pos)); 
 
     let left1 = normalize(extreme_left - light.pos + rotate_90(normalize(extreme_left - light.pos)) * left_range); 
     let left2 = normalize(extreme_left - light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * left_range); 
+
 
     let right_range = min(light.inner_range, distance(extreme_right, light.pos));
 
@@ -338,14 +346,14 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
 
     var ok = false;
 
-    if left_extreme && acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
+    if acos(dot(left_middle, left1)) < acos(dot(left1, left2)) && acos(dot(left_middle, left2)) < acos(dot(left1, left2)) {
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left1, left2));
 
         ok = ok || true;
         // return 1.0;
     }
 
-    if right_extreme && acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
+    if acos(dot(right_middle, right1)) < acos(dot(right1, right2)) && acos(dot(right_middle, right2)) < acos(dot(right1, right2)) {
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right2));
 
         ok = ok || true; 
@@ -369,36 +377,38 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     return 0.0;
 }
 
-fn angle(p: vec2f) -> f32 {
-    let light = lights[light_index];
-
-    return atan2(p.y - light.pos.y, p.x - light.pos.x);
-}
-
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
     let light = lights[light_index];
+    let angle = atan2(p.y - light.pos.y, p.x - light.pos.x);
     
     if i == length - 1 {
         if term == 1 {
-            return atan2(p.y - light.pos.y, p.x - light.pos.x) + PI2;
+            return angle + PI2;
         }
         else {
-            return atan2(p.y - light.pos.y, p.x - light.pos.x);
+            return angle;
         }
     }
     else if i == 0 {
         if term == 2 {
-            return atan2(p.y - light.pos.y, p.x - light.pos.x) - PI2; 
+            return angle - PI2; 
         }
         else {
-            return atan2(p.y - light.pos.y, p.x - light.pos.x);
+            return angle;
         }
     }
 
-    return atan2(p.y - light.pos.y, p.x - light.pos.x);
+    return angle;
 }
 
-fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+fn vertex_forward(start: u32, index: u32, start_vertex: u32, n_vertices: u32) -> vec2<f32> {
+    if start + index >= start_vertex + n_vertices {
+        return vertices[start + index - n_vertices];
+    }
+    return vertices[start + index];
+}
+
+fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32, start_vertex: u32, n_vertices: u32) -> i32 {
     let light = lights[light_index];
 
     var ans = -1;
@@ -406,19 +416,19 @@ fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
     var low = 0i; 
     var high = i32(length) - 1;
 
-    let min_angle = angle_term(vertices[start + u32(low)], u32(low), length, term); 
+    let min_angle = angle_term(vertex_forward(start, u32(low), start_vertex, n_vertices), u32(low), length, term); 
 
     if angle < min_angle {
         return -1;
     }
 
-    if angle >= angle_term(vertices[start + u32(high)], u32(high), length, term) {
+    if angle >= angle_term(vertex_forward(start, u32(high), start_vertex, n_vertices), u32(high), length, term) {
         return high + 1;
     }
 
     while (low <= high) {
         let mid = low + (high - low + 1) / 2;
-        let val = angle_term(vertices[start + u32(mid)], u32(mid), length, term);
+        let val = angle_term(vertex_forward(start, u32(mid), start_vertex, n_vertices), u32(mid), length, term);
 
         if (val < angle) {
             ans = i32(mid);
@@ -432,7 +442,14 @@ fn bs_vertex_forward(angle: f32, start: u32, length: u32, term: u32) -> i32 {
     return ans;
 }
 
-fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32) -> i32 {
+fn vertex_reverse(start: u32, index: u32, n_vertices: u32) -> u32 {
+    if start - index < 0 {
+        return start - index + n_vertices; 
+    }
+    return start - index;
+}
+
+fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32, n_vertices: u32) -> i32 {
     let light = lights[light_index];
 
     var ans = -1;
