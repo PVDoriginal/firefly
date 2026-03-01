@@ -286,6 +286,9 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             let next = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
 
             
+            let prev_last  = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
+            let prev_first = select(min_v + 1, min_v + 1 - occluder.n_vertices, min_v + 1 >= occluder.start_vertex + occluder.n_vertices);
+
             // if orientation(vertices[min_v], vertices[prev], pos) > 0 && orientation(vertices[last], vertices[next], pos) < 0 {
             //     return 1.0;
             // }
@@ -294,7 +297,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             //     return 1.0;
             // }
             
-            return get_softness_multi(pos, vertices[min_v], vertices[last], vertices[prev], vertices[next], bounds);
+            return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], bounds);
         }
         // else {
         //     return get_softness_multi(pos, vertices[min_v], vertices[min_v - length + 1], bounds);
@@ -309,7 +312,8 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
     }
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>, prev: vec2<f32>, next: vec2<f32>, bounds: u32) -> f32 {
+// TODO: OPTIMIZE THE MATH!
+fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left: vec2<f32>, extreme_right: vec2<f32>, prev_extreme_right: vec2<f32>, prev: vec2<f32>, next: vec2<f32>, bounds: u32) -> f32 {
     let light = lights[light_index];
 
     let left_range = min(light.inner_range, distance(extreme_left, light.pos)); 
@@ -345,7 +349,9 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     var ok = false;
 
     if acos(dot(left_middle, left_max)) < acos(dot(left_max, left2)) && acos(dot(left_middle, left2)) < acos(dot(left_max, left2)) 
-        && (orientation(extreme_left, extreme_right, pos) < 0 || dot(normalize(pos - extreme_left), normalize(extreme_right - extreme_left)) < 0)
+        && (!same_orientation(extreme_left, prev_extreme_left, pos, light.pos) || orientation(pos, extreme_left, light.pos) > 0)
+        // && (orientation(extreme_left, prev_extreme_left, pos) < 0 || orientation(pos, extreme_left, light.pos) > 0) 
+        // && (orientation(extreme_left, extreme_right, pos) < 0 || dot(normalize(pos - extreme_left), normalize(extreme_right - extreme_left)) < 0)
         // && (distance(pos, extreme_left) < distance(pos, extreme_right) || orientation(extreme_left, extreme_right, pos) < 0)
         {
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left_max, left2));
@@ -355,7 +361,9 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     }
 
     if acos(dot(right_middle, right_max)) < acos(dot(right1, right_max)) && acos(dot(right_middle, right1)) < acos(dot(right1, right_max))
-        && (orientation(extreme_right, extreme_left, pos) > 0 || dot(normalize(pos - extreme_right), normalize(extreme_left - extreme_right)) < 0) 
+        && (!same_orientation(extreme_right, prev_extreme_right, pos, light.pos) || orientation(pos, extreme_right, light.pos) < 0)
+        // && (orientation(extreme_right, prev_extreme_right, pos) < 0 || orientation(pos, extreme_right, light.pos) < 0)
+        // && (orientation(extreme_right, extreme_left, pos) > 0 || dot(normalize(pos - extreme_right), normalize(extreme_left - extreme_right)) < 0) 
         // && (distance(pos, extreme_left) > distance(pos, extreme_right) || orientation(extreme_right, extreme_left, pos) > 0)
         {
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right_max));
@@ -378,7 +386,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: ve
     //     return 1.0;
     // }
 
-    return 1.0;
+    return 0.0;
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
@@ -706,3 +714,4 @@ fn get_extreme_angle_local(p: vec2f, l: vec2f, t: vec2f) -> f32 {
 
     return angle;
 }
+

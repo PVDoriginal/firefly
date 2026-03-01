@@ -558,11 +558,6 @@ impl BinBuffer {
     pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
-        info!("");
-        info!("");
-        info!("");
-        info!("");
-
         for edge in edges {
             let mut min_bin = edge.min_angle.map_or(0, |angle| {
                 (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
@@ -571,6 +566,17 @@ impl BinBuffer {
             let mut max_bin = edge.max_angle.map_or(N_BINS as i32 - 1, |angle| {
                 (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
             });
+
+            if max_bin > N_BINS as i32 - 1 {
+                if min_bin < 0 {
+                    self.add_to_bins(0, N_BINS - 1, edge.pointer);
+                    return;
+                } else if max_bin - N_BINS as i32 >= min_bin {
+                    max_bin = min_bin - 1 + N_BINS as i32;
+                }
+            }
+
+            info!("min bin: {min_bin}, max bin: {max_bin}");
 
             if min_bin < 0 {
                 self.add_to_bins((min_bin + N_BINS as i32) as usize, N_BINS - 1, edge.pointer);
