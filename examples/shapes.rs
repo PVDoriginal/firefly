@@ -62,27 +62,27 @@ fn setup(mut commands: Commands) {
     //     Transform::from_translation(vec3(-417., 106., 0.)),
     // ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-302., 6.),
-    //         vec2(-358., 45.),
-    //         vec2(-329., 81.),
-    //         vec2(-289., 99.),
-    //         vec2(-255., 91.),
-    //         vec2(-237., 33.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-302., 6.),
+            vec2(-358., 45.),
+            vec2(-329., 81.),
+            vec2(-289., 99.),
+            vec2(-255., 91.),
+            vec2(-237., 33.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
+        Transform::default(),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
+    ));
 
     commands.spawn((
         Occluder2d::polyline(vec![
@@ -95,21 +95,21 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-428., 135.),
-    //         vec2(-482., 158.),
-    //         vec2(-475., 231.),
-    //         vec2(-438., 290.),
-    //         vec2(-388., 299.),
-    //         vec2(-380., 278.),
-    //         vec2(-358., 276.),
-    //         vec2(-342., 208.),
-    //         vec2(-429., 172.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-428., 135.),
+            vec2(-482., 158.),
+            vec2(-475., 231.),
+            vec2(-438., 290.),
+            vec2(-388., 299.),
+            vec2(-380., 278.),
+            vec2(-358., 276.),
+            vec2(-342., 208.),
+            vec2(-429., 172.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     // commands.spawn((
     //     Occluder2d::circle(23.),
@@ -121,17 +121,17 @@ fn setup(mut commands: Commands) {
     //     Transform::from_translation(vec3(-387., 81., 0.)),
     // ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-249., 243.),
-    //         vec2(-262., 163.),
-    //         vec2(-161., 147.),
-    //         vec2(-135., 237.),
-    //         vec2(-216., 261.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-249., 243.),
+            vec2(-262., 163.),
+            vec2(-161., 147.),
+            vec2(-135., 237.),
+            vec2(-216., 261.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     // commands.spawn((
     //     Occluder2d::round_rectangle(53., 38., 23.),

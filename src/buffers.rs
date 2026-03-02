@@ -559,35 +559,33 @@ impl BinBuffer {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
         for edge in edges {
-            let mut min_bin = edge.min_angle.map_or(0, |angle| {
-                (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
-            });
-
-            let mut max_bin = edge.max_angle.map_or(N_BINS as i32 - 1, |angle| {
-                (((angle + PI) / TAU) * Self::N_BINS).floor() as i32
-            });
-
-            if max_bin > N_BINS as i32 - 1 {
-                if min_bin < 0 {
-                    self.add_to_bins(0, N_BINS - 1, edge.pointer);
-                    return;
-                } else if max_bin - N_BINS as i32 >= min_bin {
-                    max_bin = min_bin - 1 + N_BINS as i32;
-                }
+            if edge.angle.ceil() >= TAU {
+                self.add_to_bins(0, N_BINS - 1, edge.pointer);
+                continue;
             }
 
-            info!("min bin: {min_bin}, max bin: {max_bin}");
+            info!("init min angle: {}", edge.min_angle);
 
-            if min_bin < 0 {
-                self.add_to_bins((min_bin + N_BINS as i32) as usize, N_BINS - 1, edge.pointer);
-                min_bin = 0;
-            }
-            if max_bin > N_BINS as i32 - 1 {
-                self.add_to_bins(0, (max_bin - N_BINS as i32) as usize, edge.pointer);
-                max_bin = N_BINS as i32 - 1;
-            }
+            let min_angle = if edge.min_angle < -PI {
+                edge.min_angle + TAU as f32
+            } else {
+                edge.min_angle
+            };
 
-            self.add_to_bins(min_bin as usize, max_bin as usize, edge.pointer);
+            info!("min angle: {min_angle}");
+
+            let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
+            let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
+
+            info!("min bin: {min_bin}");
+            info!("n_bins; {n_bins}");
+
+            if min_bin + n_bins >= N_BINS {
+                self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
+                self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
+            } else {
+                self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer);
+            }
         }
     }
 
@@ -602,8 +600,8 @@ impl BinBuffer {
 /// CPU struct describing an occluder or edge.
 pub struct OccluderData {
     pub pointer: OccluderPointer,
-    pub min_angle: Option<f32>,
-    pub max_angle: Option<f32>,
+    pub min_angle: f32,
+    pub angle: f32,
 }
 
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  

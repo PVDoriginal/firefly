@@ -1,7 +1,7 @@
 //! Module that prepares BindGroups for GPU use.
 
 use core::f32;
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
@@ -413,7 +413,7 @@ struct OccluderSlice {
     pub length: u32,
 
     pub start_angle: f32,
-    pub end_angle: f32,
+    pub angle: f32,
 }
 
 #[derive(Debug)]
@@ -535,8 +535,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: Some(slice.start_angle - angle_left),
-                        max_angle: Some(slice.end_angle + angle_right),
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
                     });
                 }
                 Some(split) => {
@@ -548,8 +548,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: Some(slice.start_angle - angle_left),
-                        max_angle: None,
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
                     });
                     edges.push(OccluderData {
                         pointer: OccluderPointer {
@@ -559,8 +559,8 @@ fn push_vertices(
                             length,
                             distance,
                         },
-                        min_angle: None,
-                        max_angle: Some(slice.end_angle + angle_right),
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
                     });
                 }
             }
@@ -583,20 +583,20 @@ fn push_vertices(
                     split: None,
                     length: 1,
                     start_angle: vertex.angle,
-                    end_angle: vertex.angle,
+                    angle: 0.0,
                 };
             }
             // if the next vertex is increasing, simple case
             else if !loops && vertex.angle > last.angle {
                 slice.length += 1;
-                slice.end_angle = vertex.angle;
+                slice.angle += vertex.angle - last.angle;
             }
             // if the next vertex is increasing and loops over
             else {
                 slice.split = Some(slice.length);
                 slice.length += 1;
 
-                slice.end_angle = vertex.angle;
+                slice.angle += vertex.angle - last.angle + TAU;
             }
         } else {
             slice = OccluderSlice {
@@ -605,7 +605,7 @@ fn push_vertices(
                 split: None,
                 length: 1,
                 start_angle: vertex.angle,
-                end_angle: vertex.angle,
+                angle: 0.0,
             };
         }
 
