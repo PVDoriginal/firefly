@@ -434,7 +434,7 @@ fn push_vertices(
     poly: bool,
     soft_shadows: bool,
 ) {
-    info!("start vertex: {start_vertex}");
+    // info!("start vertex: {start_vertex}");
 
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
@@ -459,7 +459,7 @@ fn push_vertices(
 
         vertices.rotate_right(1);
 
-        info!("{vertices:?}");
+        // info!("{vertices:?}");
     }
 
     let index = match poly {
@@ -468,8 +468,8 @@ fn push_vertices(
     };
 
     let mut edges: Vec<OccluderData> = vec![];
-    info!("");
-    info!("---------");
+    // info!("");
+    // info!("---------");
     let mut push_slice = |slice: &OccluderSlice| {
         if slice.length > 1 {
             let rev: u32 = match rev {
@@ -477,12 +477,12 @@ fn push_vertices(
                 false => 0,
             };
 
-            info!("pushing {slice:?}!");
+            // info!("pushing {slice:?}!");
 
-            info!(
-                "slice start: {}, slice length: {}",
-                slice.start_vertex, slice.length
-            );
+            // info!(
+            //     "slice start: {}, slice length: {}",
+            //     slice.start_vertex, slice.length
+            // );
 
             let min_v = (rev << 29) | slice.start_vertex + start_vertex;
             let length = slice.length;
@@ -612,7 +612,7 @@ fn push_vertices(
         last = Some(vertex);
     }
 
-    info!("final slice: {slice:?}");
+    // info!("final slice: {slice:?}");
     push_slice(&slice);
 
     bins.add_occluder(edges);

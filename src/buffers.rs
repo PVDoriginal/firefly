@@ -564,7 +564,7 @@ impl BinBuffer {
                 continue;
             }
 
-            info!("init min angle: {}", edge.min_angle);
+            // info!("init min angle: {}", edge.min_angle);
 
             let min_angle = if edge.min_angle < -PI {
                 edge.min_angle + TAU as f32
@@ -572,13 +572,13 @@ impl BinBuffer {
                 edge.min_angle
             };
 
-            info!("min angle: {min_angle}");
+            // info!("min angle: {min_angle}");
 
             let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
             let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
 
-            info!("min bin: {min_bin}");
-            info!("n_bins; {n_bins}");
+            // info!("min bin: {min_bin}");
+            // info!("n_bins; {n_bins}");
 
             if min_bin + n_bins >= N_BINS {
                 self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
@@ -590,7 +590,7 @@ impl BinBuffer {
     }
 
     fn add_to_bins(&mut self, min_bin: usize, max_bin: usize, pointer: OccluderPointer) {
-        info!("writing buffers {min_bin} to {max_bin}");
+        // info!("writing buffers {min_bin} to {max_bin}");
         for index in min_bin..(max_bin + 1) {
             self.occluders[index].push(pointer);
         }
