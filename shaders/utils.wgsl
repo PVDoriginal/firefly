@@ -274,25 +274,10 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
     return false;
 }
 
-// checks if the half-segment [a, b] ending in a intersects the [c, d] line 
+// checks if the half-segment [a, b] ending in a intersects the [c, d] segment
 fn intersects_half(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> bool {
-    // if b.x == d.x && b.y == d.y {
-    //     return false;
-    // }
-    
-    let r = b - a;
-    let s = d - c;
-
-    let det = r.x * s.y - r.y * s.x;
-
-    if (abs(det) < 1e-6) {
-        return false; 
-    }
-
-    let diff = c - a;
-    
-    let t = (diff.x * s.y - diff.y * s.x) / det;
-    let u = (diff.x * r.y - diff.y * r.x) / det;
-
-    return t >= 0.0 && u >= 0.0 && u <= 1.0;
+    let p = intersection_point(a, b, c, d);
+    let on_ab = dot(p - a, b - a) > 0;
+    let on_cd = dot(p - c, d - c) > 0 && dot(p - d, c - d) > 0;
+    return on_ab && on_cd; 
 }
