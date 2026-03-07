@@ -213,7 +213,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 // }
             }
             
-
             if dot(shadow, shadow) < 0.0001 {
                 break;
             }
@@ -238,7 +237,7 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
 
         if !occ.occluded_full {
             if occ.occluded_left && occ.occluded_right {
-                if orientation(occ.left_extreme, occ.right_extreme, pos) < 0.0// && 
+                // if orientation(occ.left_extreme, occ.right_extreme, pos) < 0.0 //&& 
 
                 // (
                 //     (occ.right_extreme.x == occ.left_prev.x && occ.right_extreme.y == occ.left_prev.y) ||
@@ -247,9 +246,9 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
                 //         !intersects_half(occ.left_extreme, occ.left_prev, pos, occ.right_extreme)
                 //     )
                 // )
-                {
+                // {
                     multi = min(occ.left, occ.right);
-                }
+                // }
             }       
             else if occ.occluded_left {
                 multi = occ.left;
@@ -452,13 +451,18 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
 
     if acos(dot(left_middle, left_max)) < acos(dot(left_max, left2)) && acos(dot(left_middle, left2)) < acos(dot(left_max, left2)) 
         && (!same_orientation(extreme_left, prev_extreme_left, pos, light.pos) || orientation(pos, extreme_left, light.pos) > 0)
-        && orientation(prev, extreme_left, prev_extreme_left) <= 0 
+        && orientation(prev, extreme_left, prev_extreme_left) <= 0
         // && (orientation(extreme_left, prev_extreme_left, pos) < 0 || orientation(pos, extreme_left, light.pos) > 0) 
         // && (orientation(extreme_left, extreme_right, pos) < 0 || dot(normalize(pos - extreme_left), normalize(extreme_right - extreme_left)) < 0)
         // && (distance(pos, extreme_left) < distance(pos, extreme_right) || orientation(extreme_left, extreme_right, pos) < 0)
         {
+
         left = true;
+        
         left_multi = acos(dot(left_middle, left2)) / acos(dot(left_max, left2));
+        // if term == 2u {
+        //     left_multi = 0.0;
+        // }
 
         ok = ok || true;
         // return 1.0;
@@ -466,13 +470,17 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
 
     if acos(dot(right_middle, right_max)) < acos(dot(right1, right_max)) && acos(dot(right_middle, right1)) < acos(dot(right1, right_max))
         && (!same_orientation(extreme_right, prev_extreme_right, pos, light.pos) || orientation(pos, extreme_right, light.pos) < 0)
-        && orientation(next, extreme_right, prev_extreme_right) >= 0
+        && orientation(next, extreme_right, prev_extreme_right) >= 0 
         // && (orientation(extreme_right, prev_extreme_right, pos) < 0 || orientation(pos, extreme_right, light.pos) < 0)
         // && (orientation(extreme_right, extreme_left, pos) > 0 || dot(normalize(pos - extreme_right), normalize(extreme_left - extreme_right)) < 0) 
         // && (distance(pos, extreme_left) > distance(pos, extreme_right) || orientation(extreme_right, extreme_left, pos) > 0)
         {
         right = true;
         right_multi = acos(dot(right_middle, right1)) / acos(dot(right1, right_max));
+
+        // if term == 1u {
+        //     right_multi = 0.0;
+        // }
 
         ok = ok || true; 
         // return 1.0;
@@ -481,7 +489,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     // let final_res = min(left_multi, right_multi);
 
     if ok {
-        return OccRes(true, false, left, left_multi, extreme_left, prev_extreme_left, right, right_multi, extreme_right, prev_extreme_right);
+        return OccRes(true, false, true, left_multi, extreme_left, prev_extreme_left, true, right_multi, extreme_right, prev_extreme_right);
         // return final_res;
     }
 
@@ -494,7 +502,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     //     return 1.0;
     // }
     
-
+    // return res_no_occlusion();
     return res_full_occlusion();
     // return OccRes(false, false, 0.0, vec2<f32>(0.0), false, 0.0, vec2<f32>(0.0));
     // return OccRes(true, true, 1.0, true, 1.0);

@@ -84,12 +84,25 @@ fn setup(mut commands: Commands) {
         Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
     ));
 
+    // commands.spawn((
+    //     Occluder2d::polyline(vec![
+    //         vec2(-97., 108.),
+    //         vec2(-58., 163.),
+    //         vec2(-25., 105.),
+    //         vec2(-109., 53.),
+    //     ])
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
+
     commands.spawn((
-        Occluder2d::polyline(vec![
+        Occluder2d::polygon(vec![
             vec2(-97., 108.),
             vec2(-58., 163.),
             vec2(-25., 105.),
             vec2(-109., 53.),
+            vec2(-37., 105.),
+            vec2(-60., 150.),
         ])
         .unwrap(),
         Transform::default(),
