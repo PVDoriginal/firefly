@@ -251,8 +251,8 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
                     format,
                     blend: Some(BlendState {
                         color: BlendComponent {
-                            src_factor: BlendFactor::Src,
-                            dst_factor: BlendFactor::Dst,
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::One,
                             operation: BlendOperation::Max,
                         },
                         alpha: BlendComponent::REPLACE,
@@ -500,12 +500,12 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 entry_point: Some("fragment".into()),
                 targets: vec![
                     Some(ColorTargetState {
-                        format: TextureFormat::Rgba32Float, //format,
+                        format: TextureFormat::Rgba16Float, //format,
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     }),
                     Some(ColorTargetState {
-                        format: TextureFormat::Rgba32Float,
+                        format: TextureFormat::Rgba16Float,
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     }),

@@ -22,4 +22,5 @@ fixedbitset = "0.5.7"
 
 [dev-dependencies]
 rand = "0.9.2"
-bevy = { version = "0.18" }
+bevy = { version = "0.18", features = ["webgpu"] }
+getrandom = { version = "0.3.4", features = ["wasm_js"]}
