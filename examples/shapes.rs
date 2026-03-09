@@ -84,29 +84,29 @@ fn setup(mut commands: Commands) {
         Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::polyline(vec![
-    //         vec2(-97., 108.),
-    //         vec2(-58., 163.),
-    //         vec2(-25., 105.),
-    //         vec2(-109., 53.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
-
     commands.spawn((
-        Occluder2d::polygon(vec![
+        Occluder2d::polyline(vec![
             vec2(-97., 108.),
             vec2(-58., 163.),
             vec2(-25., 105.),
             vec2(-109., 53.),
-            vec2(-37., 105.),
-            vec2(-60., 150.),
         ])
         .unwrap(),
         Transform::default(),
     ));
+
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![
+    //         vec2(-97., 108.),
+    //         vec2(-58., 163.),
+    //         vec2(-25., 105.),
+    //         vec2(-109., 53.),
+    //         vec2(-37., 105.),
+    //         vec2(-60., 150.),
+    //     ])
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
@@ -181,6 +181,23 @@ fn setup(mut commands: Commands) {
     //     Occluder2d::rectangle(10., 10.),
     //     Transform::from_translation(vec3(-109., 210., 0.)),
     // ));
+
+    let spline = CubicCardinalSpline::new_catmull_rom(vec![
+        vec2(0., 0.),
+        vec2(100., 0.),
+        vec2(120., 150.),
+        vec2(54., 120.),
+        vec2(0., 170.),
+    ])
+    .to_curve()
+    .unwrap();
+
+    let samples = 10 * spline.segments().len();
+
+    commands.spawn((
+        Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
+        Transform::from_translation(vec3(-410., -200., 0.)),
+    ));
 }
 
 fn move_light(
