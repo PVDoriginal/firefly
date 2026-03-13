@@ -416,6 +416,19 @@ struct OccluderSlice {
     pub angle: f32,
 }
 
+impl OccluderSlice {
+    fn new(index: usize, vertex: &Vertex) -> Self {
+        OccluderSlice {
+            start_index: index,
+            start_vertex: vertex.index,
+            split: None,
+            length: 1,
+            start_angle: vertex.angle,
+            angle: 0.0,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Vertex {
     pub index: u32,
@@ -577,36 +590,31 @@ fn push_vertices(
             // if the next vertex is decreasing
             if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
                 push_slice(&slice);
-                slice = OccluderSlice {
-                    start_index: index,
-                    start_vertex: vertex.index,
-                    split: None,
-                    length: 1,
-                    start_angle: vertex.angle,
-                    angle: 0.0,
-                };
+                slice = OccluderSlice::new(index, vertex);
             }
             // if the next vertex is increasing, simple case
             else if !loops && vertex.angle > last.angle {
+                if slice.angle + vertex.angle - last.angle > PI {
+                    push_slice(&slice);
+                    slice = OccluderSlice::new(index - 1, last);
+                }
+
                 slice.length += 1;
                 slice.angle += vertex.angle - last.angle;
             }
             // if the next vertex is increasing and loops over
             else {
+                if slice.angle + vertex.angle - last.angle + TAU > PI {
+                    push_slice(&slice);
+                    slice = OccluderSlice::new(index - 1, last);
+                }
                 slice.split = Some(slice.length);
                 slice.length += 1;
 
                 slice.angle += vertex.angle - last.angle + TAU;
             }
         } else {
-            slice = OccluderSlice {
-                start_index: index,
-                start_vertex: vertex.index,
-                split: None,
-                length: 1,
-                start_angle: vertex.angle,
-                angle: 0.0,
-            };
+            slice = OccluderSlice::new(index, vertex);
         }
 
         last = Some(vertex);
