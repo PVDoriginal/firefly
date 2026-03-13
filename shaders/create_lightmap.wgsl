@@ -529,6 +529,16 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     // let reverse = orientation(pos, extreme_right, extreme_left) < 0;
     // let reverse = false;
 
+    if !left_is_valid && !inside_left && (!out_of_bounds || (inside_right && !above_left)) {
+        left = true;
+        left_multi = 1.0;
+    }
+
+    if !right_is_valid && !inside_right && (!out_of_bounds || (inside_left && !under_right)) {
+        right = true;
+        right_multi = 1.0;
+    }
+
     if !left_is_valid && !right_is_valid && !out_of_bounds {
         left = true; 
         right = true;
