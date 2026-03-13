@@ -39,7 +39,7 @@ fn setup(mut commands: Commands) {
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 3.0,
-            inner_range: 30.,
+            inner_range: 40.,
             range: 450.,
             ..default()
         },
@@ -198,6 +198,28 @@ fn setup(mut commands: Commands) {
         Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
         Transform::from_translation(vec3(-410., -200., 0.)),
     ));
+
+    // commands.spawn((
+    //     Occluder2d::polyline(
+    //         vec![
+    //             vec2(0., 0.),
+    //             vec2(30., -10.),
+    //             vec2(60., -30.),
+    //             vec2(30., -3.),
+    //             vec2(100., 20.),
+    //             vec2(100., 0.),
+    //             vec2(120., 150.),
+    //             vec2(54., 120.),
+    //             vec2(0., 170.),
+    //         ]
+    //         .iter()
+    //         .rev()
+    //         .map(|x| *x)
+    //         .collect(),
+    //     )
+    //     .unwrap(),
+    //     Transform::from_translation(vec3(-410., -200., 0.)),
+    // ));
 }
 
 fn move_light(

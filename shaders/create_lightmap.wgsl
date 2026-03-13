@@ -451,7 +451,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
             let left2 = normalize(extreme_left - left_t2);
             left_multi = 1.0 - acos(dot(normalize(pos - extreme_left), left2)) / acos(dot(normalize(extreme_left - left_t1), left2));
         }
-        else if under_left && !under_right && (!out_of_bounds || (!right_is_valid && out_of_bounds && orientation(extreme_right, prev_extreme_right, pos) > 0)) {
+        else if !out_of_bounds || (inside_right && !above_left) {
             left_multi = 1.0;
         }
         else {
@@ -466,7 +466,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
             let right1 = normalize(extreme_right - right_t1);
             right_multi = 1.0 - acos(dot(normalize(pos - extreme_right), right1)) / acos(dot(normalize(extreme_right - right_t2), right1));
         }
-        else if above_right && !above_left && (!out_of_bounds || (!left_is_valid && out_of_bounds && orientation(extreme_left, prev_extreme_left, pos) < 0))  {
+        else if !out_of_bounds || (inside_left && !under_right) {
             right_multi = 1.0;
         }
         else {
@@ -477,8 +477,8 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     // this logic is weird, look more into what happens when left and right are reversed
     if orientation(pos, extreme_right, extreme_left) < 0 { 
         if right_is_valid && left_is_valid && inside_right && inside_left {
-            left_multi = max(left_multi, right_multi);
-            right_multi = left_multi;
+            // left_multi = max(left_multi, right_multi);
+            // right_multi = left_multi;
         }
     }
 

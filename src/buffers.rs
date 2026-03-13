@@ -580,6 +580,7 @@ impl BinBuffer {
             // info!("min bin: {min_bin}");
             // info!("n_bins; {n_bins}");
 
+            // self.add_to_bins(0, N_BINS - 1, edge.pointer);
             if min_bin + n_bins >= N_BINS {
                 self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
                 self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
