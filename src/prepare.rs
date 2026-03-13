@@ -594,20 +594,20 @@ fn push_vertices(
             }
             // if the next vertex is increasing, simple case
             else if !loops && vertex.angle > last.angle {
-                if slice.angle + vertex.angle - last.angle > PI {
-                    push_slice(&slice);
-                    slice = OccluderSlice::new(index - 1, last);
-                }
+                // if slice.angle + vertex.angle - last.angle > PI {
+                //     push_slice(&slice);
+                //     slice = OccluderSlice::new(index - 1, last);
+                // }
 
                 slice.length += 1;
                 slice.angle += vertex.angle - last.angle;
             }
             // if the next vertex is increasing and loops over
             else {
-                if slice.angle + vertex.angle - last.angle + TAU > PI {
-                    push_slice(&slice);
-                    slice = OccluderSlice::new(index - 1, last);
-                }
+                // if slice.angle + vertex.angle - last.angle + TAU > PI {
+                //     push_slice(&slice);
+                //     slice = OccluderSlice::new(index - 1, last);
+                // }
                 slice.split = Some(slice.length);
                 slice.length += 1;
 

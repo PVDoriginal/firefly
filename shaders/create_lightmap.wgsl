@@ -212,22 +212,22 @@ fn accumulate_occlusion(prev_result: OccRes, result: OccRes, pos: vec2<f32>) -> 
         acc_res.occluded = true;
     
         if result.occluded_left {
-            acc_res.left = max(acc_res.left, result.left);
 
-            if !acc_res.occluded_left || orientation(pos, acc_res.left_point, result.left_point) > 0 {
+            if !acc_res.occluded_left || orientation(pos, acc_res.left_point, result.left_point) < 0 {
                 acc_res.left_point = result.left_point;
             }
 
+            acc_res.left = max(acc_res.left, result.left);
             acc_res.occluded_left = true;
         }
 
         if result.occluded_right {
-            acc_res.right = max(acc_res.right, result.right);
 
-            if !acc_res.occluded_right || orientation(pos, acc_res.right_point, result.right_point) < 0 {
+            if !acc_res.occluded_right || orientation(pos, acc_res.right_point, result.right_point) > 0 {
                 acc_res.right_point = result.right_point;
             }
 
+            acc_res.right = max(acc_res.right, result.right);
             acc_res.occluded_right = true;
         }
     }
@@ -424,12 +424,21 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     var left_t1 = light.pos + rotate_90(normalize(extreme_left - light.pos)) * left_range;
     var left_t2 = light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * left_range;
 
-    if orientation(left_t2, extreme_left, prev) < 0 {
+    let rev = orientation(light.pos, extreme_right, extreme_left) > 0;
+
+    if !rev && orientation(left_t2, extreme_left, prev) < 0 {
         left_t2 = (extreme_left - prev) * 2.0 + extreme_left;
+    }
+    // else if rev && orientation(left_t1, extreme_left, extreme_right) > 0{
+    //     left_t1 = (extreme_left - extreme_right) * 2.0 + extreme_left;
+    // }
+
+    if rev && !out_of_bounds && orientation(left_t1, extreme_left, extreme_right) > 0 {
+        left_t1 = (extreme_left - extreme_right) * 2.0 + extreme_left;
     }
 
     // if orientation(light.pos, extreme_right, extreme_left) > 0 
-    // && orientation(left_t1, extreme_left, prev_extreme_left) < 0 {        
+    // if orientation(left_t1, extreme_left, prev_extreme_left) < 0 {        
     //     left_t1 = prev_extreme_left;
     // }
 
@@ -438,12 +447,20 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     var right_t1 = light.pos + rotate_90(normalize(extreme_right - light.pos)) * right_range;
     var right_t2 = light.pos + rotate_90_cc(normalize(extreme_right - light.pos)) * right_range;
 
-    if orientation(right_t1, extreme_right, next) > 0 {
+    if !rev && orientation(right_t1, extreme_right, next) > 0 {
         right_t1 = (extreme_right - next) * 2.0 + extreme_right;
+    }
+    // else if rev && orientation(right_t2, extreme_right, prev_extreme_right) > 0 {
+    //     // right_t2 = (extreme_right - prev_extreme_right) * -10.0 + extreme_right;
+    //     right_t2 = prev_extreme_right;
+    // }
+
+    if rev && !out_of_bounds && orientation(right_t2, extreme_right, extreme_left) < 0 {
+        right_t2 = (extreme_right - extreme_left) * 2.0 + extreme_right;
     }
 
     // if orientation(light.pos, extreme_right, extreme_left) > 0 
-    // && orientation(right_t2, extreme_right, prev_extreme_right) > 0 {        
+    // if orientation(right_t2, extreme_right, prev_extreme_right) > 0 {        
     //     right_t2 = prev_extreme_right;
     // }
 
@@ -476,7 +493,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
             let left2 = normalize(extreme_left - left_t2);
             left_multi = 1.0 - acos(dot(normalize(pos - extreme_left), left2)) / acos(dot(normalize(extreme_left - left_t1), left2));
         }
-        else if !out_of_bounds || (!right_is_valid && inside_right && !above_left) {
+        else if !out_of_bounds || (inside_right && !above_left) {
             left_multi = 1.0;
         }
         else {
@@ -491,7 +508,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
             let right1 = normalize(extreme_right - right_t1);
             right_multi = 1.0 - acos(dot(normalize(pos - extreme_right), right1)) / acos(dot(normalize(extreme_right - right_t2), right1));
         }
-        else if !out_of_bounds || (!left_is_valid && inside_left && !under_right) {
+        else if !out_of_bounds || (inside_left && !under_right) {
             right_multi = 1.0;
         }
         else {
@@ -519,8 +536,16 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
         right_multi = 1.0;
     }
 
-    return OccRes(left || right || !out_of_bounds, left, left_multi, extreme_left, right, right_multi, extreme_right);
-    
+    if orientation(light.pos, extreme_right, extreme_left) > 0 {
+        if !out_of_bounds && orientation(right_t1, pos, extreme_left) < 0 {
+            // right_multi = 1.0;
+        }
+        // if !out_of_bounds && orientation(left_t2, pos, extreme_right) > 0 {
+        //     left_multi = 1.0;
+        // }
+    }
+
+    return OccRes(left || right || !out_of_bounds, left, left_multi, extreme_left, right, right_multi, extreme_right);   
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
