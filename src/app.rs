@@ -3,15 +3,13 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    color::palettes::css::{GREY, PINK, RED, WHITE},
+    color::palettes::css::{GREY, PINK, WHITE},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
         RenderApp,
         render_graph::{RenderGraphExt, ViewNodeRunner},
-        view::Hdr,
     },
-    window::PrimaryWindow,
 };
 
 use crate::{

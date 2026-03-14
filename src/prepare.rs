@@ -488,7 +488,7 @@ fn push_vertices(
 
     let mut edges: Vec<OccluderData> = vec![];
     // info!("");
-    info!("---------");
+    // info!("---------");
     let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
         if slice.length > 1 {
             let rev: u32 = match rev {
@@ -496,12 +496,12 @@ fn push_vertices(
                 false => 0,
             };
 
-            info!("pushing {slice:?}!");
+            // info!("pushing {slice:?}!");
 
-            info!(
-                "slice start: {}, slice length: {}",
-                slice.start_vertex, slice.length
-            );
+            // info!(
+            //     "slice start: {}, slice length: {}",
+            //     slice.start_vertex, slice.length
+            // );
 
             let min_v = (rev << 29) | slice.start_vertex + start_vertex;
             let length = slice.length;
