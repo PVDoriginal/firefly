@@ -37,12 +37,12 @@ pub struct PipelinePlugin;
 
 impl Plugin for PipelinePlugin {
     fn build(&self, app: &mut App) {
-        load_shader_library!(app, "../shaders/types.wgsl");
-        load_shader_library!(app, "../shaders/utils.wgsl");
+        load_shader_library!(app, "shaders/types.wgsl");
+        load_shader_library!(app, "shaders/utils.wgsl");
 
-        embedded_asset!(app, "../shaders/create_lightmap.wgsl");
-        embedded_asset!(app, "../shaders/apply_lightmap.wgsl");
-        embedded_asset!(app, "../shaders/sprite.wgsl");
+        embedded_asset!(app, "shaders/create_lightmap.wgsl");
+        embedded_asset!(app, "shaders/apply_lightmap.wgsl");
+        embedded_asset!(app, "shaders/sprite.wgsl");
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -137,7 +137,7 @@ fn init_lightmap_creation_pipeline(
         lut_layout,
         sampler,
         vertex_state,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/create_lightmap.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/create_lightmap.wgsl"),
     });
 }
 
@@ -309,7 +309,7 @@ fn init_lightmap_application_pipeline(
         layout,
         sampler,
         vertex_state,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/apply_lightmap.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/apply_lightmap.wgsl"),
     });
 }
 
@@ -397,7 +397,7 @@ fn init_sprite_pipeline(mut commands: Commands, asset_server: Res<AssetServer>) 
     commands.insert_resource(SpritePipeline {
         view_layout,
         material_layout,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/sprite.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/sprite.wgsl"),
     });
 }
 

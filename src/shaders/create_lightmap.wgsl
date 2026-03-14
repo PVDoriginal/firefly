@@ -425,19 +425,18 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             
             return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
         }
-        // else {
-        //     let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
-        //     let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
+        else {
+            let loops = min_v - length + 1 < occluder.start_vertex;
+            let last = min_v - length + 1 + select(0, occluder.n_vertices, loops);
             
-        //     let prev = select(min_v - 1, occluder.start_vertex + occluder.n_vertices - 1, min_v - 1 < occluder.start_vertex); 
-        //     let next = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
+            let prev = select(min_v + 1, occluder.start_vertex, min_v + 1 >= occluder.start_vertex + occluder.n_vertices); 
+            let next = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
 
+            let prev_last  = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
+            let prev_first = select(min_v - 1, min_v - 1 + occluder.n_vertices, min_v - 1 < occluder.start_vertex);
             
-        //     let prev_last  = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
-        //     let prev_first = select(min_v + 1, min_v + 1 - occluder.n_vertices, min_v + 1 >= occluder.start_vertex + occluder.n_vertices);
-            
-        //     return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
-        // }
+            return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
+        }
     }
     
     if is_occluded {

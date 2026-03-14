@@ -176,6 +176,7 @@ fn prepare_lights(
     mut lights: Query<(&ExtractedPointLight, &mut LightIndex)>,
     mut light_manager: ResMut<BufferManager<UniformPointLight>>,
 ) {
+    info!("OK!");
     for (light, mut index) in &mut lights {
         let changed = light.changes.0;
 
