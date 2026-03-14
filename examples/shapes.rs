@@ -39,7 +39,8 @@ fn setup(mut commands: Commands) {
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 3.0,
-            inner_range: 40.,
+            // inner_range: 0.2,
+            // inner_range: 40.,
             range: 450.,
             ..default()
         },
