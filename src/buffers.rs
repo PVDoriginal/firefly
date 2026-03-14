@@ -577,8 +577,8 @@ impl BinBuffer {
             let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
             let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
 
-            // info!("min bin: {min_bin}");
-            // info!("n_bins; {n_bins}");
+            info!("min bin: {min_bin}");
+            info!("n_bins; {n_bins}");
 
             // self.add_to_bins(0, N_BINS - 1, edge.pointer);
             if min_bin + n_bins >= N_BINS {

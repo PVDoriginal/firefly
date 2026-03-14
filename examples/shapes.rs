@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 3.0,
             // inner_range: 0.2,
-            // inner_range: 40.,
+            inner_range: 40.,
             range: 450.,
             ..default()
         },
@@ -96,18 +96,18 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-97., 108.),
-    //         vec2(-58., 163.),
-    //         vec2(-25., 105.),
-    //         vec2(-109., 53.),
-    //         vec2(-37., 105.),
-    //         vec2(-60., 150.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-97., 108.),
+            vec2(-58., 163.),
+            vec2(-25., 105.),
+            vec2(-109., 53.),
+            vec2(-37., 105.),
+            vec2(-60., 150.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
