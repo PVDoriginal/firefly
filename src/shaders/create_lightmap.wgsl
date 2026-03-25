@@ -256,11 +256,11 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
         var left = occ.left;
         var right = occ.right;
 
-        if occ.maybe_right && (occ.occluded_right) && occ.behind_occluder && (!occ.occluded_left || occ.left == 1.0) {
+        if occ.maybe_right && (occ.occluded_right) && occ.behind_occluder && (occ.left == 1.0) {
             right = 1.0;
         }
 
-        if occ.maybe_left && occ.occluded_left && occ.behind_occluder && (!occ.occluded_right || occ.right == 1.0) {
+        if occ.maybe_left && occ.occluded_left && occ.behind_occluder && (occ.right == 1.0) {
             left = 1.0;
         }
 
@@ -927,4 +927,3 @@ fn get_extreme_angle_local(p: vec2f, l: vec2f, t: vec2f) -> f32 {
 
     return angle;
 }
-
