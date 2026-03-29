@@ -429,7 +429,7 @@ impl OccluderSlice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Vertex {
     pub index: u32,
     pub angle: f32,
@@ -460,6 +460,8 @@ fn push_vertices(
         vertices.rev().collect()
     };
 
+    let mut round_occlusion = false;
+
     loop {
         let last = vertices.last().unwrap().angle;
         let vertex = vertices.first().unwrap().angle;
@@ -472,6 +474,11 @@ fn push_vertices(
 
         vertices.rotate_right(1);
 
+        if rev && vertices.last().unwrap().index == 0 {
+            round_occlusion = true;
+            break;
+        }
+
         // info!("{vertices:?}");
     }
 
@@ -483,7 +490,7 @@ fn push_vertices(
     let mut edges: Vec<OccluderData> = vec![];
     // info!("");
     // info!("---------");
-    let mut push_slice = |slice: &OccluderSlice| {
+    let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
         if slice.length > 1 {
             let rev: u32 = match rev {
                 true => 1,
@@ -583,45 +590,59 @@ fn push_vertices(
     let mut last: Option<&Vertex> = None;
     let mut slice: OccluderSlice = default();
 
-    for (index, vertex) in vertices.iter().enumerate() {
-        if let Some(last) = last {
-            let loops = (vertex.angle - last.angle).abs() > PI;
+    if !round_occlusion {
+        for (index, vertex) in vertices.iter().enumerate() {
+            if let Some(last) = last {
+                let loops = (vertex.angle - last.angle).abs() > PI;
 
-            // if the next vertex is decreasing
-            if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
-                push_slice(&slice);
+                // if the next vertex is decreasing
+                if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
+                    push_slice(&slice, &vertices);
+                    slice = OccluderSlice::new(index, vertex);
+                }
+                // if the next vertex is increasing, simple case
+                else if !loops && vertex.angle > last.angle {
+                    slice.length += 1;
+                    slice.angle += vertex.angle - last.angle;
+                }
+                // if the next vertex is increasing and loops over
+                else {
+                    slice.split = Some(slice.length);
+                    slice.length += 1;
+
+                    slice.angle += vertex.angle - last.angle + TAU;
+                }
+            } else {
                 slice = OccluderSlice::new(index, vertex);
             }
-            // if the next vertex is increasing, simple case
-            else if !loops && vertex.angle > last.angle {
-                // if slice.angle + vertex.angle - last.angle > PI {
-                //     push_slice(&slice);
-                //     slice = OccluderSlice::new(index - 1, last);
-                // }
 
-                slice.length += 1;
-                slice.angle += vertex.angle - last.angle;
-            }
-            // if the next vertex is increasing and loops over
-            else {
-                // if slice.angle + vertex.angle - last.angle + TAU > PI {
-                //     push_slice(&slice);
-                //     slice = OccluderSlice::new(index - 1, last);
-                // }
-                slice.split = Some(slice.length);
-                slice.length += 1;
-
-                slice.angle += vertex.angle - last.angle + TAU;
-            }
-        } else {
-            slice = OccluderSlice::new(index, vertex);
+            last = Some(vertex);
         }
 
-        last = Some(vertex);
-    }
+        push_slice(&slice, &vertices);
+    } else {
+        vertices.push(vertices[0]);
+        for (index, vertex) in vertices.iter().enumerate() {
+            if let Some(last) = last {
+                let loops = (vertex.angle - last.angle).abs() > PI;
 
-    // info!("final slice: {slice:?}");
-    push_slice(&slice);
+                if !loops {
+                    slice.length += 1;
+                    slice.angle += vertex.angle - last.angle;
+                } else {
+                    slice.split = Some(slice.length);
+                    slice.length += 1;
+
+                    slice.angle += vertex.angle - last.angle + TAU;
+                }
+            } else {
+                slice = OccluderSlice::new(index, vertex);
+            }
+
+            last = Some(vertex);
+        }
+        push_slice(&slice, &vertices);
+    }
 
     bins.add_occluder(edges);
 }
