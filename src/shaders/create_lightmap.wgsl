@@ -262,15 +262,15 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
         let rev = orientation(light.pos, occ.left_point, occ.right_point) < 0;
 
         if !(!occ.behind_occluder && occ.behind_left && occ.behind_right) {
-        if occ.behind_left {
-            left = 1.0;
-            occluded_left = true;
-        }
+            if occ.behind_left {
+                left = 1.0;
+                occluded_left = true;
+            }
 
-        if occ.behind_right {
-            right = 1.0;
-            occluded_right = true;
-        }
+            if occ.behind_right {
+                right = 1.0;
+                occluded_right = true;
+            }
         }
 
         if occluded_left && occluded_right {
