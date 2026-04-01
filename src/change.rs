@@ -19,7 +19,7 @@ impl Plugin for ChangePlugin {
 }
 
 fn changed_occluders(
-    mut occluders: Query<&mut Changes, Or<(Changed<Transform>, Changed<Occluder2d>)>>,
+    mut occluders: Query<&mut Changes, Or<(Changed<GlobalTransform>, Changed<Occluder2d>)>>,
 ) {
     for mut changed in &mut occluders {
         changed.0 = true;
@@ -27,7 +27,7 @@ fn changed_occluders(
 }
 
 fn changed_lights(
-    mut lights: Query<&mut Changes, Or<(Changed<Transform>, Changed<PointLight2d>)>>,
+    mut lights: Query<&mut Changes, Or<(Changed<GlobalTransform>, Changed<PointLight2d>)>>,
 ) {
     for mut changed in &mut lights {
         changed.0 = true;
