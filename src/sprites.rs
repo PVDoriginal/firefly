@@ -13,7 +13,7 @@ use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_chang
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
-use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
+use bevy::sprite_render::{queue_material2d_meshes, SpritePipelineKey, SpriteSystems};
 use bevy::{
     core_pipeline::{
         core_2d::{AlphaMask2d, Opaque2d},
@@ -22,21 +22,21 @@ use bevy::{
     ecs::{
         prelude::*,
         query::ROQueryItem,
-        system::{SystemParamItem, lifetimeless::*},
+        system::{lifetimeless::*, SystemParamItem},
     },
     math::{Affine3A, FloatOrd},
     platform::collections::HashMap,
     prelude::*,
     render::{
-        Render, RenderApp,
         batching::sort_binned_render_phase,
         render_phase::{
-            AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
-            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-            sort_phase_system,
+            sort_phase_system, AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex,
+            RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
+            ViewSortedRenderPhases,
         },
         render_resource::*,
         view::{ExtractedView, Msaa, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
+        Render, RenderApp,
     },
 };
 
@@ -202,6 +202,10 @@ impl NormalMap {
         let image: Handle<Image> =
             asset_server.load_with_settings(path, |x: &mut ImageLoaderSettings| x.is_srgb = false);
 
+        Self { image }
+    }
+
+    pub fn from_image(image: Handle<Image>) -> Self {
         Self { image }
     }
 }
