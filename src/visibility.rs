@@ -14,7 +14,7 @@ use bevy::{
 use crate::{
     data::FireflyConfig,
     lights::{LightHeight, PointLight2d},
-    occluders::Occluder2dShape,
+    occluders::{Occluder2dShape, Occluder2dStyle},
     prelude::Occluder2d,
 };
 
@@ -159,18 +159,23 @@ fn mark_visible_occluders(
 
 fn occluder_aabb(
     mut occluders: Query<
-        (&Occluder2d, &GlobalTransform, &mut OccluderAabb),
-        Or<(Changed<GlobalTransform>, Changed<Occluder2d>)>,
+        (
+            &Occluder2dShape,
+            &Occluder2dStyle,
+            &GlobalTransform,
+            &mut OccluderAabb,
+        ),
+        Or<(Changed<GlobalTransform>, Added<Occluder2dShape>)>,
     >,
 ) {
-    for (occluder, transform, mut rect) in &mut occluders {
+    for (shape, style, transform, mut rect) in &mut occluders {
         let isometry = Isometry2d {
             rotation: Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
-            translation: transform.translation().truncate() + occluder.offset.truncate(),
+            translation: transform.translation().truncate() + style.offset.truncate(),
         };
 
-        rect.0 = match occluder.shape() {
-            Occluder2dShape::RoundRectangle {
+        rect.0 = match shape {
+            Occluder2dShape::Round {
                 width,
                 height,
                 radius,
@@ -180,8 +185,9 @@ fn occluder_aabb(
             }
             .transformed_by(isometry.translation, isometry.rotation),
 
-            Occluder2dShape::Polygon { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
-            Occluder2dShape::Polyline { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
+            Occluder2dShape::Convex { vertices, .. } => {
+                Aabb2d::from_point_cloud(isometry, vertices)
+            }
         }
     }
 }

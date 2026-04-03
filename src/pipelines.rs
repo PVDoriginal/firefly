@@ -29,7 +29,7 @@ use crate::{
     buffers::{BinIndices, OccluderPointer},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
-    occluders::{UniformOccluder, UniformRoundOccluder},
+    occluders::{UniformPolyOccluder, UniformRoundOccluder},
 };
 
 /// Plugin that initializes various Pipelines. Added automatically by [`FireflyPlugin`](crate::prelude::FireflyPlugin).
@@ -93,7 +93,7 @@ fn init_lightmap_creation_pipeline(
                 // round occluders
                 (3, storage_buffer_read_only::<UniformRoundOccluder>(false)),
                 // poly occluders
-                (4, storage_buffer_read_only::<UniformOccluder>(false)),
+                (4, storage_buffer_read_only::<UniformPolyOccluder>(false)),
                 // vertices
                 (5, storage_buffer_read_only::<Vec2>(false)),
                 // occluders

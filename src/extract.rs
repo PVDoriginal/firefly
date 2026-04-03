@@ -20,9 +20,8 @@ use crate::{
     change::Changes,
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
-    occluders::ExtractedOccluder,
+    occluders::{ExtractedOccluder, Occluder2dShape, Occluder2dStyle, OccluderIndex},
     phases::SpritePhase,
-    prelude::Occluder2d,
     sprites::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
         SpriteAssetEvents, SpriteHeight,
@@ -253,19 +252,30 @@ fn extract_occluders(
     occluders: Extract<
         Query<(
             RenderEntity,
-            &Occluder2d,
+            &Occluder2dStyle,
+            &Occluder2dShape,
             &GlobalTransform,
             &OccluderAabb,
             &ViewVisibility,
             &VisibilityTimer,
             &Changes,
+            &OccluderIndex,
         )>,
     >,
 ) {
     let mut values = Vec::with_capacity(*previous_len);
 
-    for (entity, occluder, global_transform, aabb, visibility, visibility_timer, changes) in
-        &occluders
+    for (
+        entity,
+        style,
+        shape,
+        global_transform,
+        aabb,
+        visibility,
+        visibility_timer,
+        changes,
+        index,
+    ) in &occluders
     {
         if !visibility.get() {
             if visibility_timer.0.just_finished() {
@@ -274,18 +284,19 @@ fn extract_occluders(
             continue;
         }
 
-        let pos = global_transform.translation().truncate() + occluder.offset.xy();
+        let pos = global_transform.translation().truncate() + style.offset.xy();
 
         let extracted_occluder = ExtractedOccluder {
             pos,
             rot: global_transform.rotation().to_euler(EulerRot::XYZ).2,
-            shape: occluder.shape().clone(),
+            shape: shape.clone(),
             aabb: aabb.0,
-            z: global_transform.translation().z + occluder.offset.z,
-            color: occluder.color,
-            opacity: occluder.opacity,
-            z_sorting: occluder.z_sorting,
+            z: global_transform.translation().z + style.offset.z,
+            color: style.color,
+            opacity: style.opacity,
+            z_sorting: style.z_sorting,
             changes: changes.clone(),
+            index: index.0,
         };
 
         values.push((entity, extracted_occluder));

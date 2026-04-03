@@ -3,7 +3,7 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    color::palettes::css::{GREY, PINK, WHITE},
+    color::palettes::css::{GREY, PINK, RED, WHITE},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
@@ -18,7 +18,7 @@ use crate::{
     extract::ExtractPlugin,
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
-    occluders::{Occluder2dShape, OccluderPlugin, translate_vertices},
+    occluders::{Occluder2dInternalShape, Occluder2dShape, OccluderPlugin, translate_vertices},
     pipelines::PipelinePlugin,
     sprites::SpritesPlugin,
     visibility::VisibilityPlugin,
@@ -78,6 +78,7 @@ impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FireflyGizmoStyle>();
         app.add_systems(Update, draw_gizmos);
+        // app.add_systems(Update, draw_gizmos_decomp);
     }
 }
 
@@ -99,6 +100,38 @@ impl Default for FireflyGizmoStyle {
     }
 }
 
+fn draw_gizmos_decomp(
+    mut gizmos: Gizmos,
+    style: Res<FireflyGizmoStyle>,
+    occluders: Query<(&GlobalTransform, &Occluder2dShape), Without<Occluder2d>>,
+) {
+    for (transform, occluder) in &occluders {
+        match &occluder {
+            &Occluder2dShape::Convex { vertices, .. } => {
+                let vertices = translate_vertices(
+                    vertices.clone(),
+                    transform.translation().truncate(),
+                    Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
+                );
+
+                for (i, line) in vertices.windows(2).enumerate() {
+                    if i == 0 {
+                        gizmos.line_2d(line[0], line[1], Color::Srgba(RED));
+                    } else {
+                        gizmos.line_2d(line[0], line[1], style.occluder_color);
+                    }
+                }
+                gizmos.line_2d(
+                    vertices[0],
+                    vertices[vertices.len() - 1],
+                    style.occluder_color,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
 fn draw_gizmos(
     mut gizmos: Gizmos,
     style: Res<FireflyGizmoStyle>,
@@ -114,7 +147,7 @@ fn draw_gizmos(
 
     for (transform, occluder) in &occluders {
         match occluder.shape().clone() {
-            Occluder2dShape::Polygon { vertices, .. } => {
+            Occluder2dInternalShape::Polygon { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate() + occluder.offset.xy(),
@@ -130,7 +163,7 @@ fn draw_gizmos(
                     style.occluder_color,
                 );
             }
-            Occluder2dShape::Polyline { vertices, .. } => {
+            Occluder2dInternalShape::Polyline { vertices, .. } => {
                 let vertices = translate_vertices(
                     vertices,
                     transform.translation().truncate() + occluder.offset.xy(),
@@ -141,7 +174,7 @@ fn draw_gizmos(
                     gizmos.line_2d(line[0], line[1], style.occluder_color);
                 }
             }
-            Occluder2dShape::RoundRectangle {
+            Occluder2dInternalShape::Round {
                 width,
                 height,
                 radius,

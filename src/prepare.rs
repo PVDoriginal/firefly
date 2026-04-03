@@ -47,7 +47,7 @@ use crate::{
     LightMapTexture,
     data::{FireflyConfig, UniformFireflyConfig},
     lights::{ExtractedPointLight, UniformPointLight},
-    occluders::{ExtractedOccluder, Occluder2dShape, UniformOccluder, UniformRoundOccluder},
+    occluders::{ExtractedOccluder, Occluder2dShape, UniformPolyOccluder, UniformRoundOccluder},
 };
 
 /// Camera buffer component containing the data extracted from [`FireflyConfig`].
@@ -232,7 +232,7 @@ pub(crate) fn prepare_data(
     mut light_bind_groups: ResMut<LightBindGroups>,
     mut batches: ResMut<LightBatches>,
     round_occluders: Res<BufferManager<UniformRoundOccluder>>,
-    poly_occluders: Res<BufferManager<UniformOccluder>>,
+    poly_occluders: Res<BufferManager<UniformPolyOccluder>>,
     light_buffer: Res<BufferManager<UniformPointLight>>,
     vertices: Res<VertexBuffer>,
     pipeline_cache: Res<PipelineCache>,
@@ -251,6 +251,9 @@ pub(crate) fn prepare_data(
     let light_bind_groups = &mut *light_bind_groups;
 
     let mut lights: Vec<_> = lights.iter_mut().collect();
+
+    let mut occluders: Vec<_> = occluders.iter_inner().collect();
+    occluders.sort_unstable_by_key(|(e, _, _)| e.index);
 
     for (retained_view, _) in phases.iter() {
         lights
@@ -282,7 +285,7 @@ pub(crate) fn prepare_data(
                             continue;
                         }
 
-                        if let Occluder2dShape::RoundRectangle {
+                        if let Occluder2dShape::Round {
                             width,
                             height,
                             radius,
@@ -339,7 +342,7 @@ pub(crate) fn prepare_data(
                             };
 
                             let light_inside_occluder =
-                                matches!(occluder.shape, Occluder2dShape::Polygon { .. })
+                                matches!(occluder.shape, Occluder2dShape::Convex { .. })
                                     && point_inside_poly(
                                         light.pos,
                                         occluder.vertices(),

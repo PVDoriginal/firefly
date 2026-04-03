@@ -34,6 +34,7 @@ struct PolyOccluder {
     color: vec3f, 
     opacity: f32,
     z_sorting: u32,
+    index: u32,
 }
 
 struct OccluderPointer {

@@ -58,6 +58,7 @@ const PIDIV2: f32 = 1.57079632679;
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let light = lights[light_index];
 
+        var lol = 0;
     var res = vec4f(0);
     
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
@@ -124,7 +125,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         // }
 
         var prev_index: u32;
-        var acc_res: OccRes;
+        var current_index: u32; 
+        var acc_res = res_no_occlusion();
+
 
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
@@ -161,10 +164,16 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                     }
                 }
 
-                if prev_index != occluder_index {
-                    shadow = apply_occlusion(shadow, prev_index, acc_res, pos);
+                let poly_index = poly_occluders[occluder_index].index;
+                current_index = occluder_index;
 
-                    prev_index = occluder_index; 
+                if prev_index != poly_index {
+                    if acc_res.occluded == true {
+                        lol += 1;
+                    }
+                    shadow = apply_occlusion(shadow, current_index, acc_res, pos);
+
+                    prev_index = poly_index; 
                     acc_res = res_no_occlusion();
                     // acc_res = OccRes(false, false, 0.0, false, 0.0);
                 }
@@ -193,14 +202,20 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 break;
             }
         }
-
-        shadow = apply_occlusion(shadow, prev_index, acc_res, pos);
+        if acc_res.occluded == true {
+            lol += 1;
+        }
+        shadow = apply_occlusion(shadow, current_index, acc_res, pos);
         res *= vec4f(shadow, 1);
     }
 
 #ifdef TONEMAP_IN_SHADER
     res = tonemapping::tone_mapping(res, view.color_grading);
 #endif
+
+    // if lol == 1 {
+    //     return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    // }
 
     return res;
 }
@@ -210,38 +225,9 @@ fn accumulate_occlusion(prev_result: OccRes, result: OccRes, pos: vec2<f32>) -> 
 
     if result.occluded {
         acc_res.occluded = true;
-    
-        if result.occluded_left {
 
-            if !acc_res.occluded_left || orientation(pos, acc_res.left_point, result.left_point) < 0 {
-                acc_res.left_point = result.left_point;
-            }
-            
-            acc_res.left = max(acc_res.left, result.left);
-            acc_res.occluded_left = true;
-        }
-
-        if result.occluded_right {
-
-            if !acc_res.occluded_right || orientation(pos, acc_res.right_point, result.right_point) > 0 {
-                acc_res.right_point = result.right_point;
-            }
-
-            acc_res.right = max(acc_res.right, result.right);
-            acc_res.occluded_right = true;
-        }
-
-        if result.behind_occluder {
-            acc_res.behind_occluder = true;
-        }
-
-        if result.behind_left {
-            acc_res.behind_left = true;
-        }
-
-        if result.behind_right {
-            acc_res.behind_right = true;
-        }
+        acc_res.left = max(acc_res.left, result.left);
+        acc_res.right = max(acc_res.right, result.right);
     }
     
     return acc_res;
@@ -251,49 +237,7 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
     let light = lights[light_index];
 
     if occ.occluded && index != 0u {
-        var multi = 1.0;
-
-        var left = occ.left;
-        var right = occ.right;
-
-        var occluded_left = occ.occluded_left;
-        var occluded_right = occ.occluded_right;
-
-        let rev = orientation(light.pos, occ.left_point, occ.right_point) < 0;
-
-        if !(!occ.behind_occluder && occ.behind_left && occ.behind_right) {
-            if occ.behind_left {
-                left = 1.0;
-                occluded_left = true;
-            }
-
-            if occ.behind_right {
-                right = 1.0;
-                occluded_right = true;
-            }
-        }
-
-        if occluded_left && occluded_right {
-            if !rev {
-                multi = min(left, right);
-            }
-            else {
-                if left == 1.0 && right != 1.0 {
-                    left = 0.0;
-                }
-                
-                else if right == 1.0 && left != 1.0 {
-                    right = 0.0;
-                }
-
-                multi = max(left, right);
-            }
-        }       
-        else if occluded_left || occluded_right {
-            multi = 0.0;
-        }
-
-        return shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * multi);
+        return shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * min(occ.left, occ.right));
     }
     else {
         return shadow;
@@ -302,27 +246,16 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -
 
 struct OccRes {
     occluded: bool, 
-
-    occluded_left: bool,
     left: f32,
-    left_point: vec2<f32>,
-     
-    occluded_right: bool,
     right: f32,
-    right_point: vec2<f32>,
-
-    behind_occluder: bool,
-
-    behind_left: bool, 
-    behind_right: bool,
 }
 
 fn res_full_occlusion() -> OccRes {
-    return OccRes(true, false, 0.0, vec2<f32>(0.0), false, 0.0, vec2<f32>(0.0), true, true, true);
+    return OccRes(true, 1.0, 1.0);
 }
 
 fn res_no_occlusion() -> OccRes {
-    return OccRes(false, false, 0.0, vec2<f32>(0.0), false, 0.0, vec2<f32>(0.0), false, false, false);
+    return OccRes(false, 0.0, 0.0);
 }
 
 fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
@@ -391,7 +324,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
         }
     }
 
-    if config.softness > 0 && (is_occluded || out_of_bounds) {
+    if config.softness > 0 && (is_occluded || out_of_bounds) && rev == 0 {
         if rev == 0 {
             let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
             let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
@@ -464,9 +397,6 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     var left = false;
     var right = false;
 
-    var left_multi = 0.0; 
-    var right_multi = 0.0;
-
     let above_left = orientation(left_t1, extreme_left, pos) < 0;
     let under_left = orientation(left_t2, extreme_left, pos) > 0;
 
@@ -479,40 +409,39 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
 
     var behind_left = false;
     var behind_right = false;
+
+    var left_multi = 1.0;
+    var right_multi = 1.0; 
     
     if inside_left {
         left = true;
         let left2 = normalize(extreme_left - left_t2);
         left_multi = 1.0 - acos(dot(normalize(pos - extreme_left), left2)) / acos(dot(normalize(extreme_left - left_t1), left2));
-        
-        if !left_is_valid {
-            left_multi = 0.0;
-        }
     }
-    else if !out_of_bounds || (inside_right && orientation(pos, extreme_right, light.pos) < 0) {
-        behind_left = true;
-    }
-    
     
     if inside_right {
         right = true;
         let right1 = normalize(extreme_right - right_t1);
         right_multi = 1.0 - acos(dot(normalize(pos - extreme_right), right1)) / acos(dot(normalize(extreme_right - right_t2), right1));
-
-        if !right_is_valid {
-            right_multi = 0.0;
-        }
-    }
-    else if !out_of_bounds || (inside_left && orientation(pos, extreme_left, light.pos) > 0) {
-        behind_right = true;
     }
 
-    if !out_of_bounds && !left_is_valid && !right_is_valid && !inside_left && !inside_right {
-        behind_left = true;
-        behind_right = true;
+
+    if !inside_left && !inside_right && !out_of_bounds {
+        left = true; 
+        right = true; 
+        left_multi = 1.0;
+        right_multi = 1.0;
     }
 
-    return OccRes(left || right || !out_of_bounds || behind_left || behind_right, left || behind_left, left_multi, extreme_left, right || behind_right, right_multi, extreme_right, !out_of_bounds, behind_left, behind_right);   
+    if inside_left && !inside_right {
+        right_multi = 1.0;
+    }
+
+    if inside_right && !inside_left {
+        left_multi = 1.0;
+    }
+
+    return OccRes(left || right, left_multi, right_multi);   
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {

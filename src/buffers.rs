@@ -29,8 +29,8 @@ use bytemuck::{NoUninit, Pod, Zeroable};
 use crate::{
     lights::{ExtractedPointLight, Falloff, LightIndex, UniformPointLight},
     occluders::{
-        ExtractedOccluder, Occluder2dShape, PolyOccluderIndex, RoundOccluderIndex, UniformOccluder,
-        UniformRoundOccluder,
+        ExtractedOccluder, Occluder2dShape, PolyOccluderIndex, RoundOccluderIndex,
+        UniformPolyOccluder, UniformRoundOccluder,
     },
     visibility::NotVisible,
 };
@@ -59,7 +59,7 @@ impl Plugin for BuffersPlugin {
         };
 
         render_app.init_resource::<BufferManager<UniformRoundOccluder>>();
-        render_app.init_resource::<BufferManager<UniformOccluder>>();
+        render_app.init_resource::<BufferManager<UniformPolyOccluder>>();
         render_app.init_resource::<BufferManager<UniformPointLight>>();
         render_app.init_resource::<VertexBuffer>();
     }
@@ -98,11 +98,11 @@ fn on_occluder_removed(
         With<ExtractedOccluder>,
     >,
     mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
-    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformPolyOccluder>>,
     mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
     if let Ok((occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
-        if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+        if matches!(occluder.shape, Occluder2dShape::Round { .. }) {
             if let Some(old_index) = round_index.0 {
                 round_manager.free_index(old_index);
                 round_index.0 = None;
@@ -134,13 +134,13 @@ fn on_entity_not_visible(
     >,
     mut lights: Query<(Entity, &mut LightIndex)>,
     mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
-    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformPolyOccluder>>,
     mut vertex_buffer: ResMut<VertexBuffer>,
     mut light_manager: ResMut<BufferManager<UniformPointLight>>,
     mut commands: Commands,
 ) {
     if let Ok((id, occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
-        if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
+        if matches!(occluder.shape, Occluder2dShape::Round { .. }) {
             if let Some(old_index) = round_index.0 {
                 round_manager.free_index(old_index);
                 round_index.0 = None;
@@ -214,13 +214,13 @@ fn prepare_occluders(
         &mut PolyOccluderIndex,
     )>,
     mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
-    mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
+    mut poly_manager: ResMut<BufferManager<UniformPolyOccluder>>,
     mut vertex_buffer: ResMut<VertexBuffer>,
 ) {
     for (occluder, mut round_index, mut poly_index) in &mut occluders {
         let changed = occluder.changes.0;
 
-        if let Occluder2dShape::RoundRectangle {
+        if let Occluder2dShape::Round {
             width,
             height,
             radius,
@@ -244,9 +244,6 @@ fn prepare_occluders(
                 _pad1: [0, 0, 0],
             };
 
-            // assert_eq!(std::mem::size_of::<UniformRoundOccluder>(), 64);
-            // assert_eq!(std::mem::align_of::<UniformRoundOccluder>(), 16);
-
             let new_index = round_manager.set_value(
                 &value,
                 round_index.0,
@@ -265,7 +262,7 @@ fn prepare_occluders(
             );
             poly_index.vertices = Some(vertex_index);
 
-            let value = UniformOccluder {
+            let value = UniformPolyOccluder {
                 vertex_start: vertex_index.index as u32,
                 n_vertices: occluder.shape.n_vertices(),
                 z: occluder.z,
@@ -276,7 +273,8 @@ fn prepare_occluders(
                     true => 1,
                     false => 0,
                 },
-                _pad1: [0, 0, 0],
+                index: occluder.index,
+                _pad1: [0, 0],
             };
 
             let new_index = poly_manager.set_value(
