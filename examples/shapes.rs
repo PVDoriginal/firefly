@@ -360,10 +360,48 @@ fn setup(mut commands: Commands) {
             vec2(6.0, 10.0),
             vec2(20.0, 0.0),
         ])
-        .unwrap()
-        .with_opacity(0.5),
+        .unwrap(),
         Transform::default(),
     ));
+
+    // commands.spawn((
+    //     Occluder2d::polygon(
+    //         vec![
+    //             vec2(-20.0, 0.0),
+    //             vec2(-20.0, 10.0),
+    //             vec2(-15.0, 50.0),
+    //             vec2(-20.0, 60.0),
+    //             vec2(40.0, 60.0),
+    //             vec2(0.0, 50.0),
+    //             vec2(6.0, 10.0),
+    //             vec2(20.0, 0.0),
+    //             vec2(20.0, -10.0),
+    //             vec2(50.0, -10.0),
+    //             vec2(50.0, 70.0),
+    //             vec2(-25.0, 70.0),
+    //             vec2(-25.0, -10.0),
+    //             vec2(20.0, -10.0),
+    //             vec2(20.0, -0.0),
+    //         ]
+    //         .iter()
+    //         .rev()
+    //         .map(|x| *x)
+    //         .collect::<Vec<_>>(),
+    //     )
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
+
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![
+    //         vec2(-20.0, 0.0),
+    //         vec2(20.0, 0.0),
+    //         vec2(20.0, -10.0),
+    //         vec2(-20.0, -10.0),
+    //     ])
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
 }
 
 fn move_light(

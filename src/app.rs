@@ -3,7 +3,7 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    color::palettes::css::{GREY, PINK, RED, WHITE},
+    color::palettes::css::{BLUE, GREY, PINK, RED, WHITE},
     core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
@@ -18,7 +18,10 @@ use crate::{
     extract::ExtractPlugin,
     lights::LightPlugin,
     nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
-    occluders::{Occluder2dInternalShape, Occluder2dShape, OccluderPlugin, translate_vertices},
+    occluders::{
+        ComplementaryShape, Occluder2dInternalShape, Occluder2dShape, OccluderPlugin,
+        translate_vertices,
+    },
     pipelines::PipelinePlugin,
     sprites::SpritesPlugin,
     visibility::VisibilityPlugin,
@@ -78,7 +81,7 @@ impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FireflyGizmoStyle>();
         app.add_systems(Update, draw_gizmos);
-        // app.add_systems(Update, draw_gizmos_decomp);
+        app.add_systems(Update, draw_gizmos_decomp);
     }
 }
 
@@ -103,29 +106,46 @@ impl Default for FireflyGizmoStyle {
 fn draw_gizmos_decomp(
     mut gizmos: Gizmos,
     style: Res<FireflyGizmoStyle>,
-    occluders: Query<(&GlobalTransform, &Occluder2dShape), Without<Occluder2d>>,
+    occluders: Query<
+        (&GlobalTransform, &Occluder2dShape, Has<ComplementaryShape>),
+        Without<Occluder2d>,
+    >,
 ) {
-    for (transform, occluder) in &occluders {
+    for (transform, occluder, is_complementary) in &occluders {
         match &occluder {
-            &Occluder2dShape::Convex { vertices, .. } => {
+            &Occluder2dShape::Convex {
+                vertices,
+                weak_edges,
+            } => {
                 let vertices = translate_vertices(
                     vertices.clone(),
                     transform.translation().truncate(),
                     Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
-
-                for (i, line) in vertices.windows(2).enumerate() {
-                    if i == 0 {
-                        gizmos.line_2d(line[0], line[1], Color::Srgba(RED));
-                    } else {
-                        gizmos.line_2d(line[0], line[1], style.occluder_color);
-                    }
+                for i in 0..vertices.len() {
+                    // if weak_edges.contains(&i) {
+                    //     gizmos.line_2d(
+                    //         vertices[i],
+                    //         vertices[(i + 1) % vertices.len()],
+                    //         Color::Srgba(RED),
+                    //     );
+                    // } else {
+                    gizmos.line_2d(
+                        vertices[i],
+                        vertices[(i + 1) % vertices.len()],
+                        if !is_complementary {
+                            Color::Srgba(RED)
+                        } else {
+                            Color::Srgba(BLUE)
+                        },
+                    );
+                    // }
                 }
-                gizmos.line_2d(
-                    vertices[0],
-                    vertices[vertices.len() - 1],
-                    style.occluder_color,
-                );
+                // gizmos.line_2d(
+                //     vertices[0],
+                //     vertices[vertices.len() - 1],
+                //     style.occluder_color,
+                // );
             }
             _ => {}
         }

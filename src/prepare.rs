@@ -253,7 +253,7 @@ pub(crate) fn prepare_data(
     let mut lights: Vec<_> = lights.iter_mut().collect();
 
     let mut occluders: Vec<_> = occluders.iter_inner().collect();
-    occluders.sort_unstable_by_key(|(e, _, _)| e.index);
+    occluders.sort_unstable_by_key(|(e, _, _)| (e.index, e.complementary));
 
     for (retained_view, _) in phases.iter() {
         lights
@@ -279,6 +279,14 @@ pub(crate) fn prepare_data(
                     };
 
                     bins.reset();
+
+                    let mut convex_index = None;
+                    let mut convex_set = vec![];
+
+                    let mut pushed_convex_set = false;
+                    let mut light_inside_convex_set = None;
+
+                    let mut complementary_set = vec![];
 
                     for (occluder, round_index, poly_index) in &occluders {
                         if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
@@ -322,7 +330,7 @@ pub(crate) fn prepare_data(
 
                             push_vertices(
                                 bins,
-                                vertices,
+                                vertices.iter().enumerate().collect(),
                                 light.pos,
                                 light.inner_range,
                                 0,
@@ -331,39 +339,54 @@ pub(crate) fn prepare_data(
                                 light_inside_occluder,
                                 false,
                                 camera.5.softness.is_some(),
+                                true,
                             );
                         } else {
-                            let Some(occluder_index) = poly_index.occluder else {
-                                continue;
-                            };
+                            if convex_index == Some(occluder.index) {
+                                if !occluder.complementary {
+                                    convex_set.push((*occluder, *poly_index));
+                                } else {
+                                    if light_inside_convex_set.is_none() {
+                                        light_inside_convex_set = Some(is_light_inside_convex_set(
+                                            &convex_set,
+                                            light.pos,
+                                        ));
+                                        info!("set to {light_inside_convex_set:?}");
+                                    }
 
-                            let Some(vertex_index) = poly_index.vertices else {
-                                continue;
-                            };
+                                    if matches!(light_inside_convex_set, Some(false)) {
+                                        continue;
+                                    }
 
-                            let light_inside_occluder =
-                                matches!(occluder.shape, Occluder2dShape::Convex { .. })
-                                    && point_inside_poly(
-                                        light.pos,
-                                        occluder.vertices(),
-                                        occluder.aabb,
-                                    );
+                                    complementary_set.push((*occluder, *poly_index));
+                                }
+                            } else {
+                                push_occluder_set(
+                                    bins,
+                                    &convex_set,
+                                    &complementary_set,
+                                    light_inside_convex_set,
+                                    light.inner_range,
+                                    light.pos,
+                                    camera.5.softness.is_some(),
+                                );
 
-                            let closest = occluder.aabb.closest_point(light.pos);
-
-                            push_vertices(
-                                bins,
-                                occluder.vertices(),
-                                light.pos,
-                                light.inner_range,
-                                vertex_index.index as u32,
-                                occluder_index.index as u32,
-                                closest.distance(light.pos),
-                                light_inside_occluder,
-                                true,
-                                camera.5.softness.is_some(),
-                            );
+                                convex_index = Some(occluder.index);
+                                convex_set = vec![(*occluder, *poly_index)];
+                            }
                         }
+                    }
+
+                    if !convex_set.is_empty() {
+                        push_occluder_set(
+                            bins,
+                            &convex_set,
+                            &complementary_set,
+                            light_inside_convex_set,
+                            light.inner_range,
+                            light.pos,
+                            camera.5.softness.is_some(),
+                        );
                     }
 
                     bins.write(&render_device, &render_queue);
@@ -407,6 +430,81 @@ pub(crate) fn prepare_data(
     }
 }
 
+fn is_light_inside_convex_set(
+    convex_set: &Vec<(&ExtractedOccluder, &PolyOccluderIndex)>,
+    light_pos: Vec2,
+) -> bool {
+    for (occluder, _) in convex_set {
+        if matches!(occluder.shape, Occluder2dShape::Convex { .. })
+            && point_inside_poly(light_pos, occluder.vertices(), occluder.aabb)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn push_occluder_set(
+    bins: &mut BinBuffer,
+    convex_set: &Vec<(&ExtractedOccluder, &PolyOccluderIndex)>,
+    complementary_set: &Vec<(&ExtractedOccluder, &PolyOccluderIndex)>,
+    light_inside_occluder: Option<bool>,
+    light_radius: f32,
+    light_pos: Vec2,
+    soft_shadows: bool,
+) {
+    let Some(light_inside_occluder) = light_inside_occluder else {
+        return;
+    };
+
+    let mut set = if light_inside_occluder {
+        complementary_set
+    } else {
+        convex_set
+    };
+
+    if set.is_empty() {
+        return;
+    }
+
+    let mut closest = Vec2::ZERO;
+    let mut min_dist = f32::INFINITY;
+
+    for (occluder, _) in set {
+        let point = occluder.aabb.closest_point(light_pos);
+        let dist = point.distance(light_pos);
+
+        if dist < min_dist {
+            min_dist = dist;
+            closest = point;
+        }
+    }
+
+    for (i, (occluder, poly_index)) in set.iter().enumerate() {
+        let Some(occluder_index) = poly_index.occluder else {
+            continue;
+        };
+
+        let Some(vertex_index) = poly_index.vertices else {
+            continue;
+        };
+
+        push_vertices(
+            bins,
+            occluder.vertices().iter().enumerate().collect(),
+            light_pos,
+            light_radius,
+            vertex_index.index as u32,
+            occluder_index.index as u32,
+            closest.distance(light_pos),
+            false,
+            true,
+            soft_shadows,
+            true,
+        );
+    }
+}
+
 #[derive(Debug, Default)]
 struct OccluderSlice {
     pub start_index: usize,
@@ -434,13 +532,14 @@ impl OccluderSlice {
 
 #[derive(Debug, Clone, Copy)]
 struct Vertex {
+    pos: Vec2,
     pub index: u32,
     pub angle: f32,
 }
 
 fn push_vertices(
     bins: &mut BinBuffer,
-    occluder_vertices: Vec<Vec2>,
+    occluder_vertices: Vec<(usize, &Vec2)>,
     light_pos: Vec2,
     light_radius: f32,
     start_vertex: u32,
@@ -449,11 +548,13 @@ fn push_vertices(
     rev: bool,
     poly: bool,
     soft_shadows: bool,
+    closed: bool,
 ) {
     // info!("start vertex: {start_vertex}");
 
-    let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
-        index: i as u32,
+    let vertices = occluder_vertices.iter().map(|(i, v)| Vertex {
+        pos: **v,
+        index: *i as u32,
         angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
     });
 
@@ -465,24 +566,26 @@ fn push_vertices(
 
     let mut round_occlusion = false;
 
-    loop {
-        let last = vertices.last().unwrap().angle;
-        let vertex = vertices.first().unwrap().angle;
+    if closed {
+        loop {
+            let last = vertices.last().unwrap().angle;
+            let vertex = vertices.first().unwrap().angle;
 
-        let loops = (vertex - last).abs() > PI;
+            let loops = (vertex - last).abs() > PI;
 
-        if (!loops && vertex < last) || (loops && vertex > last) {
-            break;
+            if (!loops && vertex < last) || (loops && vertex > last) {
+                break;
+            }
+
+            vertices.rotate_right(1);
+
+            if rev && vertices.last().unwrap().index == 0 {
+                round_occlusion = true;
+                break;
+            }
+
+            // info!("{vertices:?}");
         }
-
-        vertices.rotate_right(1);
-
-        if rev && vertices.last().unwrap().index == 0 {
-            round_occlusion = true;
-            break;
-        }
-
-        // info!("{vertices:?}");
     }
 
     let index = match poly {
@@ -513,7 +616,7 @@ fn push_vertices(
             let angle_left = if !soft_shadows {
                 0.0
             } else {
-                let left = occluder_vertices[vertices[slice.start_index as usize].index as usize];
+                let left = vertices[slice.start_index as usize].pos;
                 (light_pos - left)
                     .normalize()
                     .dot(
@@ -531,9 +634,7 @@ fn push_vertices(
             let angle_right = if !soft_shadows {
                 0.0
             } else {
-                let right = occluder_vertices[vertices
-                    [slice.start_index as usize + slice.length as usize - 1]
-                    .index as usize];
+                let right = vertices[slice.start_index as usize + slice.length as usize - 1].pos;
                 (light_pos - right)
                     .normalize()
                     .dot(

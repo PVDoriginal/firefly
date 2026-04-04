@@ -20,7 +20,9 @@ use crate::{
     change::Changes,
     data::{ExtractedWorldData, FireflyConfig},
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
-    occluders::{ExtractedOccluder, Occluder2dShape, Occluder2dStyle, OccluderIndex},
+    occluders::{
+        ComplementaryShape, ExtractedOccluder, Occluder2dShape, Occluder2dStyle, OccluderIndex,
+    },
     phases::SpritePhase,
     sprites::{
         ExtractedSlices, ExtractedSprite, ExtractedSpriteKind, ExtractedSprites, NormalMap,
@@ -260,6 +262,7 @@ fn extract_occluders(
             &VisibilityTimer,
             &Changes,
             &OccluderIndex,
+            Has<ComplementaryShape>,
         )>,
     >,
 ) {
@@ -275,6 +278,7 @@ fn extract_occluders(
         visibility_timer,
         changes,
         index,
+        complementary,
     ) in &occluders
     {
         if !visibility.get() {
@@ -297,6 +301,7 @@ fn extract_occluders(
             z_sorting: style.z_sorting,
             changes: changes.clone(),
             index: index.0,
+            complementary,
         };
 
         values.push((entity, extracted_occluder));

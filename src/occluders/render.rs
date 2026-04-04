@@ -22,6 +22,7 @@ pub struct ExtractedOccluder {
     pub z: f32,
     pub changes: Changes,
     pub index: u32,
+    pub complementary: bool,
 }
 
 // impl PartialEq for ExtractedOccluder {

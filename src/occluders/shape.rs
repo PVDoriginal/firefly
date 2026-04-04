@@ -62,7 +62,7 @@ impl Default for Occluder2dInternalShape {
 pub enum Occluder2dShape {
     Convex {
         vertices: Vec<Vec2>,
-        weak_edge: Range<usize>,
+        weak_edges: Vec<usize>,
     },
     Round {
         width: f32,
@@ -99,6 +99,13 @@ impl Occluder2dShape {
             _ => None,
         }
     }
+
+    pub(crate) fn weak_edges(&self) -> Vec<usize> {
+        match &self {
+            Self::Convex { weak_edges, .. } => weak_edges.clone(),
+            _ => vec![],
+        }
+    }
 }
 
 pub(crate) fn translate_vertices(vertices: Vec<Vec2>, pos: Vec2, rot: Rot2) -> Vec<Vec2> {
@@ -120,3 +127,6 @@ pub struct ConvexShapes(Vec<Entity>);
 #[derive(Component, Reflect, Debug)]
 #[relationship(relationship_target = ConvexShapes)]
 pub struct ConvexShapeOf(pub Entity);
+
+#[derive(Component, Debug)]
+pub struct ComplementaryShape;

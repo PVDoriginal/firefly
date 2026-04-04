@@ -1,16 +1,25 @@
 //! Module containing structs and functions relevant to Occluders.
 
 use bevy::{
-    camera::visibility::{VisibilityClass, add_visibility_class},
+    camera::{
+        primitives::Aabb,
+        visibility::{VisibilityClass, add_visibility_class},
+    },
     color::palettes::css::BLACK,
-    math::bounding::{Aabb2d, BoundingVolume},
+    math::{
+        FloatOrd,
+        bounding::{Aabb2d, BoundingVolume},
+    },
     prelude::*,
     render::sync_world::SyncToRenderWorld,
 };
 use core::f32;
 
-use crate::visibility::{OccluderAabb, VisibilityTimer};
 use crate::{change::Changes, occluders::convex_decomposition::convex_decomposition};
+use crate::{
+    occluders::convex_decomposition::complementary_decomposition,
+    visibility::{OccluderAabb, VisibilityTimer},
+};
 
 pub mod render;
 pub use render::*;
@@ -289,19 +298,36 @@ fn handle_new_occluders(
                 });
             }
             Occluder2dInternalShape::Polygon { vertices } => {
-                let decomp = convex_decomposition(vertices.clone());
                 let parent = entity.id();
 
+                let decomp = convex_decomposition(vertices.clone());
                 if let Some(decomp) = decomp {
                     for convex in decomp {
                         commands.spawn((
                             Occluder2dShape::Convex {
-                                vertices: convex,
-                                weak_edge: 0..0,
+                                vertices: convex.vertices,
+                                weak_edges: convex.weak_edges,
                             },
                             style,
                             ConvexShapeOf(parent),
                             OccluderIndex(*counter),
+                        ));
+                    }
+                }
+
+                let decomp = complementary_decomposition(vertices.clone());
+                info!("reverse decomp: {decomp:?}");
+                if let Some(decomp) = decomp {
+                    for convex in decomp {
+                        commands.spawn((
+                            Occluder2dShape::Convex {
+                                vertices: convex.vertices,
+                                weak_edges: convex.weak_edges,
+                            },
+                            style,
+                            ConvexShapeOf(parent),
+                            OccluderIndex(*counter),
+                            ComplementaryShape,
                         ));
                     }
                 }

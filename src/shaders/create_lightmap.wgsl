@@ -324,7 +324,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
         }
     }
 
-    if config.softness > 0 && (is_occluded || out_of_bounds) && rev == 0 {
+    if config.softness > 0 && (is_occluded || out_of_bounds) {//&& rev == 0 {
         if rev == 0 {
             let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
             let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
@@ -362,6 +362,7 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
     let light = lights[light_index];
 
     let range = light.inner_range;
+    // let range = 1.0;
 
     let left_range = min(range, distance(extreme_left, light.pos)); 
  
@@ -425,6 +426,12 @@ fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left
         right_multi = 1.0 - acos(dot(normalize(pos - extreme_right), right1)) / acos(dot(normalize(extreme_right - right_t2), right1));
     }
 
+    // if rev {
+    //     left = true; 
+    //     right = true; 
+    //     left_multi = 1.0;
+    //     right_multi = 1.0;
+    // }
 
     if !inside_left && !inside_right && !out_of_bounds {
         left = true; 
