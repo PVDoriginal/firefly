@@ -81,7 +81,7 @@ impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FireflyGizmoStyle>();
         app.add_systems(Update, draw_gizmos);
-        app.add_systems(Update, draw_gizmos_decomp.after(draw_gizmos));
+        app.add_systems(Update, draw_gizmos_decomp.before(draw_gizmos));
     }
 }
 
@@ -113,23 +113,13 @@ fn draw_gizmos_decomp(
 ) {
     for (transform, occluder, is_complementary) in &occluders {
         match &occluder {
-            &Occluder2dShape::Convex {
-                vertices,
-                weak_edges,
-            } => {
+            &Occluder2dShape::Convex { vertices } => {
                 let vertices = translate_vertices(
                     vertices.clone(),
                     transform.translation().truncate(),
                     Rot2::radians(transform.rotation().to_euler(EulerRot::XYZ).2),
                 );
                 for i in 0..vertices.len() {
-                    // if weak_edges.contains(&i) {
-                    //     gizmos.line_2d(
-                    //         vertices[i],
-                    //         vertices[(i + 1) % vertices.len()],
-                    //         Color::Srgba(RED),
-                    //     );
-                    // } else {
                     gizmos.line_2d(
                         vertices[i],
                         vertices[(i + 1) % vertices.len()],
@@ -139,13 +129,7 @@ fn draw_gizmos_decomp(
                             Color::Srgba(BLUE)
                         },
                     );
-                    // }
                 }
-                // gizmos.line_2d(
-                //     vertices[0],
-                //     vertices[vertices.len() - 1],
-                //     style.occluder_color,
-                // );
             }
             _ => {}
         }

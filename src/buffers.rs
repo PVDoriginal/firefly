@@ -556,7 +556,6 @@ impl BinBuffer {
     pub fn add_occluder(&mut self, edge: OccluderData) {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
-        info!("pushing {edge:?}");
         if edge.angle.ceil() >= TAU {
             self.add_to_bins(0, N_BINS - 1, edge.pointer);
             return;

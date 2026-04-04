@@ -4,47 +4,7 @@ use bevy::{
     platform::collections::HashSet,
 };
 
-#[derive(Default, Debug)]
-pub(crate) struct Polygon {
-    pub vertices: Vec<Vec2>,
-    pub weak_edges: Vec<usize>,
-}
-
-impl Polygon {
-    fn is_weak(&self, index: &usize) -> bool {
-        self.weak_edges.contains(index)
-    }
-
-    fn new(
-        vertices: Vec<Vec2>,
-        original_edges: &HashSet<(FloatOrd, FloatOrd, FloatOrd, FloatOrd)>,
-    ) -> Self {
-        let mut res = Polygon {
-            vertices: vec![],
-            weak_edges: vec![],
-        };
-
-        for i in 0..vertices.len() {
-            let v1 = vertices[i];
-            let v2 = vertices[(i + 1) % vertices.len()];
-
-            if !original_edges.contains(&(
-                FloatOrd(v1.x),
-                FloatOrd(v1.y),
-                FloatOrd(v2.x),
-                FloatOrd(v2.y),
-            )) {
-                res.weak_edges.push(res.vertices.len());
-            }
-
-            res.vertices.push(v1);
-        }
-
-        res
-    }
-}
-
-pub(crate) fn complementary_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
+pub(crate) fn complementary_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Vec<Vec2>>> {
     let mut aabb = Aabb2d::from_point_cloud(Isometry2d::default(), &vertices);
     // aabb.min -= Vec2::splat(f32::EPSILON);
     // aabb.max += Vec2::splat(f32::EPSILON);
@@ -87,7 +47,11 @@ pub(crate) fn complementary_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Pol
     convex_decomposition(new_vertices)
 }
 
-pub(crate) fn convex_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
+pub(crate) fn convex_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Vec<Vec2>>> {
+    if is_convex(&vertices) {
+        return Some(vec![vertices]);
+    }
+
     let mut triangles = triangulate(vertices)?;
 
     let mut i = 0;
@@ -114,36 +78,28 @@ pub(crate) fn convex_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> 
     Some(triangles)
 }
 
-fn try_merge(a: &Polygon, b: &Polygon) -> Option<Polygon> {
-    for i in 0..a.vertices.len() {
-        let (a1, a2) = (a.vertices[i], a.vertices[(i + 1) % a.vertices.len()]);
-        for j in 0..b.vertices.len() {
-            let (b1, b2) = (b.vertices[j], b.vertices[(j + 1) % b.vertices.len()]);
+fn try_merge(a: &Vec<Vec2>, b: &Vec<Vec2>) -> Option<Vec<Vec2>> {
+    for i in 0..a.len() {
+        let (a1, a2) = (a[i], a[(i + 1) % a.len()]);
+        for j in 0..b.len() {
+            let (b1, b2) = (b[j], b[(j + 1) % b.len()]);
 
             if a1 == b2 && a2 == b1 {
-                let mut merged = Polygon::default();
+                let mut merged = vec![];
 
-                let mut k = (i + 1) % a.vertices.len();
+                let mut k = (i + 1) % a.len();
                 while k != i {
-                    merged.vertices.push(a.vertices[k]);
-                    if a.is_weak(&k) {
-                        merged.weak_edges.push(merged.vertices.len() - 1);
-                    }
-
-                    k = (k + 1) % a.vertices.len();
+                    merged.push(a[k]);
+                    k = (k + 1) % a.len();
                 }
 
-                let mut k = (j + 1) % b.vertices.len();
+                let mut k = (j + 1) % b.len();
                 while k != j {
-                    merged.vertices.push(b.vertices[k]);
-
-                    if b.is_weak(&k) {
-                        merged.weak_edges.push(merged.vertices.len() - 1);
-                    }
-                    k = (k + 1) % b.vertices.len();
+                    merged.push(b[k]);
+                    k = (k + 1) % b.len();
                 }
 
-                if is_convex(&merged.vertices) {
+                if is_convex(&merged) {
                     return Some(merged);
                 }
             }
@@ -198,7 +154,7 @@ fn is_convex(vertices: &Vec<Vec2>) -> bool {
 //     }
 // }
 
-fn triangulate(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
+fn triangulate(vertices: Vec<Vec2>) -> Option<Vec<Vec<Vec2>>> {
     let mut original_edges = HashSet::new();
     for i in 0..vertices.len() {
         let p1 = vertices[i];
@@ -247,10 +203,7 @@ fn triangulate(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
             }
 
             found_ear = true;
-            res.push(Polygon::new(
-                vec![vertices[prev], vertices[curr], vertices[next]],
-                &original_edges,
-            ));
+            res.push(vec![vertices[prev], vertices[curr], vertices[next]]);
             indices.remove(i);
             break;
         }
@@ -261,14 +214,11 @@ fn triangulate(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
         }
     }
 
-    res.push(Polygon::new(
-        vec![
-            vertices[indices[0]],
-            vertices[indices[1]],
-            vertices[indices[2]],
-        ],
-        &original_edges,
-    ));
+    res.push(vec![
+        vertices[indices[0]],
+        vertices[indices[1]],
+        vertices[indices[2]],
+    ]);
 
     Some(res)
 }

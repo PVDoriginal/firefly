@@ -294,10 +294,7 @@ fn handle_new_occluders(
                     n_convex = decomp.len();
                     for convex in decomp {
                         commands.spawn((
-                            Occluder2dShape::Convex {
-                                vertices: convex.vertices,
-                                weak_edges: convex.weak_edges,
-                            },
+                            Occluder2dShape::Convex { vertices: convex },
                             style,
                             ConvexShapeOf(parent),
                             OccluderIndex(index),
@@ -311,10 +308,7 @@ fn handle_new_occluders(
                     if let Some(decomp) = decomp {
                         for convex in decomp {
                             commands.spawn((
-                                Occluder2dShape::Convex {
-                                    vertices: convex.vertices,
-                                    weak_edges: convex.weak_edges,
-                                },
+                                Occluder2dShape::Convex { vertices: convex },
                                 style,
                                 ConvexShapeOf(parent),
                                 OccluderIndex(index),

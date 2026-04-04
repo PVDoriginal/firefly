@@ -62,7 +62,6 @@ impl Default for Occluder2dInternalShape {
 pub enum Occluder2dShape {
     Convex {
         vertices: Vec<Vec2>,
-        weak_edges: Vec<usize>,
     },
     Round {
         width: f32,
@@ -97,13 +96,6 @@ impl Occluder2dShape {
                 rot,
             )),
             _ => None,
-        }
-    }
-
-    pub(crate) fn weak_edges(&self) -> Vec<usize> {
-        match &self {
-            Self::Convex { weak_edges, .. } => weak_edges.clone(),
-            _ => vec![],
         }
     }
 }
