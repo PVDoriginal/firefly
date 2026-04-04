@@ -20,6 +20,7 @@ fn main() {
     app.add_systems(Startup, setup);
     app.add_systems(Update, (move_light, move_camera, rotate_occluders));
 
+    app.add_systems(Update, despawn_occluders);
     app.run();
 }
 
@@ -458,9 +459,22 @@ fn move_camera(
     }
 }
 
+fn despawn_occluders(
+    occluders: Query<Entity, With<Occluder2d>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+) {
+    if !keys.just_pressed(KeyCode::Enter) {
+        return;
+    }
+    for occluder in occluders {
+        commands.entity(occluder).try_despawn();
+    }
+}
+
 fn rotate_occluders(mut occluders: Query<&mut Transform, With<Occluder2d>>) {
     for mut occluder in &mut occluders {
-        occluder.rotate_z(0.001);
-        occluder.translation.x += 0.05;
+        // occluder.rotate_z(0.001);
+        // occluder.translation.x += 0.05;
     }
 }

@@ -236,6 +236,7 @@ pub struct OccluderPlugin;
 impl Plugin for OccluderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_new_occluders, propagate_transform));
+        app.add_observer(despawn_unlinked_convex_occluders);
     }
 }
 
@@ -346,4 +347,8 @@ fn propagate_transform(
             shape.rotation = transform.rotation();
         }
     }
+}
+
+fn despawn_unlinked_convex_occluders(trigger: On<Remove, ConvexShapeOf>, mut commands: Commands) {
+    commands.entity(trigger.entity).try_despawn();
 }
