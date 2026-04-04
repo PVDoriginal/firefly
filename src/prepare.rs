@@ -350,7 +350,7 @@ pub(crate) fn prepare_data(
                                             &convex_set,
                                             light.pos,
                                         ));
-                                        info!("set to {light_inside_convex_set:?}");
+                                        // info!("set to {light_inside_convex_set:?}");
                                     }
 
                                     if matches!(light_inside_convex_set, Some(false)) {
@@ -372,6 +372,8 @@ pub(crate) fn prepare_data(
 
                                 convex_index = Some(occluder.index);
                                 convex_set = vec![(*occluder, *poly_index)];
+                                complementary_set = vec![];
+                                light_inside_convex_set = None;
                             }
                         }
                     }

@@ -1,9 +1,7 @@
-use std::hash::{Hash, Hasher};
-
 use bevy::{
     log::warn,
     math::{FloatOrd, Isometry2d, Vec2, bounding::Aabb2d, vec2},
-    platform::collections::{HashMap, HashSet},
+    platform::collections::HashSet,
 };
 
 #[derive(Default, Debug)]
@@ -48,11 +46,11 @@ impl Polygon {
 
 pub(crate) fn complementary_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Polygon>> {
     let mut aabb = Aabb2d::from_point_cloud(Isometry2d::default(), &vertices);
-    aabb.min -= Vec2::splat(f32::EPSILON);
-    aabb.max += Vec2::splat(f32::EPSILON);
+    // aabb.min -= Vec2::splat(f32::EPSILON);
+    // aabb.max += Vec2::splat(f32::EPSILON);
 
-    // aabb.min -= Vec2::splat(10.0);
-    // aabb.max += Vec2::splat(10.0);
+    aabb.min -= Vec2::splat(0.5);
+    aabb.max += Vec2::splat(0.5);
 
     let (min_y_index, min_y_point) = vertices
         .iter()

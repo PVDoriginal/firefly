@@ -1,15 +1,9 @@
 //! Module containing structs and functions relevant to Occluders.
 
 use bevy::{
-    camera::{
-        primitives::Aabb,
-        visibility::{VisibilityClass, add_visibility_class},
-    },
+    camera::visibility::{VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
-    math::{
-        FloatOrd,
-        bounding::{Aabb2d, BoundingVolume},
-    },
+    math::bounding::{Aabb2d, BoundingVolume},
     prelude::*,
     render::sync_world::SyncToRenderWorld,
 };
@@ -241,27 +235,19 @@ pub struct OccluderPlugin;
 
 impl Plugin for OccluderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, handle_new_occluders);
+        app.add_systems(Update, (handle_new_occluders, propagate_transform));
     }
 }
 
 fn handle_new_occluders(
     occluders: Query<
-        (
-            Entity,
-            &Occluder2d,
-            Option<&OccluderIndex>,
-            Option<&ConvexShapes>,
-        ),
+        (Entity, &Occluder2d, &GlobalTransform, Option<&ConvexShapes>),
         Changed<Occluder2d>,
     >,
-    mut counter: Local<u32>,
     mut commands: Commands,
 ) {
-    for (entity, occluder, index, convex_shapes) in occluders {
-        if *counter == 0 {
-            *counter = 1;
-        }
+    for (entity, occluder, transform, convex_shapes) in occluders {
+        let index = entity.index().index();
 
         if let Some(convex_shapes) = convex_shapes {
             for entity in convex_shapes.collection() {
@@ -279,10 +265,6 @@ fn handle_new_occluders(
 
         entity.insert(style);
 
-        if index.is_none() {
-            entity.insert(OccluderIndex(*counter));
-        }
-
         let shape = occluder.shape();
 
         match shape {
@@ -291,11 +273,14 @@ fn handle_new_occluders(
                 height,
                 radius,
             } => {
-                entity.insert(Occluder2dShape::Round {
-                    width,
-                    height,
-                    radius,
-                });
+                entity.insert((
+                    Occluder2dShape::Round {
+                        width,
+                        height,
+                        radius,
+                    },
+                    OccluderIndex(index),
+                ));
             }
             Occluder2dInternalShape::Polygon { vertices } => {
                 let parent = entity.id();
@@ -314,7 +299,8 @@ fn handle_new_occluders(
                             },
                             style,
                             ConvexShapeOf(parent),
-                            OccluderIndex(*counter),
+                            OccluderIndex(index),
+                            transform.compute_transform(),
                         ));
                     }
                 }
@@ -330,8 +316,9 @@ fn handle_new_occluders(
                                 },
                                 style,
                                 ConvexShapeOf(parent),
-                                OccluderIndex(*counter),
+                                OccluderIndex(index),
                                 ComplementaryShape,
+                                transform.compute_transform(),
                             ));
                         }
                     }
@@ -339,7 +326,24 @@ fn handle_new_occluders(
             }
             _ => {}
         }
+    }
+}
 
-        *counter += 1;
+fn propagate_transform(
+    occluders: Query<
+        (&GlobalTransform, &ConvexShapes),
+        (With<Occluder2d>, Changed<GlobalTransform>),
+    >,
+    mut convex_shapes: Query<&mut Transform, With<ConvexShapeOf>>,
+) {
+    for (transform, shapes) in occluders {
+        for shape in shapes.collection() {
+            let Ok(mut shape) = convex_shapes.get_mut(*shape) else {
+                continue;
+            };
+
+            shape.translation = transform.translation();
+            shape.rotation = transform.rotation();
+        }
     }
 }

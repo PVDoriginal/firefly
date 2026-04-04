@@ -81,7 +81,7 @@ impl Plugin for FireflyGizmosPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FireflyGizmoStyle>();
         app.add_systems(Update, draw_gizmos);
-        app.add_systems(Update, draw_gizmos_decomp);
+        app.add_systems(Update, draw_gizmos_decomp.after(draw_gizmos));
     }
 }
 

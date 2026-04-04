@@ -18,7 +18,7 @@ fn main() {
         FireflyGizmosPlugin,
     ));
     app.add_systems(Startup, setup);
-    app.add_systems(Update, (move_light, move_camera));
+    app.add_systems(Update, (move_light, move_camera, rotate_occluders));
 
     app.run();
 }
@@ -455,5 +455,12 @@ fn move_camera(
     }
     if keys.pressed(KeyCode::KeyW) {
         camera.translation.y += time.delta_secs() * CAMERA_SPEED;
+    }
+}
+
+fn rotate_occluders(mut occluders: Query<&mut Transform, With<Occluder2d>>) {
+    for mut occluder in &mut occluders {
+        occluder.rotate_z(0.001);
+        occluder.translation.x += 0.05;
     }
 }
