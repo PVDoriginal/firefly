@@ -116,21 +116,21 @@ fn setup(mut commands: Commands) {
     //     Transform::default(),
     // ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-428., 135.),
-    //         vec2(-482., 158.),
-    //         vec2(-475., 231.),
-    //         vec2(-438., 290.),
-    //         vec2(-388., 299.),
-    //         vec2(-380., 278.),
-    //         vec2(-358., 276.),
-    //         vec2(-342., 208.),
-    //         vec2(-429., 172.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-428., 135.),
+            vec2(-482., 158.),
+            vec2(-475., 231.),
+            vec2(-438., 290.),
+            vec2(-388., 299.),
+            vec2(-380., 278.),
+            vec2(-358., 276.),
+            vec2(-342., 208.),
+            vec2(-429., 172.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     // commands.spawn((
     //     Occluder2d::circle(23.),
@@ -363,6 +363,17 @@ fn setup(mut commands: Commands) {
         .unwrap(),
         Transform::default(),
     ));
+
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![
+    //         vec2(-20.0, 0.0),
+    //         vec2(-20.0, 20.0),
+    //         vec2(20.0, 20.0),
+    //         vec2(20.0, 0.0),
+    //     ])
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
 
     // commands.spawn((
     //     Occluder2d::polygon(

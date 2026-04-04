@@ -339,7 +339,6 @@ pub(crate) fn prepare_data(
                                 light_inside_occluder,
                                 false,
                                 camera.5.softness.is_some(),
-                                true,
                             );
                         } else {
                             if convex_index == Some(occluder.index) {
@@ -453,11 +452,26 @@ fn push_occluder_set(
     light_pos: Vec2,
     soft_shadows: bool,
 ) {
-    let Some(light_inside_occluder) = light_inside_occluder else {
-        return;
-    };
+    let light_inside_occluder =
+        light_inside_occluder.unwrap_or_else(|| is_light_inside_convex_set(convex_set, light_pos));
 
-    let mut set = if light_inside_occluder {
+    if convex_set.len() == 1 && light_inside_occluder {
+        push_vertices(
+            bins,
+            convex_set[0].0.vertices().iter().enumerate().collect(),
+            light_pos,
+            light_radius,
+            convex_set[0].1.vertices.unwrap().index as u32,
+            convex_set[0].1.occluder.unwrap().index as u32,
+            0.0,
+            true,
+            true,
+            false,
+        );
+        return;
+    }
+
+    let set = if light_inside_occluder {
         complementary_set
     } else {
         convex_set
@@ -500,7 +514,6 @@ fn push_occluder_set(
             false,
             true,
             soft_shadows,
-            true,
         );
     }
 }
@@ -548,7 +561,6 @@ fn push_vertices(
     rev: bool,
     poly: bool,
     soft_shadows: bool,
-    closed: bool,
 ) {
     // info!("start vertex: {start_vertex}");
 
@@ -564,9 +576,7 @@ fn push_vertices(
         vertices.rev().collect()
     };
 
-    let mut round_occlusion = false;
-
-    if closed {
+    if !rev {
         loop {
             let last = vertices.last().unwrap().angle;
             let vertex = vertices.first().unwrap().angle;
@@ -578,13 +588,6 @@ fn push_vertices(
             }
 
             vertices.rotate_right(1);
-
-            if rev && vertices.last().unwrap().index == 0 {
-                round_occlusion = true;
-                break;
-            }
-
-            // info!("{vertices:?}");
         }
     }
 
@@ -593,7 +596,6 @@ fn push_vertices(
         false => (0 << 31) | index as u32,
     };
 
-    let mut edges: Vec<OccluderData> = vec![];
     // info!("");
     // info!("---------");
     let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
@@ -651,7 +653,7 @@ fn push_vertices(
 
             match slice.split {
                 None => {
-                    edges.push(OccluderData {
+                    bins.add_occluder(OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v,
@@ -664,7 +666,7 @@ fn push_vertices(
                     });
                 }
                 Some(split) => {
-                    edges.push(OccluderData {
+                    bins.add_occluder(OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v: (1 << 30) | min_v,
@@ -675,7 +677,7 @@ fn push_vertices(
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
                     });
-                    edges.push(OccluderData {
+                    bins.add_occluder(OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v: (2 << 30) | min_v,
@@ -694,7 +696,7 @@ fn push_vertices(
     let mut last: Option<&Vertex> = None;
     let mut slice: OccluderSlice = default();
 
-    if !round_occlusion {
+    if !rev {
         for (index, vertex) in vertices.iter().enumerate() {
             if let Some(last) = last {
                 let loops = (vertex.angle - last.angle).abs() > PI;
@@ -747,8 +749,6 @@ fn push_vertices(
         }
         push_slice(&slice, &vertices);
     }
-
-    bins.add_occluder(edges);
 }
 
 fn prepare_light_luts(

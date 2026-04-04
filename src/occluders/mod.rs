@@ -301,7 +301,11 @@ fn handle_new_occluders(
                 let parent = entity.id();
 
                 let decomp = convex_decomposition(vertices.clone());
+
+                let mut n_convex = 0;
+
                 if let Some(decomp) = decomp {
+                    n_convex = decomp.len();
                     for convex in decomp {
                         commands.spawn((
                             Occluder2dShape::Convex {
@@ -315,20 +319,21 @@ fn handle_new_occluders(
                     }
                 }
 
-                let decomp = complementary_decomposition(vertices.clone());
-                info!("reverse decomp: {decomp:?}");
-                if let Some(decomp) = decomp {
-                    for convex in decomp {
-                        commands.spawn((
-                            Occluder2dShape::Convex {
-                                vertices: convex.vertices,
-                                weak_edges: convex.weak_edges,
-                            },
-                            style,
-                            ConvexShapeOf(parent),
-                            OccluderIndex(*counter),
-                            ComplementaryShape,
-                        ));
+                if n_convex > 1 {
+                    let decomp = complementary_decomposition(vertices.clone());
+                    if let Some(decomp) = decomp {
+                        for convex in decomp {
+                            commands.spawn((
+                                Occluder2dShape::Convex {
+                                    vertices: convex.vertices,
+                                    weak_edges: convex.weak_edges,
+                                },
+                                style,
+                                ConvexShapeOf(parent),
+                                OccluderIndex(*counter),
+                                ComplementaryShape,
+                            ));
+                        }
                     }
                 }
             }

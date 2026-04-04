@@ -128,7 +128,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var current_index: u32; 
         var acc_res = res_no_occlusion();
 
-
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
             
@@ -192,7 +191,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 let result = poly_check(pos, occluder_index, term, rev, min_v, split, length); 
                 acc_res = accumulate_occlusion(acc_res, result, pos);
-
                 // if result > 0.0 {
                 //     shadow = shadow_blend(shadow, poly_occluders[occluder_index].color, poly_occluders[occluder_index].opacity * result);
                 // }
@@ -271,6 +269,7 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
 }
 
 fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32) -> OccRes {
+    
     let light = lights[light_index];
     let occluder = poly_occluders[index];
 
@@ -324,7 +323,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
         }
     }
 
-    if config.softness > 0 && (is_occluded || out_of_bounds) {//&& rev == 0 {
+    if config.softness > 0 && (is_occluded || out_of_bounds) && rev == 0 {
         if rev == 0 {
             let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
             let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
@@ -347,8 +346,9 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
 
             let prev_last  = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
             let prev_first = select(min_v - 1, min_v - 1 + occluder.n_vertices, min_v - 1 < occluder.start_vertex);
-            
-            return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
+
+            return res_full_occlusion();
+            // return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
         }
     }
     

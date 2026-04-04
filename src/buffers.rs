@@ -553,38 +553,37 @@ impl BinBuffer {
     }
 
     /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
-    pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
+    pub fn add_occluder(&mut self, edge: OccluderData) {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
-        for edge in edges {
-            if edge.angle.ceil() >= TAU {
-                self.add_to_bins(0, N_BINS - 1, edge.pointer);
-                continue;
-            }
+        info!("pushing {edge:?}");
+        if edge.angle.ceil() >= TAU {
+            self.add_to_bins(0, N_BINS - 1, edge.pointer);
+            return;
+        }
 
-            // info!("init min angle: {}", edge.min_angle);
+        // info!("init min angle: {}", edge.min_angle);
 
-            let min_angle = if edge.min_angle < -PI {
-                edge.min_angle + TAU as f32
-            } else {
-                edge.min_angle
-            };
+        let min_angle = if edge.min_angle < -PI {
+            edge.min_angle + TAU as f32
+        } else {
+            edge.min_angle
+        };
 
-            // info!("min angle: {min_angle}");
+        // info!("min angle: {min_angle}");
 
-            let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
-            let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
+        let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
+        let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
 
-            // info!("min bin: {min_bin}");
-            // info!("n_bins; {n_bins}");
+        // info!("min bin: {min_bin}");
+        // info!("n_bins; {n_bins}");
 
-            // self.add_to_bins(0, N_BINS - 1, edge.pointer);
-            if min_bin + n_bins >= N_BINS {
-                self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
-                self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
-            } else {
-                self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer);
-            }
+        // self.add_to_bins(0, N_BINS - 1, edge.pointer);
+        if min_bin + n_bins >= N_BINS {
+            self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
+            self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
+        } else {
+            self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer);
         }
     }
 
@@ -597,6 +596,7 @@ impl BinBuffer {
 }
 
 /// CPU struct describing an occluder or edge.
+#[derive(Debug)]
 pub struct OccluderData {
     pub pointer: OccluderPointer,
     pub min_angle: f32,
@@ -605,7 +605,7 @@ pub struct OccluderData {
 
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  
 #[repr(C)]
-#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType)]
+#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType, Debug)]
 pub struct OccluderPointer {
     /// The index's first bit is the type of occluder: 0 for round, 1 for polygonal.
     pub index: u32,
