@@ -275,9 +275,15 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
 }
 
 // checks if the half-segment [a, b] ending in a intersects the [c, d] segment
-fn intersects_half(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> bool {
+fn intersects_half(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> IntersectionResult {
     let p = intersection_point(a, b, c, d);
     let on_ab = dot(p - a, b - a) > 0;
     let on_cd = dot(p - c, d - c) > 0 && dot(p - d, c - d) > 0;
-    return on_ab && on_cd; 
+    return IntersectionResult(on_ab && on_cd, p); 
 }
+
+struct IntersectionResult {
+    result: bool, 
+    intersection: vec2<f32>,
+}
+

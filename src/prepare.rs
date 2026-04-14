@@ -293,6 +293,8 @@ pub(crate) fn prepare_data(
                             continue;
                         }
 
+                        info!("occluder: {:?}, index: {}", occluder.shape, occluder.index);
+
                         if let Occluder2dShape::Round {
                             width,
                             height,
@@ -339,6 +341,7 @@ pub(crate) fn prepare_data(
                                 light_inside_occluder,
                                 false,
                                 camera.5.softness.is_some(),
+                                occluder.index,
                             );
                         } else {
                             if convex_index == Some(occluder.index) {
@@ -360,15 +363,18 @@ pub(crate) fn prepare_data(
                                     complementary_set.push((*occluder, *poly_index));
                                 }
                             } else {
-                                push_occluder_set(
-                                    bins,
-                                    &convex_set,
-                                    &complementary_set,
-                                    light_inside_convex_set,
-                                    light.inner_range,
-                                    light.pos,
-                                    camera.5.softness.is_some(),
-                                );
+                                if let Some(index) = convex_index {
+                                    push_occluder_set(
+                                        bins,
+                                        &convex_set,
+                                        &complementary_set,
+                                        light_inside_convex_set,
+                                        light.inner_range,
+                                        light.pos,
+                                        camera.5.softness.is_some(),
+                                        0,
+                                    );
+                                }
 
                                 convex_index = Some(occluder.index);
                                 convex_set = vec![(*occluder, *poly_index)];
@@ -387,6 +393,7 @@ pub(crate) fn prepare_data(
                             light.inner_range,
                             light.pos,
                             camera.5.softness.is_some(),
+                            convex_index.unwrap(),
                         );
                     }
 
@@ -453,6 +460,7 @@ fn push_occluder_set(
     light_radius: f32,
     light_pos: Vec2,
     soft_shadows: bool,
+    entity_index: u32,
 ) {
     let light_inside_occluder =
         light_inside_occluder.unwrap_or_else(|| is_light_inside_convex_set(convex_set, light_pos));
@@ -469,6 +477,7 @@ fn push_occluder_set(
             true,
             true,
             false,
+            entity_index,
         );
         return;
     }
@@ -516,6 +525,7 @@ fn push_occluder_set(
             false,
             true,
             soft_shadows,
+            entity_index,
         );
     }
 }
@@ -563,6 +573,7 @@ fn push_vertices(
     rev: bool,
     poly: bool,
     soft_shadows: bool,
+    entity_index: u32,
 ) {
     // info!("start vertex: {start_vertex}");
 
@@ -665,6 +676,7 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
+                        index: entity_index,
                     });
                 }
                 Some(split) => {
@@ -678,6 +690,7 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
+                        index: entity_index,
                     });
                     bins.add_occluder(OccluderData {
                         pointer: OccluderPointer {
@@ -689,6 +702,7 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
+                        index: entity_index,
                     });
                 }
             }

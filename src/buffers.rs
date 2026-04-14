@@ -479,7 +479,7 @@ pub struct BinBuffer {
     /// Indices describing where each bin starts, written to the GPU. The extra value at the end is the maximum index / length.  
     bin_indices: StorageBuffer<BinIndices>,
     /// Data stored on the CPU.
-    occluders: [BinaryHeap<OccluderPointer>; N_BINS],
+    occluders: [BinaryHeap<(u32, OccluderPointer)>; N_BINS],
 }
 
 /// Wrapper for the bin indices, so it can impl Default.
@@ -529,7 +529,12 @@ impl BinBuffer {
 
         let values = self.buffer.values_mut();
         for (index, bin) in self.occluders.iter_mut().enumerate() {
-            values.extend_from_slice(&bin.clone().into_sorted_vec());
+            values.extend_from_slice(
+                &bin.clone()
+                    .into_iter_sorted()
+                    .map(|(_, x)| x)
+                    .collect::<Vec<_>>(),
+            );
 
             bin_indices[index] = count as u32;
             count += bin.len();
@@ -557,7 +562,7 @@ impl BinBuffer {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
         if edge.angle.ceil() >= TAU {
-            self.add_to_bins(0, N_BINS - 1, edge.pointer);
+            self.add_to_bins(0, N_BINS - 1, edge.pointer, edge.index);
             return;
         }
 
@@ -579,17 +584,23 @@ impl BinBuffer {
 
         // self.add_to_bins(0, N_BINS - 1, edge.pointer);
         if min_bin + n_bins >= N_BINS {
-            self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
-            self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
+            self.add_to_bins(min_bin, N_BINS - 1, edge.pointer, edge.index);
+            self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer, edge.index);
         } else {
-            self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer);
+            self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer, edge.index);
         }
     }
 
-    fn add_to_bins(&mut self, min_bin: usize, max_bin: usize, pointer: OccluderPointer) {
+    fn add_to_bins(
+        &mut self,
+        min_bin: usize,
+        max_bin: usize,
+        pointer: OccluderPointer,
+        index: u32,
+    ) {
         // info!("writing buffers {min_bin} to {max_bin}");
-        for index in min_bin..(max_bin + 1) {
-            self.occluders[index].push(pointer);
+        for i in min_bin..(max_bin + 1) {
+            self.occluders[i].push((index, pointer));
         }
     }
 }
@@ -600,6 +611,7 @@ pub struct OccluderData {
     pub pointer: OccluderPointer,
     pub min_angle: f32,
     pub angle: f32,
+    pub index: u32,
 }
 
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::{lights::PointLight2d, prelude::Occluder2d};
 
 /// Component that stores whether an entity has changed or not.
-#[derive(Component, Clone, Default)]
+#[derive(Component, Clone, Default, Debug)]
 pub struct Changes(pub bool);
 
 /// Plugin that handles change detection. Added automatically by [`FireflyPlugin`](crate::prelude::FireflyPlugin).

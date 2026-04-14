@@ -9,7 +9,7 @@ use bytemuck::{NoUninit, Pod, Zeroable};
 use crate::{buffers::BufferIndex, change::Changes, occluders::Occluder2dShape};
 
 /// Component with data extracted to the Render World from Occluders.
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Debug)]
 #[require(PolyOccluderIndex, RoundOccluderIndex)]
 pub struct ExtractedOccluder {
     pub color: Color,

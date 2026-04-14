@@ -14,7 +14,7 @@
     ndc_to_world, frag_coord_to_ndc, orientation, same_orientation, intersect, blend, 
     shadow_blend, intersects_arc, rotate, rotate_arctan, between_arctan, distance_point_to_line,
     intersection_point, rect_intersection, rect_line_intersection, intersects_axis_edge, intersects_corner_arc,
-    rotate_90, rotate_90_cc, intersects_half
+    rotate_90, rotate_90_cc, intersects_half, IntersectionResult,
 }
 
 @group(1) @binding(0)
@@ -54,11 +54,11 @@ const PI2: f32 = 6.28318530718;
 const PI: f32 = 3.14159265359;
 const PIDIV2: f32 = 1.57079632679; 
 
+const MAXINTERVALS: u32 = 8;
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let light = lights[light_index];
-
-        var lol = 0;
     var res = vec4f(0);
     
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
@@ -71,6 +71,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let a = pos - light.pos;
     let b = light.dir;
     let angle = acos(dot(a, b) / (length(a) * length(b)));
+
+    let t1 = rotate_90(normalize(pos - light.pos));
+    let t2 = rotate_90_cc(normalize(pos - light.pos));
     
     if (dist < light.range && angle <= light.angle / 2.) {
         var normal_multi = 1f;
@@ -126,12 +129,13 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
         var prev_index: u32;
         var current_index: u32; 
-        var acc_res = res_no_occlusion();
+
+        var visibility: Visibility; 
 
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
             
-            if pointer.distance > dist { break; }
+            if pointer.distance > dist { continue; }
             
             let occluder_type = pointer.index & 2147483648u;
             let occluder_index = pointer.index & 2147483647u;
@@ -164,18 +168,22 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 }
 
                 let poly_index = poly_occluders[occluder_index].index;
-                current_index = occluder_index;
+
+                // if poly_index == 16u && prev_index == 17u {
+                //     return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                // }
 
                 if prev_index != poly_index {
-                    if acc_res.occluded == true {
-                        lol += 1;
-                    }
-                    shadow = apply_occlusion(shadow, current_index, acc_res, pos);
+                    shadow = apply_occlusion(shadow, current_index, visibility);
 
                     prev_index = poly_index; 
-                    acc_res = res_no_occlusion();
-                    // acc_res = OccRes(false, false, 0.0, false, 0.0);
+                    var temp_visibility = array<vec2<f32>, MAXINTERVALS>();
+                    temp_visibility[0] = vec2<f32>(0.0, 1.0);
+
+                    visibility = Visibility(false, temp_visibility, 1);
                 }
+
+                current_index = occluder_index;
 
                 let term = (pointer.min_v & 3221225472u) >> 30u;
 
@@ -185,25 +193,15 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 let split = pointer.split;
                 let length = pointer.length & 1073741823u;
 
-                // if split == 0 {
-                //     return vec4<f32>(0, 1, 0, 1);
-                // }
-
-                let result = poly_check(pos, occluder_index, term, rev, min_v, split, length); 
-                acc_res = accumulate_occlusion(acc_res, result, pos);
-                // if result > 0.0 {
-                //     shadow = shadow_blend(shadow, poly_occluders[occluder_index].color, poly_occluders[occluder_index].opacity * result);
-                // }
+                let result = poly_check(pos, t1, t2, occluder_index, term, rev, min_v, split, length); 
+                visibility = accumulate_occlusion(visibility, result);
             }
             
             if dot(shadow, shadow) < 0.0001 {
                 break;
             }
         }
-        if acc_res.occluded == true {
-            lol += 1;
-        }
-        shadow = apply_occlusion(shadow, current_index, acc_res, pos);
+        shadow = apply_occlusion(shadow, current_index, visibility);
         res *= vec4f(shadow, 1);
     }
 
@@ -218,42 +216,81 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     return res;
 }
 
-fn accumulate_occlusion(prev_result: OccRes, result: OccRes, pos: vec2<f32>) -> OccRes {
-    var acc_res = prev_result;
-
-    if result.occluded {
-        acc_res.occluded = true;
-
-        acc_res.left = max(acc_res.left, result.left);
-        acc_res.right = max(acc_res.right, result.right);
+fn accumulate_occlusion(visibility: Visibility, result: Occlusion) -> Visibility {
+    if !result.occluded {
+        return visibility;
     }
-    
-    return acc_res;
+
+    var new_visibility = visibility;
+
+    for (var occlusion_index = 0u; occlusion_index < result.n_intervals; occlusion_index += 1u) {
+        new_visibility = accumulate_occlusion_interval(new_visibility, result.occlusion[occlusion_index]);
+    }
+
+    return new_visibility;
 }
 
-fn apply_occlusion(shadow: vec3<f32>, index: u32, occ: OccRes, pos: vec2<f32>) -> vec3<f32> {
-    let light = lights[light_index];
+fn accumulate_occlusion_interval(visibility: Visibility, occlusion: vec2<f32>) -> Visibility {
+    var new_visibility: Visibility; 
+    new_visibility.occluded = true;
 
-    if occ.occluded && index != 0u {
-        return shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * min(occ.left, occ.right));
+    for (var visibility_index = 0u; visibility_index < visibility.n_intervals; visibility_index += 1u) {
+        let interval = visibility.visibility[visibility_index];
+
+        if occlusion.y <= interval.x || occlusion.x >= interval.y {
+            new_visibility.visibility[new_visibility.n_intervals] = vec2<f32>(interval.x, interval.y);
+            new_visibility.n_intervals += 1u;
+        }
+        else {
+            if occlusion.x > interval.x {
+                new_visibility.visibility[new_visibility.n_intervals] = vec2<f32>(interval.x, occlusion.x);
+                new_visibility.n_intervals += 1u;
+            }
+
+            if occlusion.y < interval.y {
+                new_visibility.visibility[new_visibility.n_intervals] = vec2<f32>(occlusion.y, interval.y);
+                new_visibility.n_intervals += 1u;
+            }
+        }
     }
-    else {
-        return shadow;
-    }
+
+    return new_visibility;
 }
 
-struct OccRes {
+fn apply_occlusion(shadow: vec3<f32>, index: u32, visibility: Visibility) -> vec3<f32> {
+    if !visibility.occluded {
+        return shadow; 
+    }
+
+    var multi = 0.0;
+
+    for (var i = 0u ; i < visibility.n_intervals; i += 1) {
+        multi += visibility.visibility[i].y - visibility.visibility[i].x;
+    }
+
+    return shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * (1.0 - multi));
+}
+
+struct Occlusion {
     occluded: bool, 
-    left: f32,
-    right: f32,
+    occlusion: array<vec2<f32>, 4>,
+    n_intervals: u32,
 }
 
-fn res_full_occlusion() -> OccRes {
-    return OccRes(true, 1.0, 1.0);
+struct Visibility {
+    occluded: bool, 
+    visibility: array<vec2<f32>, MAXINTERVALS>,
+    n_intervals: u32,
 }
 
-fn res_no_occlusion() -> OccRes {
-    return OccRes(false, 0.0, 0.0);
+fn res_full_occlusion() -> Occlusion {
+    var occlusion = array<vec2<f32>, 4>();
+    occlusion[0] = vec2<f32>(0.0, 1.0);
+    return Occlusion(true, occlusion, 1);
+}
+
+fn res_no_occlusion() -> Occlusion {
+    return Occlusion(false, array<vec2<f32>, 4>(), 0);
 }
 
 fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
@@ -268,7 +305,7 @@ fn get_extreme_angle(pos: vec2f, extreme: vec2f) -> f32 {
     return angle;
 }
 
-fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32) -> OccRes {
+fn poly_check(pos: vec2f, t1: vec2<f32>, t2: vec2<f32>, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32) -> Occlusion {
     
     let light = lights[light_index];
     let occluder = poly_occluders[index];
@@ -324,32 +361,17 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
     }
 
     if config.softness > 0 && (is_occluded || out_of_bounds) && rev == 0 {
-        if rev == 0 {
-            let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
-            let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
-            
-            let prev = select(min_v - 1, occluder.start_vertex + occluder.n_vertices - 1, min_v - 1 < occluder.start_vertex); 
-            let next = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
+        let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
+        let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
+        
+        let prev = select(min_v - 1, occluder.start_vertex + occluder.n_vertices - 1, min_v - 1 < occluder.start_vertex); 
+        let next = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
 
-            
-            let prev_last  = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
-            let prev_first = select(min_v + 1, min_v + 1 - occluder.n_vertices, min_v + 1 >= occluder.start_vertex + occluder.n_vertices);
-            
-            return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
-        }
-        else {
-            let loops = i32(min_v) - i32(length) + 1 < i32(occluder.start_vertex);
-            let last = u32(i32(min_v) - i32(length) + 1 + select(0, i32(occluder.n_vertices), loops));
-            
-            let prev = select(min_v + 1, occluder.start_vertex, min_v + 1 >= occluder.start_vertex + occluder.n_vertices); 
-            let next = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
-
-            let prev_last  = select(last + 1, last + 1 - occluder.n_vertices, last + 1 >= occluder.start_vertex + occluder.n_vertices);
-            let prev_first = select(min_v - 1, min_v - 1 + occluder.n_vertices, min_v - 1 < occluder.start_vertex);
-
-            return res_full_occlusion();
-            // return get_softness_multi(pos, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
-        }
+        
+        let prev_last  = select(last - 1, last - 1 + occluder.n_vertices, last - 1 < occluder.start_vertex);
+        let prev_first = select(min_v + 1, min_v + 1 - occluder.n_vertices, min_v + 1 >= occluder.start_vertex + occluder.n_vertices);
+        
+        return get_softness_multi(pos, t1, t2, vertices[min_v], vertices[prev_first], vertices[last], vertices[prev_last], vertices[prev], vertices[next], out_of_bounds, term);
     }
     
     if is_occluded {
@@ -358,97 +380,122 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
     return res_no_occlusion();
 }
 
-fn get_softness_multi(pos: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left: vec2<f32>, extreme_right: vec2<f32>, prev_extreme_right: vec2<f32>, prev: vec2<f32>, next: vec2<f32>, out_of_bounds: bool, term: u32) -> OccRes {
+fn get_softness_multi(pos: vec2<f32>, t1: vec2<f32>, t2: vec2<f32>, extreme_left: vec2<f32>, prev_extreme_left: vec2<f32>, extreme_right: vec2<f32>, prev_extreme_right: vec2<f32>, prev: vec2<f32>, next: vec2<f32>, out_of_bounds: bool, term: u32) -> Occlusion {
     let light = lights[light_index];
-
-    let range = light.inner_range;
-    // let range = 1.0;
-
-    let left_range = min(range, distance(extreme_left, light.pos)); 
- 
-    var left_t1 = light.pos + rotate_90(normalize(extreme_left - light.pos)) * left_range;
-    var left_t2 = light.pos + rotate_90_cc(normalize(extreme_left - light.pos)) * left_range;
-
-    let rev = orientation(light.pos, extreme_right, extreme_left) > 0;
     
-    if orientation(left_t2, extreme_left, prev) < 0 {
-        left_t2 = (extreme_left - prev) * 2.0 + extreme_left;
-    }
+    let left_range = min(light.inner_range, distance(extreme_left, light.pos) * 0.5);
+    let left1 = light.pos + t1 * left_range; 
+    let left2 = light.pos + t2 * left_range;
 
-    if rev && orientation(left_t1, extreme_left, extreme_right) > 0 {
-        left_t1 = (extreme_left - extreme_right) * 2.0 + extreme_left;
-    }
+    var inter_left = intersects_half(extreme_left, extreme_left + extreme_left - pos, left1, left2);
 
-    let right_range = min(range, distance(extreme_right, light.pos));
+    let right_range = min(light.inner_range, distance(extreme_right, light.pos) * 0.5);
+    let right1 = light.pos + t1 * right_range; 
+    let right2 = light.pos + t2 * right_range;
 
-    var right_t1 = light.pos + rotate_90(normalize(extreme_right - light.pos)) * right_range;
-    var right_t2 = light.pos + rotate_90_cc(normalize(extreme_right - light.pos)) * right_range;
-
-    if orientation(right_t1, extreme_right, next) > 0 {
-        right_t1 = (extreme_right - next) * 2.0 + extreme_right;
-    }
-
-    if rev && orientation(right_t2, extreme_right, extreme_left) < 0 {
-        right_t2 = (extreme_right - extreme_left) * 2.0 + extreme_right;
-    }
-
-    let left_is_valid = orientation(prev, extreme_left, prev_extreme_left) <= 0;
-    let right_is_valid = orientation(next, extreme_right, prev_extreme_right) >= 0;
-
-    var left = false;
-    var right = false;
-
-    let above_left = orientation(left_t1, extreme_left, pos) < 0;
-    let under_left = orientation(left_t2, extreme_left, pos) > 0;
-
-    let inside_left = !above_left && !under_left;
-
-    let under_right = orientation(right_t2, extreme_right, pos) > 0;
-    let above_right = orientation(right_t1, extreme_right, pos) < 0;
-
-    let inside_right = !above_right && !under_right;
-
-    var behind_left = false;
-    var behind_right = false;
-
-    var left_multi = 1.0;
-    var right_multi = 1.0; 
+    var inter_right = intersects_half(extreme_right, extreme_right + extreme_right - pos, right1, right2);
     
-    if inside_left {
-        left = true;
-        let left2 = normalize(extreme_left - left_t2);
-        left_multi = 1.0 - acos(dot(normalize(pos - extreme_left), left2)) / acos(dot(normalize(extreme_left - left_t1), left2));
-    }
-    
-    if inside_right {
-        right = true;
-        let right1 = normalize(extreme_right - right_t1);
-        right_multi = 1.0 - acos(dot(normalize(pos - extreme_right), right1)) / acos(dot(normalize(extreme_right - right_t2), right1));
-    }
+    var interval_left: vec2<f32>;
+    var interval_right: vec2<f32>;
 
-    // if rev {
-    //     left = true; 
-    //     right = true; 
-    //     left_multi = 1.0;
-    //     right_multi = 1.0;
-    // }
+    if inter_left.result {
+        let clamp_intersection = intersects_half(extreme_left, extreme_left + extreme_left - prev, left1, left2);
+        var right_end = 1.0;
 
-    if !inside_left && !inside_right && !out_of_bounds {
-        left = true; 
-        right = true; 
-        left_multi = 1.0;
-        right_multi = 1.0;
-    }
+        if clamp_intersection.result {
+            right_end = distance(clamp_intersection.intersection, left1) / distance(left1, left2);
+        }
 
-    if inside_left && !inside_right {
-        right_multi = 1.0;
+        let left_end = distance(inter_left.intersection, left1) / distance(left1, left2);
+
+        if right_end == 1.0 {
+            interval_left = vec2<f32>(left_end, 1.0);
+        }
+        else if left_end > right_end {
+            // interval_left = vec2<f32>(0.0, 0.0);
+            inter_left.result = false;
+        }
+        else {
+            interval_left = vec2<f32>(left_end, 1.0 - (1.0 - right_end) * sqrt(left_end));
+        }
     }
 
-    if inside_right && !inside_left {
-        left_multi = 1.0;
+    if inter_right.result {
+        let clamp_intersection = intersects_half(extreme_right, extreme_right + extreme_right - next, right1, right2);
+        var left_end = 0.0;
+
+        if clamp_intersection.result {
+            left_end = distance(clamp_intersection.intersection, right1) / distance(right1, right2);
+        }
+
+        let right_end = 1.0 - distance(inter_right.intersection, right2) / distance(right1, right2);
+
+        if left_end == 0.0 {
+            interval_right = vec2<f32>(0.0, right_end);
+        }
+        else if left_end > right_end {
+            inter_right.result = false;
+            // interval_right = vec2<f32>(0.0, 0.0);
+        }
+        else {
+            interval_right = vec2<f32>(left_end * sqrt(1.0 - right_end), right_end);
+        }
     }
 
-    return OccRes(left || right, left_multi, right_multi);   
+    var result = res_no_occlusion();
+
+    if inter_right.result && inter_left.result {
+        result.occluded = true; 
+
+        if interval_right.x > 0.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(0.0, interval_right.x);
+            result.n_intervals += 1u;
+        }
+        
+        if interval_right.y < interval_left.x {
+            result.occlusion[result.n_intervals] = vec2<f32>(interval_right.y, interval_left.x);
+            result.n_intervals += 1u;
+        }
+
+        if interval_left.y < 1.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(interval_left.y, 1.0);
+            result.n_intervals += 1u;
+        }
+        
+    }
+    else if inter_left.result {
+        result.occluded = true;
+
+        if interval_left.x > 0.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(0.0, interval_left.x);
+            result.n_intervals += 1u;
+        }
+
+        if interval_left.y < 1.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(interval_left.y, 1.0);
+            result.n_intervals += 1u;
+        }
+    }
+    else if inter_right.result {
+        result.occluded = true;
+
+        if interval_right.x > 0.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(0.0, interval_right.x);
+            result.n_intervals += 1u;
+        }
+
+        if interval_right.y < 1.0 {
+            result.occlusion[result.n_intervals] = vec2<f32>(interval_right.y, 1.0);
+            result.n_intervals += 1u;
+        }
+    }
+    else if !out_of_bounds {
+        result.occluded = true;
+        result.occlusion[0] = vec2<f32>(0.0, 1.0);
+        result.n_intervals = 1u;
+    }
+
+    return result;
 }
 
 fn angle_term(p: vec2f, i: u32, length: u32, term: u32) -> f32 {
@@ -552,37 +599,6 @@ fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32, start_verte
 
     return ans;
 }
-
-
-// fn bs_vertex(angle: f32, offset: u32, size: u32) -> i32 {
-//     var ans = -1;
-    
-//     var low = 0i; 
-//     var high = i32(size) - 1;
-
-//     if angle < vertices[u32(low) + offset].angle {
-//         return -1;
-//     }
-
-//     if angle >= vertices[u32(high) + offset].angle {
-//         return high + 1;
-//     }
-
-//     while (low <= high) {
-//         let mid = low + (high - low + 1) / 2;
-//         let val = vertices[u32(mid) + offset].angle;
-
-//         if (val < angle) {
-//             ans = i32(mid);
-//             low = mid + 1;
-//         }
-//         else {
-//             high = mid - 1;
-//         }
-//     }
-
-//     return ans;
-// }
 
 struct OcclusionResult {
     occluded: bool, 
