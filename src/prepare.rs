@@ -372,7 +372,7 @@ pub(crate) fn prepare_data(
                                         light.inner_range,
                                         light.pos,
                                         camera.5.softness.is_some(),
-                                        0,
+                                        index,
                                     );
                                 }
 

@@ -86,8 +86,6 @@
 //! - Sprite-based shadows.
 //! - Light textures.
 
-#![feature(binary_heap_into_iter_sorted)]
-
 use bevy::{
     prelude::*,
     render::{render_graph::RenderLabel, texture::CachedTexture},

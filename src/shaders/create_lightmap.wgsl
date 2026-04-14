@@ -135,7 +135,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
             
-            if pointer.distance > dist { continue; }
+            // TODO: break doesn't work here. WHY? 
+            if pointer.distance > dist { break; }
             
             let occluder_type = pointer.index & 2147483648u;
             let occluder_index = pointer.index & 2147483647u;
@@ -169,7 +170,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 let poly_index = poly_occluders[occluder_index].index;
 
-                // if poly_index == 16u && prev_index == 17u {
+                // if poly_index == 20u {
+                //     return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+                // }
+
+                // if poly_index == 20u && prev_index == 19u {
                 //     return vec4<f32>(1.0, 0.0, 0.0, 1.0);
                 // }
 

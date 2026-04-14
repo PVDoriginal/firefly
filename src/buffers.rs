@@ -479,7 +479,7 @@ pub struct BinBuffer {
     /// Indices describing where each bin starts, written to the GPU. The extra value at the end is the maximum index / length.  
     bin_indices: StorageBuffer<BinIndices>,
     /// Data stored on the CPU.
-    occluders: [BinaryHeap<(u32, OccluderPointer)>; N_BINS],
+    occluders: [BinaryHeap<(OccluderPointer, u32)>; N_BINS],
 }
 
 /// Wrapper for the bin indices, so it can impl Default.
@@ -531,10 +531,20 @@ impl BinBuffer {
         for (index, bin) in self.occluders.iter_mut().enumerate() {
             values.extend_from_slice(
                 &bin.clone()
-                    .into_iter_sorted()
-                    .map(|(_, x)| x)
+                    .into_sorted_vec()
+                    .iter()
+                    .map(|(x, _)| *x)
                     .collect::<Vec<_>>(),
             );
+
+            // info!(
+            //     "extending with: {:?}",
+            //     bin.clone()
+            //         .into_sorted_vec()
+            //         .iter()
+            //         .map(|(x, index)| (index, x.distance))
+            //         .collect::<Vec<_>>()
+            // );
 
             bin_indices[index] = count as u32;
             count += bin.len();
@@ -600,7 +610,7 @@ impl BinBuffer {
     ) {
         // info!("writing buffers {min_bin} to {max_bin}");
         for i in min_bin..(max_bin + 1) {
-            self.occluders[i].push((index, pointer));
+            self.occluders[i].push((pointer, index));
         }
     }
 }
