@@ -1,8 +1,64 @@
+use std::f32::consts::{FRAC_2_PI, FRAC_PI_2, PI};
+
 use bevy::{
     log::warn,
     math::{FloatOrd, Isometry2d, Vec2, bounding::Aabb2d, vec2},
     platform::collections::HashSet,
 };
+
+pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>> {
+    if vertices.len() < 2 {
+        return None;
+    }
+
+    let mut res = vec![];
+
+    let mut curr = vec![vertices[0], vertices[1]];
+    let mut old_orientation = None;
+
+    let mut angle = 0.0;
+
+    for line in vertices.windows(3) {
+        let new_orientation = orientation(line[0], line[1], line[2]);
+
+        let next_angle = angle + (line[0] - line[1]).angle_to(line[2] - line[1]);
+        println!("angle: {}", (line[0] - line[1]).angle_to(line[2] - line[1]));
+
+        if (old_orientation.is_none()
+            || matches!(new_orientation, Orientation::Touch)
+            || Some(new_orientation) == old_orientation)
+            && next_angle < FRAC_PI_2
+        {
+            curr.push(line[2]);
+            angle = next_angle;
+        } else {
+            for i in (1..curr.len() - 1).rev() {
+                curr.push(curr[i]);
+            }
+
+            res.push(curr);
+            curr = vec![line[0], line[1], line[2]];
+
+            angle = next_angle - angle;
+        }
+
+        old_orientation = Some(new_orientation);
+    }
+
+    if curr.len() > 1 {
+        for i in (1..curr.len() - 1).rev() {
+            curr.push(curr[i]);
+        }
+
+        res.push(curr);
+    }
+
+    // for line in vertices.windows(3) {
+    //     res.push(vec![line[0], line[1], line[2], line[1]]);
+    // }
+
+    Some(res)
+}
 
 pub(crate) fn complementary_decomposition(vertices: Vec<Vec2>) -> Option<Vec<Vec<Vec2>>> {
     let mut aabb = Aabb2d::from_point_cloud(Isometry2d::default(), &vertices);
@@ -239,7 +295,7 @@ fn point_in_triangle(p: Vec2, (a, b, c): (Vec2, Vec2, Vec2)) -> bool {
     a || b
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum Orientation {
     Touch,
     Left,

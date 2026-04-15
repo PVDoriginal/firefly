@@ -270,7 +270,8 @@ fn apply_occlusion(shadow: vec3<f32>, index: u32, visibility: Visibility) -> vec
     var multi = 0.0;
 
     for (var i = 0u ; i < visibility.n_intervals; i += 1) {
-        multi += visibility.visibility[i].y - visibility.visibility[i].x;
+        // multi += visibility.visibility[i].y - visibility.visibility[i].x;
+        multi = max(multi, visibility.visibility[i].y - visibility.visibility[i].x);
     }
 
     return shadow_blend(shadow, poly_occluders[index].color, poly_occluders[index].opacity * (1.0 - multi));

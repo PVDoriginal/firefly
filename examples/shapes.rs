@@ -83,44 +83,44 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    commands.spawn((
-        Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
-        Transform::default(),
-    ));
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
+    //     Transform::default(),
+    // ));
 
     commands.spawn((
         Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::polyline(vec![
-    //         vec2(-97., 108.),
-    //         vec2(-58., 163.),
-    //         vec2(-25., 105.),
-    //         vec2(-109., 53.),
-    //         vec2(-97., 100.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
-
     commands.spawn((
-        Occluder2d::polygon(vec![
+        Occluder2d::polyline(vec![
             vec2(-97., 108.),
             vec2(-58., 163.),
             vec2(-25., 105.),
             vec2(-109., 53.),
-            vec2(-37., 105.),
-            vec2(-60., 150.),
+            vec2(-97., 100.),
         ])
         .unwrap(),
         Transform::default(),
     ));
 
-    commands.spawn((
-        Occluder2d::polygon(vec![vec2(-25., 105.), vec2(-109., 53.), vec2(-37., 105.)]).unwrap(),
-        Transform::default().with_translation(vec3(0.0, 90.0, 0.0)),
-    ));
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![
+    //         vec2(-97., 108.),
+    //         vec2(-58., 163.),
+    //         vec2(-25., 105.),
+    //         vec2(-109., 53.),
+    //         vec2(-37., 105.),
+    //         vec2(-60., 150.),
+    //     ])
+    //     .unwrap(),
+    //     Transform::default(),
+    // ));
+
+    // commands.spawn((
+    //     Occluder2d::polygon(vec![vec2(-25., 105.), vec2(-109., 53.), vec2(-37., 105.)]).unwrap(),
+    //     Transform::default().with_translation(vec3(0.0, 90.0, 0.0)),
+    // ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
@@ -202,62 +202,62 @@ fn setup(mut commands: Commands) {
     //     Transform::from_translation(vec3(-109., 210., 0.)),
     // ));
 
-    // let spline = CubicCardinalSpline::new_catmull_rom(vec![
-    //     vec2(0., 0.),
-    //     vec2(100., 0.),
-    //     vec2(120., 150.),
-    //     vec2(54., 120.),
-    //     vec2(0., 170.),
-    // ])
-    // .to_curve()
-    // .unwrap();
+    let spline = CubicCardinalSpline::new_catmull_rom(vec![
+        vec2(0., 0.),
+        vec2(100., 0.),
+        vec2(120., 150.),
+        vec2(54., 120.),
+        vec2(0., 170.),
+    ])
+    .to_curve()
+    .unwrap();
 
-    // let samples = 10 * spline.segments().len();
+    let samples = 10 * spline.segments().len();
 
-    // commands.spawn((
-    //     Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
-    //     Transform::from_translation(vec3(-410., -200., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::polyline(spline.iter_positions(samples).collect::<Vec<_>>()).unwrap(),
+        Transform::from_translation(vec3(-410., -200., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polyline(
-    //         vec![
-    //             vec2(0., 0.),
-    //             vec2(30., -10.),
-    //             vec2(60., -30.),
-    //             vec2(30., -3.),
-    //             vec2(100., 20.),
-    //             vec2(100., 0.),
-    //             vec2(120., 150.),
-    //             vec2(54., 120.),
-    //             vec2(0., 170.),
-    //         ]
-    //         .iter()
-    //         .rev()
-    //         .map(|x| *x)
-    //         .collect(),
-    //     )
-    //     .unwrap(),
-    //     Transform::from_translation(vec3(-210., -200., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::polyline(
+            vec![
+                vec2(0., 0.),
+                vec2(30., -10.),
+                vec2(60., -30.),
+                vec2(30., -3.),
+                vec2(100., 20.),
+                vec2(100., 0.),
+                vec2(120., 150.),
+                vec2(54., 120.),
+                vec2(0., 170.),
+            ]
+            .iter()
+            .rev()
+            .map(|x| *x)
+            .collect::<Vec<_>>(),
+        )
+        .unwrap(),
+        Transform::from_translation(vec3(-210., -200., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polyline(
-    //         vec![
-    //             vec2(100., 20.),
-    //             vec2(100., 0.),
-    //             vec2(120., 150.),
-    //             vec2(54., 120.),
-    //             vec2(0., 170.),
-    //         ]
-    //         .iter()
-    //         .rev()
-    //         .map(|x| *x)
-    //         .collect(),
-    //     )
-    //     .unwrap(),
-    //     Transform::from_translation(vec3(-30., -200., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::polyline(
+            vec![
+                vec2(100., 20.),
+                vec2(100., 0.),
+                vec2(120., 150.),
+                vec2(54., 120.),
+                // vec2(0., 170.),
+            ]
+            .iter()
+            .rev()
+            .map(|x| *x)
+            .collect::<Vec<_>>(),
+        )
+        .unwrap(),
+        Transform::from_translation(vec3(-30., -200., 0.)),
+    ));
 
     // commands.spawn((
     //     Occluder2d::polygon(vec![

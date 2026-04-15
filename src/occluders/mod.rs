@@ -9,7 +9,10 @@ use bevy::{
 };
 use core::f32;
 
-use crate::{change::Changes, occluders::convex_decomposition::convex_decomposition};
+use crate::{
+    change::Changes,
+    occluders::convex_decomposition::{convex_decomposition, line_decomposition},
+};
 use crate::{
     occluders::convex_decomposition::complementary_decomposition,
     visibility::{OccluderAabb, VisibilityTimer},
@@ -316,6 +319,25 @@ fn handle_new_occluders(
                                 transform.compute_transform(),
                             ));
                         }
+                    }
+                }
+            }
+            Occluder2dInternalShape::Polyline { vertices } => {
+                let parent = entity.id();
+
+                info!("target: {vertices:?}");
+                let decomp = line_decomposition(vertices);
+                info!("decomp: {decomp:?}");
+
+                if let Some(decomp) = decomp {
+                    for convex in decomp {
+                        commands.spawn((
+                            Occluder2dShape::Convex { vertices: convex },
+                            style,
+                            ConvexShapeOf(parent),
+                            OccluderIndex(index),
+                            transform.compute_transform(),
+                        ));
                     }
                 }
             }

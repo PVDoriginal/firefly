@@ -293,7 +293,7 @@ pub(crate) fn prepare_data(
                             continue;
                         }
 
-                        info!("occluder: {:?}, index: {}", occluder.shape, occluder.index);
+                        // info!("occluder: {:?}, index: {}", occluder.shape, occluder.index);
 
                         if let Occluder2dShape::Round {
                             width,
