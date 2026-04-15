@@ -247,7 +247,7 @@ fn setup(mut commands: Commands) {
                 vec2(100., 20.),
                 vec2(100., 0.),
                 vec2(120., 150.),
-                vec2(54., 120.),
+                // vec2(54., 120.),
                 // vec2(0., 170.),
             ]
             .iter()

@@ -11,6 +11,10 @@ pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>>
         return None;
     }
 
+    // if vertices.len() == 2 {
+    //     return Some(vec![vertices.clone()]);
+    // }
+
     let mut res = vec![];
 
     let mut curr = vec![vertices[0], vertices[1]];
@@ -21,8 +25,9 @@ pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>>
     for line in vertices.windows(3) {
         let new_orientation = orientation(line[0], line[1], line[2]);
 
-        let next_angle = angle + (line[0] - line[1]).angle_to(line[2] - line[1]);
-        println!("angle: {}", (line[0] - line[1]).angle_to(line[2] - line[1]));
+        let curr_angle = PI - (line[0] - line[1]).angle_to(line[2] - line[1]).abs();
+        let next_angle = angle + curr_angle;
+        println!("angle: {curr_angle}");
 
         if (old_orientation.is_none()
             || matches!(new_orientation, Orientation::Touch)
@@ -32,14 +37,16 @@ pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>>
             curr.push(line[2]);
             angle = next_angle;
         } else {
-            for i in (1..curr.len() - 1).rev() {
-                curr.push(curr[i]);
+            if curr.len() > 1 {
+                for i in (1..curr.len() - 1).rev() {
+                    curr.push(curr[i]);
+                }
+                res.push(curr);
             }
 
-            res.push(curr);
-            curr = vec![line[0], line[1], line[2]];
+            curr = vec![line[1], line[2]];
 
-            angle = next_angle - angle;
+            angle = 0.0;
         }
 
         old_orientation = Some(new_orientation);
@@ -49,7 +56,6 @@ pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>>
         for i in (1..curr.len() - 1).rev() {
             curr.push(curr[i]);
         }
-
         res.push(curr);
     }
 
