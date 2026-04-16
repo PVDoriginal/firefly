@@ -70,7 +70,7 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     var color = textureSample(sprite_texture, sprite_sampler, in.uv);
     var normal = textureSample(normal_texture, sprite_sampler, in.uv);
     
-    if color.a > 0.1 {
+    if color.a >= 1.0 {
         res.stencil = vec4f(0, in.z, in.height, 1);
     }
     else {
