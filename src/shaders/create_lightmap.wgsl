@@ -404,13 +404,13 @@ fn get_softness_multi(pos: vec2<f32>, t1: vec2<f32>, t2: vec2<f32>, extreme_left
     var interval_left: vec2<f32>;
     var interval_right: vec2<f32>;
 
-    let rev = orientation(extreme_left, light.pos, extreme_right) > 0;
+    let rev = orientation(pos, extreme_left, extreme_right) > 0;
 
     if inter_left.result {
         let clamp_intersection = intersects_half(extreme_left, extreme_left + extreme_left - prev, left1, left2);
         var right_end = 1.0;
 
-        if clamp_intersection.result && !rev {
+        if clamp_intersection.result {
             right_end = distance(clamp_intersection.intersection, left1) / distance(left1, left2);
         }
 
@@ -432,7 +432,7 @@ fn get_softness_multi(pos: vec2<f32>, t1: vec2<f32>, t2: vec2<f32>, extreme_left
         let clamp_intersection = intersects_half(extreme_right, extreme_right + extreme_right - next, right1, right2);
         var left_end = 0.0;
 
-        if clamp_intersection.result && !rev {
+        if clamp_intersection.result {
             left_end = distance(clamp_intersection.intersection, right1) / distance(right1, right2);
         }
 
@@ -448,6 +448,12 @@ fn get_softness_multi(pos: vec2<f32>, t1: vec2<f32>, t2: vec2<f32>, extreme_left
         else {
             interval_right = vec2<f32>(left_end * sqrt(1.0 - right_end), right_end);
         }
+    }
+
+    if rev {
+        // return res_full_occlusion();
+        // interval_left = 1.0 - vec2<f32>(interval_left.y, interval_left.x);
+        // interval_right = 1.0 - vec2<f32>(interval_right.y, interval_left.x);
     }
 
     var result = res_no_occlusion();

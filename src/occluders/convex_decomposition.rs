@@ -1,4 +1,4 @@
-use std::f32::consts::{FRAC_2_PI, FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_2_PI, FRAC_PI_2, FRAC_PI_4, PI};
 
 use bevy::{
     log::warn,
@@ -11,57 +11,39 @@ pub(crate) fn line_decomposition(vertices: &Vec<Vec2>) -> Option<Vec<Vec<Vec2>>>
         return None;
     }
 
-    // if vertices.len() == 2 {
-    //     return Some(vec![vertices.clone()]);
-    // }
-
     let mut res = vec![];
 
-    let mut curr = vec![vertices[0], vertices[1]];
-    let mut old_orientation = None;
+    // let mut curr = vec![];
 
-    let mut angle = 0.0;
+    // for vertex in vertices {
+    //     if curr.len() < 2
+    //         || matches!(
+    //             orientation(curr[curr.len() - 2], curr[curr.len() - 1], *vertex),
+    //             Orientation::Touch
+    //         )
+    //     {
+    //         curr.push(*vertex);
+    //     } else {
+    //         for i in (1..curr.len() - 1).rev() {
+    //             curr.push(curr[i]);
+    //         }
 
-    for line in vertices.windows(3) {
-        let new_orientation = orientation(line[0], line[1], line[2]);
-
-        let curr_angle = PI - (line[0] - line[1]).angle_to(line[2] - line[1]).abs();
-        let next_angle = angle + curr_angle;
-        println!("angle: {curr_angle}");
-
-        if (old_orientation.is_none()
-            || matches!(new_orientation, Orientation::Touch)
-            || Some(new_orientation) == old_orientation)
-            && next_angle < FRAC_PI_2
-        {
-            curr.push(line[2]);
-            angle = next_angle;
-        } else {
-            if curr.len() > 1 {
-                for i in (1..curr.len() - 1).rev() {
-                    curr.push(curr[i]);
-                }
-                res.push(curr);
-            }
-
-            curr = vec![line[1], line[2]];
-
-            angle = 0.0;
-        }
-
-        old_orientation = Some(new_orientation);
-    }
-
-    if curr.len() > 1 {
-        for i in (1..curr.len() - 1).rev() {
-            curr.push(curr[i]);
-        }
-        res.push(curr);
-    }
-
-    // for line in vertices.windows(3) {
-    //     res.push(vec![line[0], line[1], line[2], line[1]]);
+    //         let last = *curr.last().unwrap();
+    //         res.push(curr);
+    //         curr = vec![last, *vertex];
+    //     }
     // }
+
+    // if curr.len() > 1 {
+    //     for i in (1..curr.len() - 1).rev() {
+    //         curr.push(curr[i]);
+    //     }
+    //     res.push(curr);
+    // }
+
+    for line in vertices.windows(2) {
+        res.push(vec![line[0], line[1]]);
+    }
 
     Some(res)
 }
