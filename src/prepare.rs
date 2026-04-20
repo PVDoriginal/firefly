@@ -896,6 +896,7 @@ fn prepare_sprite_image_bind_groups(
                             &uv_offset_scale,
                             extracted_sprite.transform.translation().z,
                             extracted_sprite.height,
+                            extracted_sprite.transform.translation().y,
                         ));
 
                     current_batch.as_mut().unwrap().get_mut().range.end += 1;
@@ -942,6 +943,7 @@ fn prepare_sprite_image_bind_groups(
                                 &uv_offset_scale,
                                 extracted_sprite.transform.translation().z,
                                 extracted_sprite.height,
+                                extracted_sprite.transform.translation().y,
                             ));
 
                         current_batch.as_mut().unwrap().get_mut().range.end += 1;

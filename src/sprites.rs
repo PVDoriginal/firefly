@@ -13,7 +13,7 @@ use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_chang
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
-use bevy::sprite_render::{queue_material2d_meshes, SpritePipelineKey, SpriteSystems};
+use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
 use bevy::{
     core_pipeline::{
         core_2d::{AlphaMask2d, Opaque2d},
@@ -22,21 +22,21 @@ use bevy::{
     ecs::{
         prelude::*,
         query::ROQueryItem,
-        system::{lifetimeless::*, SystemParamItem},
+        system::{SystemParamItem, lifetimeless::*},
     },
     math::{Affine3A, FloatOrd},
     platform::collections::HashMap,
     prelude::*,
     render::{
+        Render, RenderApp,
         batching::sort_binned_render_phase,
         render_phase::{
-            sort_phase_system, AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex,
-            RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
-            ViewSortedRenderPhases,
+            AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
+            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
+            sort_phase_system,
         },
         render_resource::*,
         view::{ExtractedView, Msaa, RenderVisibleEntities, RetainedViewEntity, ViewUniformOffset},
-        Render, RenderApp,
     },
 };
 
@@ -101,12 +101,13 @@ pub(crate) struct SpriteInstance {
     pub i_uv_offset_scale: [f32; 4],
     pub z: f32,
     pub height: f32,
-    pub _padding: [f32; 2],
+    pub y: f32,
+    pub _padding: f32,
 }
 
 impl SpriteInstance {
     #[inline]
-    pub fn from(transform: &Affine3A, uv_offset_scale: &Vec4, z: f32, height: f32) -> Self {
+    pub fn from(transform: &Affine3A, uv_offset_scale: &Vec4, z: f32, height: f32, y: f32) -> Self {
         let transpose_model_3x3 = transform.matrix3.transpose();
         Self {
             i_model_transpose: [
@@ -117,7 +118,8 @@ impl SpriteInstance {
             z,
             i_uv_offset_scale: uv_offset_scale.to_array(),
             height,
-            _padding: [0.0, 0.0],
+            y,
+            _padding: 0.0,
         }
     }
 }

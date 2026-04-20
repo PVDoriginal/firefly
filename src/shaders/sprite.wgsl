@@ -1,3 +1,5 @@
+enable f16;
+
 #ifdef TONEMAP_IN_SHADER
 #import bevy_core_pipeline::tonemapping
 #endif
@@ -22,6 +24,7 @@ struct VertexInput {
     @location(3) i_uv_offset_scale: vec4<f32>,
     @location(4) z: f32,
     @location(5) height: f32,
+    @location(6) y: f32,
 }
 
 struct VertexOutput {
@@ -29,6 +32,7 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) z: f32,
     @location(2) height: f32,
+    @location(3) y: f32,
 };
 
 @vertex
@@ -49,6 +53,7 @@ fn vertex(in: VertexInput) -> VertexOutput {
     out.uv = vec2<f32>(vertex_position.xy) * in.i_uv_offset_scale.zw + in.i_uv_offset_scale.xy;
     out.z = in.z;
     out.height = in.height;
+    out.y = in.y;
 
     return out;
 }
@@ -71,17 +76,22 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     var normal = textureSample(normal_texture, sprite_sampler, in.uv);
     
     if color.a >= 1.0 {
-        res.stencil = vec4f(0, in.z, in.height, 1);
+        res.stencil = vec4<f32>(in.y, in.z, in.height, 1.0);
     }
     else {
-        res.stencil = vec4f(0, 0, 0, 0);
+        res.stencil = vec4<f32>(0, 0, 0, 0);
     }
 
-    if normal_dummy == 1 {
-        res.normal = vec4f(0, 0, 0.1, color.a);
+    if color.a >= 1.0 {
+        if normal_dummy == 1 {
+            res.normal = vec4<f32>(0, 0, f32(f16(0.1)), 1.0);
+        }
+        else {
+            res.normal = normal;
+        }
     }
     else {
-        res.normal = normal;
+        res.normal = vec4<f32>(0.0);
     }
 
     return res; 

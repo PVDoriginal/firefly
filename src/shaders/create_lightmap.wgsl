@@ -1,3 +1,5 @@
+enable f16;
+
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 #import bevy_render::view::View
 
@@ -63,7 +65,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     var res = vec4f(0);
     
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
-    let normal = textureSample(normal_map, texture_sampler, in.uv);
+    let normal = textureLoad(normal_map, vec2<i32>(in.uv * vec2<f32>(textureDimensions(normal_map))), 0);
     let stencil = textureSample(sprite_stencil, texture_sampler, in.uv);
 
     let dist = distance(pos, light.pos);
@@ -85,7 +87,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     if (dist < light.radius && angle <= light.angle / 2.) {
         var normal_multi = 1f;
     
-        if config.normal_mode != 0 && normal.a > 0 {
+        if config.normal_mode != 0 && normal.a > 0 && normal.b != 0.1 {
             let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), config.normal_attenuation);
 
             if normal.b == 0.0 {
@@ -103,6 +105,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 normal_multi = max(0f, dot(normal_dir, light_dir));
             }
         }; 
+
+        if normal.b == f32(f16(0.1)) {
+            normal_multi = 1.0;
+        }
 
         if dist <= light.core_radius {
             res = vec4f(light_color.xyz, 0) * normal_multi * (light.intensity + light.core_boost * falloff(dist / light.core_radius, light.core_falloff, light.core_falloff_intensity));

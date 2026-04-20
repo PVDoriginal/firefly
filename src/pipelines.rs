@@ -484,6 +484,12 @@ impl SpecializedRenderPipeline for SpritePipeline {
                     offset: 68,
                     shader_location: 5,
                 },
+                // @location(6) y: f32,
+                VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: 72,
+                    shader_location: 6,
+                },
             ],
         };
 

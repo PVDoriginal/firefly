@@ -72,6 +72,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         PointLight2d {
             intensity: 3.,
             radius: 100.,
+            core: Core {
+                radius: 20.0,
+                ..default()
+            },
             color: Color::srgb(1.0, 0.8, 0.6),
             ..default()
         },
@@ -87,6 +91,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         PointLight2d {
             intensity: 5.,
             radius: 100.,
+            core: Core {
+                radius: 20.0,
+                ..default()
+            },
             color: Color::srgb(0.8, 0.8, 1.0),
             offset: vec3(0., 22., 0.),
             ..default()

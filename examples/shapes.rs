@@ -1,16 +1,11 @@
 use bevy::{
-    color::palettes::css::RED,
-    input::mouse::{MouseScrollUnit, MouseWheel},
-    prelude::*,
-    render::view::Hdr,
+    color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
     window::PrimaryWindow,
 };
 use bevy_firefly::{app::FireflyGizmoStyle, prelude::*};
 
 // A simple example showcasing the different occluder shapes.
 // You can click around the screen to reposition the light.
-
-// This example also showcases hard (non-soft) shadows and light banding.
 
 fn main() {
     let mut app = App::new();
@@ -60,7 +55,7 @@ fn setup(mut commands: Commands) {
             radius: 450.0,
             core: Core {
                 radius: 30.0,
-                boost: 20.0,
+                boost: 15.0,
                 ..default()
             },
             ..default()
@@ -128,19 +123,6 @@ fn setup(mut commands: Commands) {
         .unwrap(),
         Transform::default(),
     ));
-
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-97., 108.),
-    //         vec2(-58., 163.),
-    //         vec2(-25., 105.),
-    //         vec2(-109., 53.),
-    //         vec2(-37., 105.),
-    //         vec2(-60., 150.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
 
     commands.spawn((
         Occluder2d::polygon(vec![
