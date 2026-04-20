@@ -55,6 +55,8 @@ pub struct FireflyConfig {
     /// **Default:** true.
     pub z_sorting: bool,
 
+    pub z_sorting_error_margin: f32,
+
     /// Field that controls how the normal maps are applied relative to perspective.
     ///
     /// **Performance Impact:** Very minor.
@@ -107,6 +109,7 @@ impl Default for FireflyConfig {
             light_bands: None,
             soft_shadows: true,
             z_sorting: true,
+            z_sorting_error_margin: 0.0,
             normal_mode: NormalMode::None,
             normal_attenuation: 0.5,
         }
@@ -121,6 +124,7 @@ pub struct UniformFireflyConfig {
     pub light_bands: f32,
     pub soft_shadows: u32,
     pub z_sorting: u32,
+    pub z_sorting_error_margin: f32,
     pub normal_mode: u32,
     pub normal_attenuation: f32,
 }

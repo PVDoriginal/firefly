@@ -130,6 +130,8 @@ fn prepare_config(
                 true => 1,
             },
 
+            z_sorting_error_margin: config.z_sorting_error_margin,
+
             normal_mode: match config.normal_mode {
                 NormalMode::None => 0,
                 NormalMode::Simple => 1,

@@ -74,6 +74,7 @@ struct FireflyConfig {
     light_bands: f32,
     soft_shadows: u32,
     z_sorting: u32,
+    z_sorting_error_margin: f32,
     // 0 - none, 1 - simple, 2 - topdown
     normal_mode: u32, 
     normal_attenuation: f32,

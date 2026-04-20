@@ -56,8 +56,6 @@ const PI2: f32 = 6.28318530717958647692528676655900577;
 const PI: f32 = 3.14159265358979323846264338327950288;
 const PIDIV2: f32 = 1.57079632679489661923132169163975144; 
 
-const EPSILON: f32 = 1.19209290e-07;
-
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let light = lights[light_index];
@@ -161,7 +159,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             // round occluder
             if occluder_type == 0 {
                 if stencil.a > 0.1 {
-                    if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= f32(f16(round_occluders[occluder_index].z)) {
+                    if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= round_occluders[occluder_index].z - config.z_sorting_error_margin {
                         continue;
                     }
                 }
@@ -175,7 +173,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             // poly occluder
             else {
                 if stencil.a > 0.1 {
-                    if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= f32(f16(poly_occluders[occluder_index].z)) {
+                    if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z - config.z_sorting_error_margin {
                         continue;
                     }
                 }
