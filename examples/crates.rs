@@ -27,7 +27,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Projection::Orthographic(proj),
         FireflyConfig {
             // normal maps need to be explicitly enabled
-            normal_mode: NormalMode::TopDown,
+            normal_mode: NormalMode::TopDownY,
             ..default()
         },
     ));
@@ -72,7 +72,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         PointLight2d {
             intensity: 3.,
             radius: 100.,
-            core: Core {
+            core: LightCore {
                 radius: 20.0,
                 ..default()
             },
@@ -91,7 +91,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         PointLight2d {
             intensity: 5.,
             radius: 100.,
-            core: Core {
+            core: LightCore {
                 radius: 20.0,
                 ..default()
             },

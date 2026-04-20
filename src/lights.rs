@@ -70,17 +70,20 @@ pub struct PointLight2d {
     /// **Default:** [InverseSquare](Falloff::InverseSquare).
     pub falloff: Falloff,
 
-    pub core: Core,
+    /// The core of the light.
+    ///
+    /// This is the inner section of the light that is usually brighter.
+    ///
+    /// The soft shadows are cast based on the radius of the core.
+    pub core: LightCore,
 
-    /// Angle in degrees of the point light. Between 0 and 360.
+    /// Optional parameter to constrain the angle of a light.
     ///
-    /// 0 - No light;
-    /// 360 - Full light going in all direction.
+    /// The direction of the angle is based on the **UP** direction of the entity.
+    /// Can be moved by rotating the entity.  
     ///
-    /// Relative to the direction the entity's facing.
-    ///
-    /// **Default:** 360.
-    pub angle: f32,
+    /// **Default:** LightAngle::FULL.
+    pub angle: LightAngle,
 
     /// Whether this light should cast shadows or not with the existent occluders.
     ///
@@ -98,6 +101,21 @@ pub struct PointLight2d {
     pub offset: Vec3,
 }
 
+impl Default for PointLight2d {
+    fn default() -> Self {
+        Self {
+            color: bevy::prelude::Color::Srgba(WHITE),
+            intensity: 1.,
+            radius: 100.,
+            falloff: Falloff::InverseSquare { intensity: 0.0 },
+            core: default(),
+            angle: LightAngle::FULL,
+            cast_shadows: true,
+            offset: Vec3::ZERO,
+        }
+    }
+}
+
 /// Optional component you can add to lights.
 ///
 /// Describes the light's 2d height, useful for emulating 3d lighting in top-down 2d games.
@@ -108,25 +126,62 @@ pub struct PointLight2d {
 #[derive(Component, Default, Reflect)]
 pub struct LightHeight(pub f32);
 
-/// An enum for the falloff type of a light.
-///
-/// **Default:** [InverseSquare](Falloff::InverseSquare).  
+#[derive(Debug, Clone, Copy, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// The angle of the light. Value is interpolated between inner and outer angles to create a smooth transition.
+pub struct LightAngle {
+    /// The inner angle of a light, in degrees. Should be less than or equial to the outer angle.
+    pub inner: f32,
+    /// The outer angle of a light, in degrees. Should be greater than or equal to the inner angle.
+    pub outer: f32,
+}
+
+impl Default for LightAngle {
+    fn default() -> Self {
+        Self::FULL
+    }
+}
+
+impl LightAngle {
+    pub const FULL: Self = Self {
+        inner: 360.0,
+        outer: 360.0,
+    };
+}
+
+/// An enum describing the falloff of a light's intensity.
 #[derive(Debug, Clone, Copy, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Falloff {
-    /// The intensity decreases inversely proportial to the square distance towards the inner light source.  
-    InverseSquare {
-        intensity: f32,
-    },
-    /// The intensity decreases linearly with the distance towards the inner light source.
-    Linear {
-        intensity: f32,
-    },
-
+    /// The light decreases inversely proportial to the square distance towards the source.  
+    ///
+    /// The intensity parameter will increase the speed at which the light fades. Can be negative or positive.
+    InverseSquare { intensity: f32 },
+    /// The light decreases linearly with the distance towards the source.
+    ///
+    /// The intensity parameter will increase the speed at which the light fades. Can be negative or positive.
+    Linear { intensity: f32 },
+    /// There is no falloff. The light will have a constant intensity.  
     None,
 }
 
 impl Falloff {
+    pub const INVERSE_SQUARE: Self = Self::InverseSquare { intensity: 0.0 };
+    pub const LINEAR: Self = Self::Linear { intensity: 0.0 };
+    pub const NONE: Self = Self::None;
+
+    pub fn inverse_square(intensity: f32) -> Falloff {
+        Falloff::InverseSquare { intensity }
+    }
+
+    pub fn linear(intensity: f32) -> Falloff {
+        Falloff::Linear { intensity }
+    }
+
+    pub fn none() -> Falloff {
+        Falloff::None
+    }
+
     pub fn intensity(&self) -> f32 {
         match *self {
             Falloff::InverseSquare { intensity } => intensity,
@@ -136,35 +191,67 @@ impl Falloff {
     }
 }
 
+/// The light's core. This is what determines the softness of shadows if [soft_shadows](crate::prelude::FireflyConfig::soft_shadows) is enabled.
 #[derive(Clone, Copy, Debug, Reflect)]
-pub struct Core {
+pub struct LightCore {
+    /// The radius of the core. This must be less than the actual radius of the light.
+    ///
+    /// **Default:** 5.0.
     pub radius: f32,
+    /// A boost to the core's intensity.
+    ///
+    /// If set to 0, the core will have a constant intensity equal to that of the light.
+    ///
+    /// Otherwise, the core will interpolate between `intensity + boost` and `intensity` based on the provided [`Falloff`].
+    ///
+    /// **Default:** 5.0.
     pub boost: f32,
+    /// The core's falloff.
+    ///
+    ///  **Default:** InverseSquare { intensity: 0.0 }
     pub falloff: Falloff,
 }
 
-impl Default for Core {
+impl Default for LightCore {
     fn default() -> Self {
-        Core {
-            radius: 0.0,
+        LightCore {
+            radius: 5.0,
             boost: 5.0,
             falloff: Falloff::InverseSquare { intensity: 0.0 },
         }
     }
 }
 
-impl Default for PointLight2d {
-    fn default() -> Self {
-        Self {
-            color: bevy::prelude::Color::Srgba(WHITE),
-            intensity: 1.,
-            radius: 100.,
+impl LightCore {
+    pub const NONE: Self = LightCore {
+        radius: 0.0,
+        boost: 0.0,
+        falloff: Falloff::None,
+    };
+
+    pub fn from_radius_boost(radius: f32, boost: f32) -> LightCore {
+        LightCore {
+            radius,
+            boost,
             falloff: Falloff::InverseSquare { intensity: 0.0 },
-            core: default(),
-            angle: 360.0,
-            cast_shadows: true,
-            offset: Vec3::ZERO,
         }
+    }
+    pub fn from_radius(radius: f32) -> LightCore {
+        LightCore {
+            radius,
+            boost: 5.0,
+            falloff: Falloff::InverseSquare { intensity: 0.0 },
+        }
+    }
+    pub fn with_boost(&self, boost: f32) -> LightCore {
+        let mut res = *self;
+        res.boost = boost;
+        res
+    }
+    pub fn with_falloff(&self, falloff: Falloff) -> LightCore {
+        let mut res = *self;
+        res.falloff = falloff;
+        res
     }
 }
 
@@ -177,8 +264,8 @@ pub struct ExtractedPointLight {
     pub intensity: f32,
     pub radius: f32,
     pub falloff: Falloff,
-    pub core: Core,
-    pub angle: f32,
+    pub core: LightCore,
+    pub angle: LightAngle,
     pub cast_shadows: bool,
     pub dir: Vec2,
     pub z: f32,
@@ -209,9 +296,10 @@ pub struct UniformPointLight {
 
     pub falloff: u32,
     pub falloff_intensity: f32,
-    pub angle: f32,
 
-    pub pad: f32,
+    pub inner_angle: f32,
+    pub outer_angle: f32,
+
     pub dir: Vec2,
 
     pub z: f32,

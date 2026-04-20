@@ -84,8 +84,16 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
     // light_color = pow(light_color, vec4<f32>(2.2));
 
-    if (dist < light.radius && angle <= light.angle / 2.) {
-        var normal_multi = 1f;
+    if (dist < light.radius && angle <= light.outer_angle / 2.) {
+
+        var angle_multi = 1.0; 
+
+        if angle > light.inner_angle / 2. {
+            // return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+            angle_multi = 1.0 - (angle - light.inner_angle / 2.) / (light.outer_angle / 2. - light.inner_angle / 2.);
+        }
+
+        var normal_multi = 1.0;
     
         if config.normal_mode != 0 && normal.a > 0 && normal.b != 0.1 {
             let normal_dir = mix(normalize(normal.xyz * 2f - 1f), vec3f(0f), config.normal_attenuation);
@@ -101,6 +109,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 normal_multi = max(0f, dot(normal_dir, light_dir));
             }
             else if config.normal_mode == 2 {
+                let light_dir = normalize(vec3f(light.pos.x - pos.x, light.height - stencil.b, stencil.r - light.pos.y));
+                normal_multi = max(0f, dot(normal_dir, light_dir));
+            }
+            else if config.normal_mode == 3 {
                 let light_dir = normalize(vec3f(light.pos.x - pos.x, light.height - stencil.b, light.z - stencil.g));
                 normal_multi = max(0f, dot(normal_dir, light_dir));
             }
@@ -111,11 +123,11 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         }
 
         if dist <= light.core_radius {
-            res = vec4f(light_color.xyz, 0) * normal_multi * (light.intensity + light.core_boost * falloff(dist / light.core_radius, light.core_falloff, light.core_falloff_intensity));
+            res = vec4f(light_color.xyz, 0) * angle_multi * normal_multi * (light.intensity + light.core_boost * falloff(dist / light.core_radius, light.core_falloff, light.core_falloff_intensity));
         }
         else {
             let x = (dist - light.core_radius) / (light.radius - light.core_radius);
-            res = vec4f(light_color.xyz, 0) * light.intensity * normal_multi * falloff(x, light.falloff, light.falloff_intensity);
+            res = vec4f(light_color.xyz, 0) * light.intensity * angle_multi * normal_multi * falloff(x, light.falloff, light.falloff_intensity);
         }
 
         var round_index = 0u;
@@ -163,7 +175,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             // poly occluder
             else {
                 if stencil.a > 0.1 {
-                    if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z {
+                    if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= f32(f16(poly_occluders[occluder_index].z)) {
                         continue;
                     }
                 }

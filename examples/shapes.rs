@@ -53,10 +53,14 @@ fn setup(mut commands: Commands) {
             color: Color::srgb(1.0, 0.5, 1.0),
             intensity: 7.0,
             radius: 450.0,
-            core: Core {
+            core: LightCore {
                 radius: 30.0,
                 boost: 15.0,
                 ..default()
+            },
+            angle: LightAngle {
+                inner: 30.0,
+                outer: 100.0,
             },
             ..default()
         },

@@ -94,7 +94,9 @@ pub enum NormalMode {
     /// it will use the [LightHeight](crate::prelude::LightHeight) and [SpriteHeight](crate::prelude::SpriteHeight) components.
     ///
     /// This is recommended for 2d perspectives where you want to simulate 3d lighting, such as top-down games.
-    TopDown,
+    TopDownY,
+
+    TopDownZ,
 }
 
 impl Default for FireflyConfig {

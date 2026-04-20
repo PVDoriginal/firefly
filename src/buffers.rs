@@ -199,10 +199,10 @@ fn prepare_lights(
                 Falloff::None => 2,
             },
             falloff_intensity: light.falloff.intensity(),
-            angle: light.angle / 180. * PI,
+            inner_angle: light.angle.inner / 180. * PI,
+            outer_angle: light.angle.outer / 180. * PI,
             dir: light.dir,
             height: light.height,
-            pad: 0.0,
         };
 
         let new_index =

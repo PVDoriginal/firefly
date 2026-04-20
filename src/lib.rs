@@ -114,9 +114,9 @@ mod utils;
 pub(crate) use phases::*;
 
 pub mod prelude {
-    pub use crate::app::{FireflyGizmosPlugin, FireflyGizmoStyle, FireflyPlugin};
+    pub use crate::app::{FireflyGizmoStyle, FireflyGizmosPlugin, FireflyPlugin};
     pub use crate::data::{FireflyConfig, NormalMode};
-    pub use crate::lights::{Core, Falloff, LightHeight, PointLight2d};
+    pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
     pub use crate::{ApplyLightmapLabel, CreateLightmapLabel};

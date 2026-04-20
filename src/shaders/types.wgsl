@@ -26,9 +26,10 @@ struct PointLight {
     // 0 - inverse square, 1 - linear, 2 - none
     falloff: u32,
     falloff_intensity: f32,
-    angle: f32,
 
-    pad: f32,
+    inner_angle: f32,
+    outer_angle: f32,
+
     dir: vec2f, 
 
     z: f32,

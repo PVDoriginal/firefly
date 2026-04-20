@@ -25,11 +25,7 @@ fn setup(mut commands: Commands) {
         // Tonemapping::SomewhatBoringDisplayTransform,
         Hdr::default(),
         Projection::Orthographic(proj),
-        FireflyConfig {
-            // normal maps need to be explicitly enabled
-            normal_mode: NormalMode::TopDown,
-            ..default()
-        },
+        FireflyConfig::default(),
     ));
 
     // commands.spawn((

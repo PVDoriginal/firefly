@@ -133,7 +133,8 @@ fn prepare_config(
             normal_mode: match config.normal_mode {
                 NormalMode::None => 0,
                 NormalMode::Simple => 1,
-                NormalMode::TopDown => 2,
+                NormalMode::TopDownY => 2,
+                NormalMode::TopDownZ => 3,
             },
 
             normal_attenuation: config.normal_attenuation,
