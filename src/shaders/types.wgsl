@@ -71,7 +71,7 @@ struct FireflyConfig {
     ambient_color: vec3f,
     ambient_brightness: f32, 
     light_bands: f32,
-    softness: f32,
+    soft_shadows: u32,
     z_sorting: u32,
     // 0 - none, 1 - simple, 2 - topdown
     normal_mode: u32, 

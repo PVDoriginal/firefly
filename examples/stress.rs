@@ -91,7 +91,7 @@ fn setup(mut commands: Commands) {
             ambient_color: Color::Srgba(PURPLE),
             ambient_brightness: 0.7,
             light_bands: None,
-            softness: None,
+            soft_shadows: false,
             z_sorting: false,
             ..default()
         },

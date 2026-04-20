@@ -65,7 +65,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
     let normal = textureSample(normal_map, texture_sampler, in.uv);
     let stencil = textureSample(sprite_stencil, texture_sampler, in.uv);
-    let soft_angle = config.softness; 
 
     let dist = distance(pos, light.pos);
     
@@ -153,15 +152,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 if result > 0.0 {
                     shadow = shadow_blend(shadow, round_occluders[occluder_index].color, round_occluders[occluder_index].opacity * result);
-                }                    
-                // else if config.softness > 0 && result.extreme_angle < soft_angle {
-                //     shadow = shadow_blend(shadow, round_occluders[index].color, round_occluders[index].opacity * (1f - (result.extreme_angle / soft_angle)));
-                // }
+                }            
             }
             // poly occluder
             else {
-                // res.r = 1.0;
-
                 if stencil.a > 0.1 {
                     if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z {
                         continue;
@@ -186,9 +180,6 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 let result = poly_check(pos, occluder_index, term, rev, min_v, split, length); 
                 accumulated_occlusion = max(accumulated_occlusion, result);
-                // if result > 0.0 {
-                //     shadow = shadow_blend(shadow, poly_occluders[occluder_index].color, poly_occluders[occluder_index].opacity * result);
-                // }
             }
 
             if dot(shadow, shadow) < 0.0001 {
@@ -261,7 +252,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
         }
     }
 
-    if config.softness > 0 && light.core_radius > 0.0 && out_of_bounds {
+    if config.soft_shadows > 0 && light.core_radius > 0.0 && out_of_bounds {
         if rev == 0 {
             let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
             let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
@@ -463,7 +454,7 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
 
     if !rect_line_intersection(p_local, l_local, rect) {
 
-        if config.softness > 0 && light.core_radius > 0.0 {
+        if config.soft_shadows > 0 && light.core_radius > 0.0 {
             return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
         }
 
@@ -520,7 +511,7 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
         }
     }
 
-    if config.softness > 0 && light.core_radius > 0.0 && !half_intersection {
+    if config.soft_shadows > 0 && light.core_radius > 0.0 && !half_intersection {
         return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
     }
 

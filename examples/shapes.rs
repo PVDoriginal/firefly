@@ -46,7 +46,6 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            softness: Some(0.5),
             // light_bands: Some(0.7),
             ..default()
         },
@@ -69,12 +68,6 @@ fn setup(mut commands: Commands) {
         Transform::default(),
     ));
 
-    // occluders
-    // commands.spawn((
-    //     Occluder2d::round_rectangle(100.0, 200.0, 30.0),
-    //     Transform::from_translation(vec3(-322., 164., 0.)),
-    // ));
-
     commands.spawn((
         Occluder2d::polygon(vec![
             vec2(0.0, 0.0),
@@ -86,277 +79,159 @@ fn setup(mut commands: Commands) {
         Transform::from_translation(vec3(-250., 164., 0.)),
     ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-166., 56., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::capsule(30.0, 10.0),
+        Transform::from_translation(vec3(-420., 230., 0.))
+            .with_rotation(Quat::from_rotation_z(0.9)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-417., 106., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-166., 56., 0.)),
+    ));
+
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-417., 106., 0.)),
+    ));
+
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-302., 6.),
+            vec2(-358., 45.),
+            vec2(-329., 81.),
+            vec2(-289., 99.),
+            vec2(-255., 91.),
+            vec2(-237., 33.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
+
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
+        Transform::default(),
+    ));
+
+    commands.spawn((
+        Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
+    ));
+
+    commands.spawn((
+        Occluder2d::polyline(vec![
+            vec2(-97., 108.),
+            vec2(-58., 163.),
+            vec2(-25., 105.),
+            vec2(-109., 53.),
+            vec2(-97., 100.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
     // commands.spawn((
     //     Occluder2d::polygon(vec![
-    //         vec2(-302., 6.),
-    //         vec2(-358., 45.),
-    //         vec2(-329., 81.),
-    //         vec2(-289., 99.),
-    //         vec2(-255., 91.),
-    //         vec2(-237., 33.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
-
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![vec2(50., 100.), vec2(47., 130.), vec2(55., 125.)]).unwrap(),
-    //     Transform::default(),
-    // ));
-
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![vec2(55., 135.), vec2(47., 140.), vec2(55., 155.)]).unwrap(),
-    // ));
-
-    // commands.spawn((
-    //     Occluder2d::polyline(vec![
     //         vec2(-97., 108.),
     //         vec2(-58., 163.),
     //         vec2(-25., 105.),
     //         vec2(-109., 53.),
-    //         vec2(-97., 100.),
+    //         vec2(-37., 105.),
+    //         vec2(-60., 150.),
     //     ])
     //     .unwrap(),
     //     Transform::default(),
     // ));
 
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(-97., 108.),
-    // //         vec2(-58., 163.),
-    // //         vec2(-25., 105.),
-    // //         vec2(-109., 53.),
-    // //         vec2(-37., 105.),
-    // //         vec2(-60., 150.),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default(),
-    // // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-428., 135.),
+            vec2(-482., 158.),
+            vec2(-475., 231.),
+            vec2(-438., 290.),
+            vec2(-388., 299.),
+            vec2(-380., 278.),
+            vec2(-358., 276.),
+            vec2(-342., 208.),
+            vec2(-429., 172.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-428., 135.),
-    //         vec2(-482., 158.),
-    //         vec2(-475., 231.),
-    //         vec2(-438., 290.),
-    //         vec2(-388., 299.),
-    //         vec2(-380., 278.),
-    //         vec2(-358., 276.),
-    //         vec2(-342., 208.),
-    //         vec2(-429., 172.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::circle(23.),
+        Transform::from_translation(vec3(-216., -33., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::circle(23.),
-    //     Transform::from_translation(vec3(-216., -33., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(69., 10.),
+        Transform::from_translation(vec3(-387., 81., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(69., 10.),
-    //     Transform::from_translation(vec3(-387., 81., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::polygon(vec![
+            vec2(-249., 243.),
+            vec2(-262., 163.),
+            vec2(-161., 147.),
+            vec2(-135., 237.),
+            vec2(-216., 261.),
+        ])
+        .unwrap(),
+        Transform::default(),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-249., 243.),
-    //         vec2(-262., 163.),
-    //         vec2(-161., 147.),
-    //         vec2(-135., 237.),
-    //         vec2(-216., 261.),
-    //     ])
-    //     .unwrap(),
-    //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::round_rectangle(53., 38., 23.),
+        Transform::from_translation(vec3(-58., -1., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::round_rectangle(53., 38., 23.),
-    //     Transform::from_translation(vec3(-58., -1., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(16., 76.),
+        Transform::from_translation(vec3(-18., 211., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(16., 76.),
-    //     Transform::from_translation(vec3(-18., 211., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 20.),
+        Transform::from_translation(vec3(-335., 133., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 20.),
-    //     Transform::from_translation(vec3(-335., 133., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(15., 40.),
+        Transform::from_translation(vec3(-258., 278., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(15., 40.),
-    //     Transform::from_translation(vec3(-258., 278., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-203., 91., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-203., 91., 0.)),
-    // ));
+    commands.spawn((
+        Occluder2d::capsule(65., 11.),
+        Transform::from_translation(vec3(-127., -102., 0.))
+            .with_rotation(Quat::from_rotation_z(0.5)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::capsule(65., 11.),
-    //     Transform::from_translation(vec3(-127., -102., 0.))
-    //         .with_rotation(Quat::from_rotation_z(0.5)),
-    // ));
+    commands.spawn((
+        Occluder2d::rectangle(10., 10.),
+        Transform::from_translation(vec3(-109., 210., 0.)),
+    ));
 
-    // commands.spawn((
-    //     Occluder2d::rectangle(10., 10.),
-    //     Transform::from_translation(vec3(-109., 210., 0.)),
-    // ));
+    let spline = CubicCardinalSpline::new_catmull_rom(vec![
+        vec2(0., 0.),
+        vec2(100., 0.),
+        vec2(120., 150.),
+        vec2(54., 120.),
+        vec2(0., 170.),
+    ])
+    .to_curve()
+    .unwrap();
 
-    // let spline = CubicCardinalSpline::new_catmull_rom(vec![
-    //     vec2(0., 0.),
-    //     vec2(100., 0.),
-    //     vec2(120., 150.),
-    //     vec2(54., 120.),
-    //     vec2(0., 170.),
-    // ])
-    // .to_curve()
-    // .unwrap();
+    let samples = 10 * spline.segments().len();
 
-    // let samples = 10 * spline.segments().len();
-
-    // commands.spawn((
-    //     Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
-    //     Transform::from_translation(vec3(-410., -200., 0.)),
-    // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polyline(
-    // //         vec![
-    // //             vec2(0., 0.),
-    // //             vec2(30., -10.),
-    // //             vec2(60., -30.),
-    // //             vec2(30., -3.),
-    // //             vec2(100., 20.),
-    // //             vec2(100., 0.),
-    // //             vec2(120., 150.),
-    // //             vec2(54., 120.),
-    // //             vec2(0., 170.),
-    // //         ]
-    // //         .iter()
-    // //         .rev()
-    // //         .map(|x| *x)
-    // //         .collect(),
-    // //     )
-    // //     .unwrap(),
-    // //     Transform::from_translation(vec3(-210., -200., 0.)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polyline(
-    // //         vec![
-    // //             vec2(100., 20.),
-    // //             vec2(100., 0.),
-    // //             vec2(120., 150.),
-    // //             vec2(54., 120.),
-    // //             vec2(0., 170.),
-    // //         ]
-    // //         .iter()
-    // //         .rev()
-    // //         .map(|x| *x)
-    // //         .collect(),
-    // //     )
-    // //     .unwrap(),
-    // //     Transform::from_translation(vec3(-30., -200., 0.)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(0.0, 5.0),
-    // //         vec2(0.0, 5.0),
-    // //         vec2(5.0, 0.0),
-    // //         vec2(5.0, 0.0),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default(),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polyline(vec![vec2(30.0, 0.0), vec2(35.0, 0.0)]).unwrap(),
-    // //     Transform::default().with_translation(vec3(5.0, 0.0, 0.0)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polyline(vec![vec2(35.0, 0.0), vec2(50.0, 20.0), vec2(60.0, 0.0)]).unwrap(),
-    // //     Transform::default().with_translation(vec3(5.0, 0.0, 0.0)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polyline(vec![vec2(60.0, 0.0), vec2(70.0, -20.0), vec2(85.0, 0.0)]).unwrap(),
-    // //     Transform::default().with_translation(vec3(5.0, 0.0, 0.0)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(0.0, 0.0),
-    // //         vec2(0.0, 10.0),
-    // //         vec2(10.0, 7.0),
-    // //         vec2(10.0, 0.0),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default(),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(0.0, 0.0),
-    // //         vec2(0.0, 7.0),
-    // //         vec2(10.0, 14.0),
-    // //         vec2(10.0, 0.0),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default().with_translation(vec3(10., 0., 0.)),
-    // // ));
-
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(0.0, 7.0),
-    // //         vec2(-5.0, 10.0),
-    // //         vec2(3.0, 20.0),
-    // //         vec2(10.0, 14.0),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default().with_translation(vec3(10., 0., 0.)),
-    // // ));
-
-    // // commands.spawn(
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(0.0, 0.0),
-    // //         vec2(0.0, 30.0),
-    // //         vec2(30.0, 30.0),
-    // //         vec2(30.0, 0.0),
-    // //     ])
-    // //     .unwrap(),
-    // // );
-
-    // // commands.spawn((
-    // //     Occluder2d::polygon(vec![
-    // //         vec2(-20.0, 0.0),
-    // //         vec2(-20.0, 10.0),
-    // //         vec2(-15.0, 50.0),
-    // //         vec2(-20.0, 60.0),
-    // //         vec2(40.0, 60.0),
-    // //         vec2(0.0, 50.0),
-    // //         vec2(6.0, 10.0),
-    // //         vec2(20.0, 0.0),
-    // //     ])
-    // //     .unwrap(),
-    // //     Transform::default(),
-    // ));
+    commands.spawn((
+        Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
+        Transform::from_translation(vec3(-510., -100., 0.)),
+    ));
 }
 
 fn move_light(

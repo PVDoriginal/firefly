@@ -120,9 +120,9 @@ fn prepare_config(
                 Some(x) => x,
             },
 
-            softness: match config.softness {
-                None => 0.,
-                Some(x) => x.min(1.).max(0.),
+            soft_shadows: match config.soft_shadows {
+                true => 1,
+                false => 0,
             },
 
             z_sorting: match config.z_sorting {
@@ -326,7 +326,7 @@ pub(crate) fn prepare_data(
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 false,
-                                camera.5.softness.is_some(),
+                                camera.5.soft_shadows,
                             );
                         } else {
                             let Some(occluder_index) = poly_index.occluder else {
@@ -357,7 +357,7 @@ pub(crate) fn prepare_data(
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 true,
-                                camera.5.softness.is_some(),
+                                camera.5.soft_shadows,
                             );
                         }
                     }

@@ -41,12 +41,8 @@ pub struct FireflyConfig {
 
     /// Whether you want to use soft shadows or not.
     ///
-    /// Softness corresponds to the angle that the soft shadows are stretched over. Should be between 0 and 1 (corresponding to 0 to 90 degress).
-    ///
-    /// **Performance Impact:** Minor.
-    ///
-    /// **Default:** Some(0.7).
-    pub softness: Option<f32>,
+    /// **Default:** true.
+    pub soft_shadows: bool,
 
     /// Whether to use occlusion z-sorting or not.
     ///
@@ -107,7 +103,7 @@ impl Default for FireflyConfig {
             ambient_color: Color::Srgba(WHITE),
             ambient_brightness: 0.0,
             light_bands: None,
-            softness: Some(0.7),
+            soft_shadows: true,
             z_sorting: true,
             normal_mode: NormalMode::None,
             normal_attenuation: 0.5,
@@ -121,7 +117,7 @@ pub struct UniformFireflyConfig {
     pub ambient_color: Vec3,
     pub ambient_brightness: f32,
     pub light_bands: f32,
-    pub softness: f32,
+    pub soft_shadows: u32,
     pub z_sorting: u32,
     pub normal_mode: u32,
     pub normal_attenuation: f32,

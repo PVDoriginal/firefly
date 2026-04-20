@@ -136,7 +136,7 @@ impl Falloff {
     }
 }
 
-#[derive(Clone, Copy, Reflect)]
+#[derive(Clone, Copy, Debug, Reflect)]
 pub struct Core {
     pub radius: f32,
     pub boost: f32,
