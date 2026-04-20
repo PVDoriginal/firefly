@@ -32,27 +32,27 @@ fn setup(mut commands: Commands) {
         },
     ));
 
-    commands.spawn((
-        PointLight2d {
-            inner_range: 1.0,
-            range: 50.0,
-            intensity: 4.0,
-            color: Color::Srgba(RED),
-            falloff_intensity: 5.0,
-            ..default()
-        },
-        Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
-    ));
+    // commands.spawn((
+    //     PointLight2d {
+    //         inner_range: 1.0,
+    //         range: 50.0,
+    //         intensity: 4.0,
+    //         color: Color::Srgba(RED),
+    //         falloff_intensity: 5.0,
+    //         ..default()
+    //     },
+    //     Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
+    // ));
 
-    commands.spawn((
-        PointLight2d {
-            inner_range: 5.0,
-            range: 50.0,
-            intensity: 4.0,
-            color: Color::Srgba(BLUE),
-            falloff_intensity: 5.0,
-            ..default()
-        },
-        Transform::from_translation(vec3(30.0, 0.0, 0.0)),
-    ));
+    // commands.spawn((
+    //     PointLight2d {
+    //         inner_range: 5.0,
+    //         range: 50.0,
+    //         intensity: 4.0,
+    //         color: Color::Srgba(BLUE),
+    //         falloff_intensity: 5.0,
+    //         ..default()
+    //     },
+    //     Transform::from_translation(vec3(30.0, 0.0, 0.0)),
+    // ));
 }

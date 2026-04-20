@@ -8,6 +8,7 @@ use bevy::{
         LogDiagnosticsPlugin, LogDiagnosticsState, SystemInformationDiagnosticsPlugin,
     },
     prelude::*,
+    window::PresentMode,
 };
 use bevy_firefly::prelude::*;
 use rand::{Rng, rng, seq::IndexedRandom};
@@ -18,7 +19,7 @@ struct Timers {
     occluder_timer: Timer,
 }
 
-const LIGHT_FREQ: f32 = 0.3;
+const LIGHT_FREQ: f32 = 0.6;
 const OCCLUDER_FREQ: f32 = 0.04;
 const HEIGHT: f32 = 20000.0;
 const WIDTH: f32 = 40000.0;
@@ -39,7 +40,10 @@ fn main() {
 
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window { ..default() }),
+            primary_window: Some(Window {
+                present_mode: PresentMode::Immediate,
+                ..default()
+            }),
             ..default()
         }),
         FireflyPlugin,
@@ -145,7 +149,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
             PointLight2d {
                 color: *COLORS.map(|c| Color::Srgba(c)).choose(&mut rng).unwrap(),
                 intensity: 1.,
-                range: r,
+                radius: r,
                 // cast_shadows: false,
                 ..default()
             },
@@ -167,7 +171,7 @@ fn move_lights(
         if r <= MOVE_FREQ {
             transform.translation.y -= time.delta_secs() * 600.0;
 
-            if transform.translation.y + light.range < -HEIGHT / 2.0 {
+            if transform.translation.y + light.radius < -HEIGHT / 2.0 {
                 commands.entity(id).despawn();
             }
         }

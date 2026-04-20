@@ -12,22 +12,32 @@
 struct PointLight {
     pos: vec2f,
     intensity: f32,
-    range: f32,
+    radius: f32,
 
     color: vec4f, 
 
-    inner_range: f32,
-    // 0 - inverse square, 1 - linear
+    core_radius: f32,
+    core_boost: f32, 
+    // 0 - inverse square, 1 - linear, 2 - none
+    core_falloff: u32, 
+    core_falloff_intensity: f32,
+
+
+    // 0 - inverse square, 1 - linear, 2 - none
     falloff: u32,
     falloff_intensity: f32,
     angle: f32,
+
+    pad: f32,
     dir: vec2f, 
+
     z: f32,
     height: f32,
+    
 }
 
 struct PolyOccluder {
-    vertex_start: u32,
+    start_vertex: u32,
     n_vertices: u32,
     z: f32,
     @size(16)
@@ -37,8 +47,9 @@ struct PolyOccluder {
 }
 
 struct OccluderPointer {
-    index: u32, 
+    index: u32,
     min_v: u32,
+    split: u32, 
     length: u32, 
     distance: f32,
 }
@@ -67,15 +78,9 @@ struct FireflyConfig {
     normal_attenuation: f32,
 }
 
-// Should correspond to the values in buffers.rs!
+// Should correspond to the value in buffers.rs!
 const N_BINS: u32 = 128;
-const N_OCCLUDERS: u32 = 32; 
 
-struct Bin {
-    occluders: array<OccluderPointer, N_OCCLUDERS>,
-    n_occluders: u32,
-}
-
-struct BinCounts {
-    counts: array<u32, N_BINS>,
+struct BinIndices {
+    indices: array<u32, N_BINS + 1>,
 }

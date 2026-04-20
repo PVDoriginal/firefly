@@ -26,7 +26,7 @@ use bevy::{
 };
 
 use crate::{
-    buffers::{Bin, BinCounts, N_BINS},
+    buffers::{BinIndices, OccluderPointer},
     data::UniformFireflyConfig,
     lights::UniformPointLight,
     occluders::{UniformOccluder, UniformRoundOccluder},
@@ -37,12 +37,12 @@ pub struct PipelinePlugin;
 
 impl Plugin for PipelinePlugin {
     fn build(&self, app: &mut App) {
-        load_shader_library!(app, "../shaders/types.wgsl");
-        load_shader_library!(app, "../shaders/utils.wgsl");
+        load_shader_library!(app, "shaders/types.wgsl");
+        load_shader_library!(app, "shaders/utils.wgsl");
 
-        embedded_asset!(app, "../shaders/create_lightmap.wgsl");
-        embedded_asset!(app, "../shaders/apply_lightmap.wgsl");
-        embedded_asset!(app, "../shaders/sprite.wgsl");
+        embedded_asset!(app, "shaders/create_lightmap.wgsl");
+        embedded_asset!(app, "shaders/apply_lightmap.wgsl");
+        embedded_asset!(app, "shaders/sprite.wgsl");
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -96,16 +96,16 @@ fn init_lightmap_creation_pipeline(
                 (4, storage_buffer_read_only::<UniformOccluder>(false)),
                 // vertices
                 (5, storage_buffer_read_only::<Vec2>(false)),
+                // occluders
+                (6, storage_buffer_read_only::<OccluderPointer>(false)),
                 // bins
-                (6, storage_buffer_read_only::<[Bin; N_BINS]>(false)),
-                (7, storage_buffer_read_only::<BinCounts>(false)),
+                (7, storage_buffer_read_only::<BinIndices>(false)),
                 // sprite stencil
                 (8, texture_2d(TextureSampleType::Float { filterable: true })),
                 // sprite normal map
                 (9, texture_2d(TextureSampleType::Float { filterable: true })),
                 // config,
                 (10, uniform_buffer::<UniformFireflyConfig>(false)),
-                // bins,
             ),
         ),
     );
@@ -137,7 +137,7 @@ fn init_lightmap_creation_pipeline(
         lut_layout,
         sampler,
         vertex_state,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/create_lightmap.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/create_lightmap.wgsl"),
     });
 }
 
@@ -251,8 +251,8 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
                     format,
                     blend: Some(BlendState {
                         color: BlendComponent {
-                            src_factor: BlendFactor::Src,
-                            dst_factor: BlendFactor::Dst,
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::One,
                             operation: BlendOperation::Max,
                         },
                         alpha: BlendComponent::REPLACE,
@@ -309,7 +309,7 @@ fn init_lightmap_application_pipeline(
         layout,
         sampler,
         vertex_state,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/apply_lightmap.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/apply_lightmap.wgsl"),
     });
 }
 
@@ -397,7 +397,7 @@ fn init_sprite_pipeline(mut commands: Commands, asset_server: Res<AssetServer>) 
     commands.insert_resource(SpritePipeline {
         view_layout,
         material_layout,
-        shader: load_embedded_asset!(asset_server.as_ref(), "../shaders/sprite.wgsl"),
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/sprite.wgsl"),
     });
 }
 
@@ -500,12 +500,12 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 entry_point: Some("fragment".into()),
                 targets: vec![
                     Some(ColorTargetState {
-                        format: TextureFormat::Rgba32Float, //format,
+                        format: TextureFormat::Rgba16Float, //format,
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     }),
                     Some(ColorTargetState {
-                        format: TextureFormat::Rgba32Float,
+                        format: TextureFormat::Rgba16Float,
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     }),

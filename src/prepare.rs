@@ -1,10 +1,11 @@
 //! Module that prepares BindGroups for GPU use.
 
-use std::f32::consts::PI;
+use core::f32;
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use crate::{
     LightmapPhase, NormalMapTexture, SpriteStencilTexture,
-    buffers::{BinBuffer, BufferManager, OccluderPointer, VertexBuffer},
+    buffers::{BinBuffer, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
     data::{ExtractedWorldData, NormalMode},
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
@@ -179,7 +180,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba32Float,
+                format: TextureFormat::Rgba16Float,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
@@ -193,7 +194,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba32Float,
+                format: TextureFormat::Rgba16Float,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
@@ -265,8 +266,8 @@ pub(crate) fn prepare_data(
                     light_pointer.0.write_buffer(&render_device, &render_queue);
 
                     let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
-                        min: light.pos - light.range,
-                        max: light.pos + light.range,
+                        min: light.pos - light.radius,
+                        max: light.pos + light.radius,
                     });
 
                     let light_aabb = Aabb2d {
@@ -275,11 +276,6 @@ pub(crate) fn prepare_data(
                     };
 
                     bins.reset();
-
-                    let softness = match camera.5.softness {
-                        None => 0.0,
-                        Some(x) => x.clamp(0.0, 1.0),
-                    };
 
                     for (occluder, round_index, poly_index) in &occluders {
                         if !light.cast_shadows || !occluder.aabb.intersects(&light_aabb) {
@@ -301,7 +297,6 @@ pub(crate) fn prepare_data(
                                 vec2(-width / 2.0 - radius, height / 2.0 + radius),
                                 vec2(width / 2.0 + radius, height / 2.0 + radius),
                                 vec2(width / 2.0 + radius, -height / 2.0 - radius),
-                                vec2(-width / 2.0 - radius, -height / 2.0 - radius),
                             ];
 
                             let isometry = Isometry2d {
@@ -325,12 +320,13 @@ pub(crate) fn prepare_data(
                                 bins,
                                 vertices,
                                 light.pos,
+                                light.core.radius,
                                 0,
                                 occluder_index.index as u32,
-                                softness,
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 false,
+                                camera.5.softness.is_some(),
                             );
                         } else {
                             let Some(occluder_index) = poly_index.occluder else {
@@ -355,12 +351,13 @@ pub(crate) fn prepare_data(
                                 bins,
                                 occluder.vertices(),
                                 light.pos,
+                                light.core.radius,
                                 vertex_index.index as u32,
                                 occluder_index.index as u32,
-                                softness,
                                 closest.distance(light.pos),
                                 light_inside_occluder,
                                 true,
+                                camera.5.softness.is_some(),
                             );
                         }
                     }
@@ -380,7 +377,7 @@ pub(crate) fn prepare_data(
                                 poly_occluders.binding(),
                                 vertices.binding(),
                                 bins.bin_binding(),
-                                bins.bin_count_binding(),
+                                bins.bin_indices_binding(),
                                 &camera.2.0.default_view,
                                 &camera.3.0.default_view,
                                 camera.4.0.binding().unwrap(),
@@ -406,16 +403,32 @@ pub(crate) fn prepare_data(
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct OccluderSlice {
-    pub start: u32,
+    pub start_index: usize,
+    pub start_vertex: u32,
+
+    pub split: Option<u32>,
     pub length: u32,
-    pub term: u32,
 
     pub start_angle: f32,
-    pub end_angle: f32,
+    pub angle: f32,
 }
 
+impl OccluderSlice {
+    fn new(index: usize, vertex: &Vertex) -> Self {
+        OccluderSlice {
+            start_index: index,
+            start_vertex: vertex.index,
+            split: None,
+            length: 1,
+            start_angle: vertex.angle,
+            angle: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 struct Vertex {
     pub index: u32,
     pub angle: f32,
@@ -425,114 +438,213 @@ fn push_vertices(
     bins: &mut BinBuffer,
     occluder_vertices: Vec<Vec2>,
     light_pos: Vec2,
+    light_radius: f32,
     start_vertex: u32,
     index: u32,
-    softness: f32,
     distance: f32,
     rev: bool,
     poly: bool,
+    soft_shadows: bool,
 ) {
-    let mut push_slice = |slice: &OccluderSlice| {
-        if slice.length > 1 {
-            let rev: u32 = match rev {
-                true => 1,
-                false => 0,
-            };
-
-            let index = match poly {
-                true => (1 << 31) | (slice.term << 29) | (rev << 28) | index as u32,
-                false => (0 << 31) | index as u32,
-            };
-
-            let occluder = OccluderPointer {
-                index,
-                min_v: slice.start + start_vertex,
-                length: slice.length,
-                distance,
-            };
-
-            match slice.term {
-                0 => bins.add_occluder(
-                    occluder,
-                    slice.start_angle - softness,
-                    slice.end_angle + softness,
-                ),
-                1 => bins.add_occluder(occluder, slice.start_angle - softness, PI),
-                2 => bins.add_occluder(occluder, -PI, slice.end_angle + softness),
-                _ => {}
-            }
-        }
-    };
+    // info!("pushing vertices: {occluder_vertices:?}");
+    // info!("start vertex: {start_vertex}");
 
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
         index: i as u32,
         angle: (v.y - light_pos.y).atan2(v.x - light_pos.x),
     });
 
-    let vertices: Vec<_> = if !rev {
+    let mut vertices: Vec<_> = if !rev {
         vertices.collect()
     } else {
         vertices.rev().collect()
     };
 
+    let mut round_occlusion = false;
+
+    loop {
+        let last = vertices.last().unwrap().angle;
+        let vertex = vertices.first().unwrap().angle;
+
+        let loops = (vertex - last).abs() > PI;
+
+        if (!loops && vertex < last) || (loops && vertex > last) {
+            break;
+        }
+
+        vertices.rotate_right(1);
+
+        if rev && vertices.last().unwrap().index == 0 {
+            round_occlusion = true;
+            break;
+        }
+
+        // info!("{vertices:?}");
+    }
+
+    let index = match poly {
+        true => (1 << 31) | index as u32,
+        false => (0 << 31) | index as u32,
+    };
+
+    let mut edges: Vec<OccluderData> = vec![];
+    // info!("");
+    // info!("---------");
+    let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
+        if slice.length > 1 {
+            let rev: u32 = match rev {
+                true => 1,
+                false => 0,
+            };
+
+            // info!("pushing {slice:?}! poly: {poly}");
+
+            // info!(
+            //     "slice start: {}, slice length: {}",
+            //     slice.start_vertex, slice.length
+            // );
+
+            let min_v = (rev << 29) | slice.start_vertex + start_vertex;
+            let length = slice.length;
+
+            let angle_left = if !soft_shadows || light_radius <= 0.0 {
+                0.0
+            } else {
+                let left = occluder_vertices[vertices[slice.start_index as usize].index as usize];
+                (light_pos - left)
+                    .normalize()
+                    .dot(
+                        (light_pos
+                            + Vec2::from_angle(FRAC_PI_2)
+                                .rotate(left - light_pos)
+                                .normalize()
+                                * light_radius
+                            - left)
+                            .normalize(),
+                    )
+                    .acos()
+            };
+
+            let angle_right = if !soft_shadows || light_radius <= 0.0 {
+                0.0
+            } else {
+                let right = occluder_vertices[vertices
+                    [slice.start_index as usize + slice.length as usize - 1]
+                    .index as usize];
+                (light_pos - right)
+                    .normalize()
+                    .dot(
+                        (light_pos
+                            + Vec2::from_angle(FRAC_PI_2)
+                                .rotate(right - light_pos)
+                                .normalize()
+                                * light_radius
+                            - right)
+                            .normalize(),
+                    )
+                    .acos()
+            };
+
+            match slice.split {
+                None => {
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v,
+                            split: 0,
+                            length,
+                            distance,
+                        },
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
+                    });
+                }
+                Some(split) => {
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v: (1 << 30) | min_v,
+                            split,
+                            length,
+                            distance,
+                        },
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
+                    });
+                    edges.push(OccluderData {
+                        pointer: OccluderPointer {
+                            index,
+                            min_v: (2 << 30) | min_v,
+                            split,
+                            length,
+                            distance,
+                        },
+                        min_angle: slice.start_angle - angle_left,
+                        angle: slice.angle + angle_left + angle_right,
+                    });
+                }
+            }
+        }
+    };
+
     let mut last: Option<&Vertex> = None;
     let mut slice: OccluderSlice = default();
 
-    for vertex in &vertices {
-        if let Some(last) = last {
-            let loops = (vertex.angle - last.angle).abs() > PI;
+    if !round_occlusion {
+        for (index, vertex) in vertices.iter().enumerate() {
+            if let Some(last) = last {
+                let loops = (vertex.angle - last.angle).abs() > PI;
 
-            // if the next vertex is decreasing
-            if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
-                push_slice(&slice);
-                slice = OccluderSlice {
-                    start: vertex.index,
-                    length: 1,
-                    term: 0,
-                    start_angle: vertex.angle,
-                    end_angle: vertex.angle,
-                };
-            }
-            // if the next vertex is increasing, simple case
-            else if !loops && vertex.angle > last.angle {
-                if slice.length == 0 {
-                    slice.start = vertex.index;
+                // if the next vertex is decreasing
+                if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
+                    push_slice(&slice, &vertices);
+                    slice = OccluderSlice::new(index, vertex);
                 }
-                slice.length += 1;
-                slice.end_angle = vertex.angle;
-            }
-            // if the next vertex is increasing and loops over
-            else {
-                if slice.length == 0 {
-                    slice.start = vertex.index;
+                // if the next vertex is increasing, simple case
+                else if !loops && vertex.angle > last.angle {
+                    slice.length += 1;
+                    slice.angle += vertex.angle - last.angle;
                 }
-                slice.length += 1;
-                slice.term = 1;
+                // if the next vertex is increasing and loops over
+                else {
+                    slice.split = Some(slice.length);
+                    slice.length += 1;
 
-                push_slice(&slice);
-
-                slice = OccluderSlice {
-                    start: last.index,
-                    length: 2,
-                    term: 2,
-                    start_angle: last.angle,
-                    end_angle: vertex.angle,
-                };
+                    slice.angle += vertex.angle - last.angle + TAU;
+                }
+            } else {
+                slice = OccluderSlice::new(index, vertex);
             }
-        } else {
-            slice = OccluderSlice {
-                start: vertex.index,
-                length: 1,
-                term: 0,
-                start_angle: vertex.angle,
-                end_angle: vertex.angle,
-            };
+
+            last = Some(vertex);
         }
 
-        last = Some(vertex);
+        push_slice(&slice, &vertices);
+    } else {
+        vertices.push(vertices[0]);
+        for (index, vertex) in vertices.iter().enumerate() {
+            if let Some(last) = last {
+                let loops = (vertex.angle - last.angle).abs() > PI;
+
+                if !loops {
+                    slice.length += 1;
+                    slice.angle += vertex.angle - last.angle;
+                } else {
+                    slice.split = Some(slice.length);
+                    slice.length += 1;
+
+                    slice.angle += vertex.angle - last.angle + TAU;
+                }
+            } else {
+                slice = OccluderSlice::new(index, vertex);
+            }
+
+            last = Some(vertex);
+        }
+        push_slice(&slice, &vertices);
     }
 
-    push_slice(&slice);
+    bins.add_occluder(edges);
 }
 
 fn prepare_light_luts(
