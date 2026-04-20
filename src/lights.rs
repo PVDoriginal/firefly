@@ -62,24 +62,14 @@ pub struct PointLight2d {
     pub intensity: f32,
 
     /// Outer range of the point light.
-    pub range: f32,
-
-    /// Inner range of the point light. Should be less than the normal range.
-    ///
-    /// The light will have no falloff (full intensity) within this range.
-    ///
-    /// **Default:** 0.
-    pub inner_range: f32,
+    pub radius: f32,
 
     /// Type of falloff for this light.
     ///
     /// **Default:** [InverseSquare](Falloff::InverseSquare).
     pub falloff: Falloff,
 
-    /// The intensity of this light's falloff effect.
-    ///
-    /// **Default:** 1.
-    pub falloff_intensity: f32,
+    pub core: Core,
 
     /// Angle in degrees of the point light. Between 0 and 360.
     ///
@@ -123,9 +113,42 @@ pub struct LightHeight(pub f32);
 #[derive(Clone, Copy, Reflect)]
 pub enum Falloff {
     /// The intensity decreases inversely proportial to the square distance towards the inner light source.  
-    InverseSquare,
+    InverseSquare {
+        intensity: f32,
+    },
     /// The intensity decreases linearly with the distance towards the inner light source.
-    Linear,
+    Linear {
+        intensity: f32,
+    },
+
+    None,
+}
+
+impl Falloff {
+    pub fn intensity(&self) -> f32 {
+        match *self {
+            Falloff::InverseSquare { intensity } => intensity,
+            Falloff::Linear { intensity } => intensity,
+            Falloff::None => 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Reflect)]
+pub struct Core {
+    pub radius: f32,
+    pub boost: f32,
+    pub falloff: Falloff,
+}
+
+impl Default for Core {
+    fn default() -> Self {
+        Core {
+            radius: 0.0,
+            boost: 5.0,
+            falloff: Falloff::InverseSquare { intensity: 0.0 },
+        }
+    }
 }
 
 impl Default for PointLight2d {
@@ -133,10 +156,9 @@ impl Default for PointLight2d {
         Self {
             color: bevy::prelude::Color::Srgba(WHITE),
             intensity: 1.,
-            range: 100.,
-            inner_range: 0.,
-            falloff: Falloff::InverseSquare,
-            falloff_intensity: 0.0,
+            radius: 100.,
+            falloff: Falloff::InverseSquare { intensity: 0.0 },
+            core: default(),
             angle: 360.0,
             cast_shadows: true,
             offset: Vec3::ZERO,
@@ -151,10 +173,9 @@ pub struct ExtractedPointLight {
     pub pos: Vec2,
     pub color: Color,
     pub intensity: f32,
-    pub range: f32,
-    pub inner_range: f32,
+    pub radius: f32,
     pub falloff: Falloff,
-    pub falloff_intensity: f32,
+    pub core: Core,
     pub angle: f32,
     pub cast_shadows: bool,
     pub dir: Vec2,
@@ -165,7 +186,7 @@ pub struct ExtractedPointLight {
 
 impl PartialEq for ExtractedPointLight {
     fn eq(&self, other: &Self) -> bool {
-        self.pos == other.pos && self.range == other.range
+        self.pos == other.pos && self.radius == other.radius
     }
 }
 
@@ -175,14 +196,20 @@ impl PartialEq for ExtractedPointLight {
 pub struct UniformPointLight {
     pub pos: Vec2,
     pub intensity: f32,
-    pub range: f32,
+    pub radius: f32,
 
     pub color: Vec4,
-    pub inner_range: f32,
+
+    pub core_radius: f32,
+    pub core_boost: f32,
+    pub core_falloff: u32,
+    pub core_falloff_intensity: f32,
+
     pub falloff: u32,
     pub falloff_intensity: f32,
     pub angle: f32,
 
+    pub pad: f32,
     pub dir: Vec2,
 
     pub z: f32,

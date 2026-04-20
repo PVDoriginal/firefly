@@ -127,9 +127,9 @@ fn rotate_90_cc(p: vec2f) -> vec2f{
     return vec2f(p.y, -p.x);
 }
 
-const PI2: f32 = 6.28318530718;
-const PI: f32 = 3.14159265359;
-const PIDIV2: f32 = 1.57079632679; 
+const PI2: f32 = 6.28318530717958647692528676655900577;
+const PI: f32 = 3.14159265358979323846264338327950288;
+const PIDIV2: f32 = 1.57079632679489661923132169163975144; 
 
 // checks if x is between a and b, all being arctan angles 
 fn between_arctan(x: f32, a: f32, b: f32) -> bool {
@@ -210,32 +210,46 @@ fn rect_line_intersection(a: vec2f, b: vec2f, rect: vec4f) -> bool {
     return t_min <= t_max;
 }
 
-fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, is_vertical: bool) -> bool {
+fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, is_vertical: bool) -> IntersectsEdge {
     let d = l - p;
+
+    var res: IntersectsEdge;
     
     if (is_vertical) {
         // Vertical edge (fixed x)
-        if (abs(d.x) < 1e-6) { return false; } 
-        let t = (coord - p.x) / d.x;
-        if (t >= 0.0 && t <= 1.0) {
-            let y_hit = p.y + t * d.y;
-            return y_hit >= min_v && y_hit <= max_v;
+        // if (abs(d.x) < 1e-6) { return res; } 
+        let t = (coord - p.x) / d.x; 
+        let y_hit = p.y + t * d.y;
+        
+        if y_hit >= min_v && y_hit <= max_v && t <= 1.0 {
+            res.half_intersection = true;
+            res.full_intersection = t >= 0.0 && t <= 1.0;
         }
     } else {
         // Horizontal edge (fixed y)
-        if (abs(d.y) < 1e-6) { return false; }
-        let t = (coord - p.y) / d.y;
-        if (t >= 0.0 && t <= 1.0) {
-            let x_hit = p.x + t * d.x;
-            return x_hit >= min_v && x_hit <= max_v;
+        // if (abs(d.y) < 1e-6) { return res; }
+        let t = (coord - p.y) / d.y; 
+        let x_hit = p.x + t * d.x;
+        
+        if x_hit >= min_v && x_hit <= max_v && t <= 1.0 {
+            res.half_intersection = true;
+            res.full_intersection = t >= 0.0 && t <= 1.0;
         }
     }
-    return false;
+    return res;
+}
+
+struct IntersectsEdge {
+    full_intersection: bool,
+    half_intersection: bool,
 }
 
 // Checks intersection between line segment [p1, p2] and a 90-degree arc 
 // c: center of the arc, r: radius, quadrant: a vec2 indicating which corner (+1 or -1)
-fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f) -> bool {
+fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f) -> IntersectsEdge {
+
+    var res: IntersectsEdge;
+
     let d = p2 - p1;
     let f = p1 - c;
 
@@ -247,7 +261,7 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
     let discriminant = b_quad * b_quad - 4.0 * a_quad * c_quad;
 
     if (discriminant < 0.0) {
-        return false; // No intersection with the infinite circle
+        return res; // No intersection with the infinite circle
     }
 
     let sqrt_d = sqrt(discriminant);
@@ -263,15 +277,18 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
             let hit_point = p1 + t * d;
             let local_hit = hit_point - c;
             
+            res.half_intersection = true; 
+
             // Fast Quadrant Check: Instead of atan2, just check the sign of the vector components
             // If quadrant is vec2(1, 1), we check if local_hit.x > 0 and local_hit.y > 0
-            if (sign(local_hit.x) == quadrant.x && sign(local_hit.y) == quadrant.y) {
-                return true;
+            if sign(local_hit.x) == quadrant.x && sign(local_hit.y) == quadrant.y {
+                res.full_intersection = true;
+                return res; 
             }
         }
     }
 
-    return false;
+    return res;
 }
 
 // checks if the half-segment [a, b] ending in a intersects the [c, d] segment
@@ -280,4 +297,16 @@ fn intersects_half(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> bo
     let on_ab = dot(p - a, b - a) > 0;
     let on_cd = dot(p - c, d - c) > 0 && dot(p - d, c - d) > 0;
     return on_ab && on_cd; 
+}
+
+fn falloff(x: f32, falloff: u32, falloff_intensity: f32) -> f32 {
+    if falloff == 0 {
+        let x2 = x * x; 
+        return ((1.0 - x2) * (1.0 - x2) / (1.0 + falloff_intensity * x2));
+    }
+    else if falloff == 1 { 
+        return ((1.0 - x) / (1.0 + falloff_intensity * x));
+    }
+    
+    return 1.0;
 }

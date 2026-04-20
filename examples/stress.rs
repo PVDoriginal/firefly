@@ -149,7 +149,7 @@ fn spawn_lights(mut commands: Commands, mut timers: ResMut<Timers>, time: Res<Ti
             PointLight2d {
                 color: *COLORS.map(|c| Color::Srgba(c)).choose(&mut rng).unwrap(),
                 intensity: 1.,
-                range: r,
+                radius: r,
                 // cast_shadows: false,
                 ..default()
             },
@@ -171,7 +171,7 @@ fn move_lights(
         if r <= MOVE_FREQ {
             transform.translation.y -= time.delta_secs() * 600.0;
 
-            if transform.translation.y + light.range < -HEIGHT / 2.0 {
+            if transform.translation.y + light.radius < -HEIGHT / 2.0 {
                 commands.entity(id).despawn();
             }
         }

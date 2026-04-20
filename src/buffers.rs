@@ -182,18 +182,27 @@ fn prepare_lights(
         let light = UniformPointLight {
             pos: light.pos,
             intensity: light.intensity,
-            range: light.range,
+            radius: light.radius,
             color: light.color.to_linear().to_vec4(),
             z: light.z,
-            inner_range: light.inner_range.min(light.range),
-            falloff: match light.falloff {
-                Falloff::InverseSquare => 0,
-                Falloff::Linear => 1,
+            core_radius: light.core.radius,
+            core_boost: light.core.boost,
+            core_falloff: match light.core.falloff {
+                Falloff::InverseSquare { .. } => 0,
+                Falloff::Linear { .. } => 1,
+                Falloff::None => 2,
             },
-            falloff_intensity: light.falloff_intensity,
+            core_falloff_intensity: light.core.falloff.intensity(),
+            falloff: match light.falloff {
+                Falloff::InverseSquare { .. } => 0,
+                Falloff::Linear { .. } => 1,
+                Falloff::None => 2,
+            },
+            falloff_intensity: light.falloff.intensity(),
             angle: light.angle / 180. * PI,
             dir: light.dir,
             height: light.height,
+            pad: 0.0,
         };
 
         let new_index =
@@ -470,6 +479,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 
 /// The amount of bins that each [`Bins`] will have.
 pub const N_BINS: usize = 128;
+pub const N_BINS_FLOAT: f32 = 128.0;
 
 /// A component that each light has, containing sets of bins of occluders for faster iteration.
 /// This is the most important acceleration structure used by Firefly. It is used in a custom
@@ -510,8 +520,6 @@ impl Default for BinBuffer {
 }
 
 impl BinBuffer {
-    const N_BINS: f32 = N_BINS as f32;
-
     /// Get the binding of the bins. It is guaranteed to exist.
     pub fn bin_binding(&self) -> BindingResource<'_> {
         self.buffer.binding().unwrap()
@@ -559,6 +567,7 @@ impl BinBuffer {
         // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
 
         for edge in edges {
+            // info!("min angle: {}, angle: {}", edge.min_angle, edge.angle);
             if edge.angle.ceil() >= TAU {
                 self.add_to_bins(0, N_BINS - 1, edge.pointer);
                 continue;
@@ -572,13 +581,10 @@ impl BinBuffer {
                 edge.min_angle
             };
 
-            // info!("min angle: {min_angle}");
+            let min_bin = (((min_angle + PI) / TAU) * N_BINS_FLOAT).floor() as usize;
+            let n_bins = ((edge.angle / TAU) * N_BINS_FLOAT).ceil() as usize;
 
-            let min_bin = (((min_angle + PI) / TAU) * Self::N_BINS).floor() as usize;
-            let n_bins = ((edge.angle / TAU) * Self::N_BINS).ceil() as usize;
-
-            // info!("min bin: {min_bin}");
-            // info!("n_bins; {n_bins}");
+            // info!("min bin: {min_bin}, n_bins: {n_bins}");
 
             // self.add_to_bins(0, N_BINS - 1, edge.pointer);
             if min_bin + n_bins >= N_BINS {

@@ -266,8 +266,8 @@ pub(crate) fn prepare_data(
                     light_pointer.0.write_buffer(&render_device, &render_queue);
 
                     let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
-                        min: light.pos - light.range,
-                        max: light.pos + light.range,
+                        min: light.pos - light.radius,
+                        max: light.pos + light.radius,
                     });
 
                     let light_aabb = Aabb2d {
@@ -297,7 +297,6 @@ pub(crate) fn prepare_data(
                                 vec2(-width / 2.0 - radius, height / 2.0 + radius),
                                 vec2(width / 2.0 + radius, height / 2.0 + radius),
                                 vec2(width / 2.0 + radius, -height / 2.0 - radius),
-                                vec2(-width / 2.0 - radius, -height / 2.0 - radius),
                             ];
 
                             let isometry = Isometry2d {
@@ -321,7 +320,7 @@ pub(crate) fn prepare_data(
                                 bins,
                                 vertices,
                                 light.pos,
-                                light.inner_range,
+                                light.core.radius,
                                 0,
                                 occluder_index.index as u32,
                                 closest.distance(light.pos),
@@ -352,7 +351,7 @@ pub(crate) fn prepare_data(
                                 bins,
                                 occluder.vertices(),
                                 light.pos,
-                                light.inner_range,
+                                light.core.radius,
                                 vertex_index.index as u32,
                                 occluder_index.index as u32,
                                 closest.distance(light.pos),
@@ -447,6 +446,7 @@ fn push_vertices(
     poly: bool,
     soft_shadows: bool,
 ) {
+    // info!("pushing vertices: {occluder_vertices:?}");
     // info!("start vertex: {start_vertex}");
 
     let vertices = occluder_vertices.iter().enumerate().map(|(i, v)| Vertex {
@@ -497,7 +497,7 @@ fn push_vertices(
                 false => 0,
             };
 
-            // info!("pushing {slice:?}!");
+            // info!("pushing {slice:?}! poly: {poly}");
 
             // info!(
             //     "slice start: {}, slice length: {}",
@@ -507,7 +507,7 @@ fn push_vertices(
             let min_v = (rev << 29) | slice.start_vertex + start_vertex;
             let length = slice.length;
 
-            let angle_left = if !soft_shadows {
+            let angle_left = if !soft_shadows || light_radius <= 0.0 {
                 0.0
             } else {
                 let left = occluder_vertices[vertices[slice.start_index as usize].index as usize];
@@ -525,7 +525,7 @@ fn push_vertices(
                     .acos()
             };
 
-            let angle_right = if !soft_shadows {
+            let angle_right = if !soft_shadows || light_radius <= 0.0 {
                 0.0
             } else {
                 let right = occluder_vertices[vertices

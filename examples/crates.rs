@@ -71,7 +71,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Sprite::from_image(asset_server.load("bonfire.png")),
         PointLight2d {
             intensity: 3.,
-            range: 100.,
+            radius: 100.,
             color: Color::srgb(1.0, 0.8, 0.6),
             ..default()
         },
@@ -86,7 +86,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_translation(vec3(20., 0., 0.)),
         PointLight2d {
             intensity: 5.,
-            range: 100.,
+            radius: 100.,
             color: Color::srgb(0.8, 0.8, 1.0),
             offset: vec3(0., 22., 0.),
             ..default()

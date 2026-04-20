@@ -99,8 +99,8 @@ fn mark_visible_lights(
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
 
         let light_aabb = Aabb2d {
-            min: pos - light.range,
-            max: pos + light.range,
+            min: pos - light.radius,
+            max: pos + light.radius,
         };
 
         if light_aabb.intersects(&camera_aabb) {
@@ -116,8 +116,8 @@ fn mark_visible_lights(
             light_rect.0 = light_rect
                 .0
                 .union(camera_rect.union_point(pos).intersect(Rect {
-                    min: pos - light.range,
-                    max: pos + light.range,
+                    min: pos - light.radius,
+                    max: pos + light.radius,
                 }));
         }
 

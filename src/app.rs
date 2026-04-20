@@ -108,8 +108,8 @@ fn draw_gizmos(
     for (transform, light) in lights {
         let isometry = Isometry2d::from_translation(transform.translation().xy());
 
-        gizmos.circle_2d(isometry, light.inner_range, style.light_inner_color);
-        gizmos.circle_2d(isometry, light.range, style.light_outer_color);
+        gizmos.circle_2d(isometry, light.core.radius, style.light_inner_color);
+        gizmos.circle_2d(isometry, light.radius, style.light_outer_color);
     }
 
     for (transform, occluder) in &occluders {

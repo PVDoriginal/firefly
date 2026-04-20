@@ -12,18 +12,28 @@
 struct PointLight {
     pos: vec2f,
     intensity: f32,
-    range: f32,
+    radius: f32,
 
     color: vec4f, 
 
-    inner_range: f32,
-    // 0 - inverse square, 1 - linear
+    core_radius: f32,
+    core_boost: f32, 
+    // 0 - inverse square, 1 - linear, 2 - none
+    core_falloff: u32, 
+    core_falloff_intensity: f32,
+
+
+    // 0 - inverse square, 1 - linear, 2 - none
     falloff: u32,
     falloff_intensity: f32,
     angle: f32,
+
+    pad: f32,
     dir: vec2f, 
+
     z: f32,
     height: f32,
+    
 }
 
 struct PolyOccluder {
@@ -72,5 +82,5 @@ struct FireflyConfig {
 const N_BINS: u32 = 128;
 
 struct BinIndices {
-    indices: array<u32, N_BINS>,
+    indices: array<u32, N_BINS + 1>,
 }
