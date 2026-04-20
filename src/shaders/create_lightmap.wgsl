@@ -161,7 +161,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             // round occluder
             if occluder_type == 0 {
                 if stencil.a > 0.1 {
-                    if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= round_occluders[occluder_index].z {
+                    if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= f32(f16(round_occluders[occluder_index].z)) {
                         continue;
                     }
                 }
