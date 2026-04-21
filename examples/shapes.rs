@@ -53,8 +53,8 @@ fn setup(mut commands: Commands) {
             intensity: 7.0,
             radius: 450.0,
             core: LightCore {
-                radius: 100.0,
-                boost: 50.0,
+                radius: 30.0,
+                boost: 10.0,
                 ..default()
             },
             ..default()
