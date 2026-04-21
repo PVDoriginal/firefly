@@ -9,7 +9,7 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()));
-    app.add_plugins((FireflyPlugin, FireflyGizmosPlugin));
+    app.add_plugins(FireflyPlugin);
 
     app.add_systems(Startup, setup);
 
@@ -22,33 +22,30 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         Camera2d,
-        // Tonemapping::SomewhatBoringDisplayTransform,
         Hdr::default(),
         Projection::Orthographic(proj),
         FireflyConfig::default(),
     ));
 
-    // commands.spawn((
-    //     PointLight2d {
-    //         inner_range: 1.0,
-    //         range: 50.0,
-    //         intensity: 4.0,
-    //         color: Color::Srgba(RED),
-    //         falloff_intensity: 5.0,
-    //         ..default()
-    //     },
-    //     Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
-    // ));
+    commands.spawn((
+        PointLight2d {
+            radius: 50.0,
+            intensity: 4.0,
+            color: Color::Srgba(RED),
+            core: LightCore::from_radius_boost(5.0, 5.0),
+            ..default()
+        },
+        Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
+    ));
 
-    // commands.spawn((
-    //     PointLight2d {
-    //         inner_range: 5.0,
-    //         range: 50.0,
-    //         intensity: 4.0,
-    //         color: Color::Srgba(BLUE),
-    //         falloff_intensity: 5.0,
-    //         ..default()
-    //     },
-    //     Transform::from_translation(vec3(30.0, 0.0, 0.0)),
-    // ));
+    commands.spawn((
+        PointLight2d {
+            radius: 50.0,
+            intensity: 4.0,
+            color: Color::Srgba(BLUE),
+            core: LightCore::from_radius_boost(10.0, 4.0),
+            ..default()
+        },
+        Transform::from_translation(vec3(30.0, 0.0, 0.0)),
+    ));
 }

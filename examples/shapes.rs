@@ -1,5 +1,3 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::{
     color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
     window::PrimaryWindow,
@@ -43,7 +41,6 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            // light_bands: Some(0.7),
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
@@ -59,10 +56,6 @@ fn setup(mut commands: Commands) {
                 radius: 30.0,
                 boost: 15.0,
                 ..default()
-            },
-            angle: LightAngle {
-                inner: 30.0,
-                outer: 100.0,
             },
             ..default()
         },
@@ -235,9 +228,9 @@ fn move_light(
         light.1.core.radius = light.1.core.radius.max(0.0);
     }
 
-    // if !buttons.pressed(MouseButton::Left) {
-    //     return;
-    // }
+    if !buttons.pressed(MouseButton::Left) {
+        return;
+    }
 
     let Some(cursor_position) = window
         .cursor_position()
@@ -246,14 +239,9 @@ fn move_light(
         return;
     };
 
-    let angle = (cursor_position - light.0.translation.xy())
-        .normalize()
-        .to_angle();
-    light.0.rotation = Quat::from_rotation_z(angle - FRAC_PI_2);
+    gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
 
-    // gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
-
-    // light.0.translation = cursor_position.extend(0.);
+    light.0.translation = cursor_position.extend(0.);
 }
 
 const CAMERA_SPEED: f32 = 60.0;

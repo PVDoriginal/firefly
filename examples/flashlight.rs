@@ -1,12 +1,6 @@
-use std::f32::consts::{FRAC_PI_2, PI, TAU};
+use std::f32::consts::{FRAC_PI_2, TAU};
 
-use bevy::{
-    color::palettes::css::{BLUE, RED},
-    input::mouse::MouseWheel,
-    prelude::*,
-    render::view::Hdr,
-    window::PrimaryWindow,
-};
+use bevy::{input::mouse::MouseWheel, prelude::*, render::view::Hdr, window::PrimaryWindow};
 use bevy_firefly::prelude::*;
 
 fn main() {
@@ -58,40 +52,6 @@ fn setup(mut commands: Commands) {
     let radius = 150.0;
 
     let angles: Vec<f32> = (0..7).rev().map(|i| i as f32 * angle_step).collect();
-
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         vec2(-10.0, 0.0),
-    //         vec2(-10.0, 50.0),
-    //         vec2(10.0, 50.0),
-    //         vec2(10.0, 40.0),
-    //         vec2(0.0, 40.0),
-    //         vec2(0.0, 30.0),
-    //         vec2(10.0, 30.0),
-    //         vec2(10.0, 20.0),
-    //         vec2(0.0, 20.0),
-    //         vec2(0.0, 0.0),
-    //     ])
-    //     .unwrap(),
-    //     Transform::from_translation(vec3(0.0, 50.0, 0.0)),
-    // ));
-    // commands.spawn((
-    //     Occluder2d::polygon(vec![
-    //         // vec2(-10.0, 0.0),
-    //         // vec2(-10.0, 50.0),
-    //         // vec2(10.0, 50.0),
-    //         vec2(10.0, 40.0),
-    //         vec2(0.0, 40.0),
-    //         vec2(0.0, 30.0),
-    //     ])
-    //     .unwrap(),
-    //     Transform::from_translation(vec3(0.0, 100.0, 0.0)),
-    // ));
-
-    // commands.spawn((
-    //     Occluder2d::circle(30.0),
-    //     Transform::from_translation(vec3(0.0, 50.0, 0.0)),
-    // ));
 
     let opacity = 0.8;
 
