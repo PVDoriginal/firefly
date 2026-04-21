@@ -111,7 +111,9 @@ impl Occluder2d {
     ///
     /// # Failure
     /// This returns None if the provided list doesn't contain at least 2 vertices.
-    pub fn polygon(vertices: Vec<Vec2>) -> Option<Self> {
+    pub fn polygon(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
+        let vertices = vertices.into();
+
         normalize_vertices(vertices)
             .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polygon { vertices })))
     }
@@ -124,8 +126,10 @@ impl Occluder2d {
     ///
     /// # Failure
     /// This returns None if the provided list doesn't contain at least 2 vertices.
-    pub fn polyline(mut vertices: Vec<Vec2>) -> Option<Self> {
+    pub fn polyline(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
+        let mut vertices = vertices.into();
         let mut vertices_clone = vertices.clone();
+
         vertices_clone.reverse();
         vertices.extend_from_slice(&vertices_clone[1..vertices_clone.len() - 1]);
 

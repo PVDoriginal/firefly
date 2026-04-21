@@ -167,12 +167,25 @@ pub(crate) struct ImageBindGroups {
 ///
 /// # Example
 ///
+/// Automatic image loading:
 /// ```
 /// commands.spawn((
 ///     Sprite::from_image(asset_server.load("some_sprite.png")),
 ///     NormalMap::from_file("some_sprite_normal.png"),
 /// ));
 /// ```
+///
+/// Manual image loading:
+///
+/// ```
+/// let image: Handle<Image> = asset_server.load_with_settings("some_sprite_normal.png", |x: &mut ImageLoaderSettings| x.is_srgb = false);
+///
+/// commands.spawn((
+///     Sprite::from_image(asset_server.load("some_sprite.png")),
+///     NormalMap::from_image(image),
+/// ));
+/// ```
+///  
 /// See [Sprite] for more information on using sprites.
 #[derive(Component)]
 pub struct NormalMap {
@@ -199,7 +212,7 @@ impl NormalMap {
     ///
     /// This image file needs to match the corresponding [Sprite] image 1:1.  
     ///
-    /// You can use [.handle()](NormalMap::handle) to get the resulting image handle.
+    /// You can use [`.handle()`](NormalMap::handle) to get the resulting image handle.
     pub fn from_file<'a>(path: impl Into<AssetPath<'a>>, asset_server: &AssetServer) -> Self {
         let image: Handle<Image> =
             asset_server.load_with_settings(path, |x: &mut ImageLoaderSettings| x.is_srgb = false);
@@ -207,6 +220,14 @@ impl NormalMap {
         Self { image }
     }
 
+    /// Construct a new [NormalMap] from an image handle. It's important that this image is loaded without gamma correction:
+    ///
+    /// ```
+    /// let image: Handle<Image> = asset_server.load_with_settings(path, |x: &mut ImageLoaderSettings| x.is_srgb = false);
+    /// ```
+    ///
+    /// You can use the [`from_file`](NormalMap::from_file) constructor to handle this automatically for you, and later grab the handle
+    /// via the [`.handle()`](NormalMap::handle) method.
     pub fn from_image(image: Handle<Image>) -> Self {
         Self { image }
     }

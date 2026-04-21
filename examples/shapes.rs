@@ -53,13 +53,13 @@ fn setup(mut commands: Commands) {
             intensity: 7.0,
             radius: 450.0,
             core: LightCore {
-                radius: 30.0,
-                boost: 15.0,
+                radius: 100.0,
+                boost: 50.0,
                 ..default()
             },
             ..default()
         },
-        Transform::default(),
+        Transform::from_translation(vec3(-150., 120.0, 0.0)),
     ));
 
     commands.spawn((
@@ -210,7 +210,7 @@ fn setup(mut commands: Commands) {
     let samples = 10 * spline.segments().len();
 
     commands.spawn((
-        Occluder2d::polyline(spline.iter_positions(samples).collect()).unwrap(),
+        Occluder2d::polyline(spline.iter_positions(samples).collect::<Vec<_>>()).unwrap(),
         Transform::from_translation(vec3(-510., -100., 0.)),
     ));
 }

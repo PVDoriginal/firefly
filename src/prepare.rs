@@ -268,6 +268,10 @@ pub(crate) fn prepare_data(
                     light_pointer.0.set(index.index as u32);
                     light_pointer.0.write_buffer(&render_device, &render_queue);
 
+                    let Some(light_pointer_binding) = light_pointer.0.binding() else {
+                        continue;
+                    };
+
                     let light_rect = camera_rect.union_point(light.pos).intersect(Rect {
                         min: light.pos - light.radius,
                         max: light.pos + light.radius,
@@ -375,7 +379,7 @@ pub(crate) fn prepare_data(
                             &BindGroupEntries::sequential((
                                 &lightmap_pipeline.sampler,
                                 light_buffer.binding(),
-                                light_pointer.0.binding().unwrap(),
+                                light_pointer_binding,
                                 round_occluders.binding(),
                                 poly_occluders.binding(),
                                 vertices.binding(),
@@ -802,6 +806,10 @@ fn prepare_sprite_image_bind_groups(
                 let mut dummy_buffer = UniformBuffer::<u32>::from(if is_dummy { 1 } else { 0 });
                 dummy_buffer.write_buffer(&render_device, &render_queue);
 
+                let Some(dummy_buffer_binding) = dummy_buffer.binding() else {
+                    continue;
+                };
+
                 image_bind_groups
                     .values
                     .entry((batch_image_handle, batch_normal_handle, is_dummy))
@@ -813,7 +821,7 @@ fn prepare_sprite_image_bind_groups(
                                 &gpu_image.texture_view,
                                 &normal_image.texture_view,
                                 &gpu_image.sampler,
-                                dummy_buffer.binding().unwrap(),
+                                dummy_buffer_binding,
                             )),
                         )
                     });
