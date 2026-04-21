@@ -1,3 +1,5 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::{
     color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
     window::PrimaryWindow,
@@ -233,9 +235,9 @@ fn move_light(
         light.1.core.radius = light.1.core.radius.max(0.0);
     }
 
-    if !buttons.pressed(MouseButton::Left) {
-        return;
-    }
+    // if !buttons.pressed(MouseButton::Left) {
+    //     return;
+    // }
 
     let Some(cursor_position) = window
         .cursor_position()
@@ -244,9 +246,14 @@ fn move_light(
         return;
     };
 
-    gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
+    let angle = (cursor_position - light.0.translation.xy())
+        .normalize()
+        .to_angle();
+    light.0.rotation = Quat::from_rotation_z(angle - FRAC_PI_2);
 
-    light.0.translation = cursor_position.extend(0.);
+    // gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
+
+    // light.0.translation = cursor_position.extend(0.);
 }
 
 const CAMERA_SPEED: f32 = 60.0;

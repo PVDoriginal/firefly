@@ -465,13 +465,15 @@ fn push_vertices(
 
     let mut round_occlusion = false;
 
+    // info!("vertices: {vertices:?}");
+
     loop {
         let last = vertices.last().unwrap().angle;
         let vertex = vertices.first().unwrap().angle;
 
         let loops = (vertex - last).abs() > PI;
 
-        if (!loops && vertex < last) || (loops && vertex > last) {
+        if (!loops && vertex <= last) || (loops && vertex >= last) {
             break;
         }
 
@@ -481,8 +483,6 @@ fn push_vertices(
             round_occlusion = true;
             break;
         }
-
-        // info!("{vertices:?}");
     }
 
     let index = match poly {
@@ -599,7 +599,7 @@ fn push_vertices(
                 let loops = (vertex.angle - last.angle).abs() > PI;
 
                 // if the next vertex is decreasing
-                if (!loops && vertex.angle < last.angle) || (loops && vertex.angle > last.angle) {
+                if (!loops && vertex.angle <= last.angle) || (loops && vertex.angle >= last.angle) {
                     push_slice(&slice, &vertices);
                     slice = OccluderSlice::new(index, vertex);
                 }
