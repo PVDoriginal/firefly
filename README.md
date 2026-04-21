@@ -1,4 +1,4 @@
-# Firefly
+# Firefly - 2D Lighting for Bevy 
 
 [![Discord](https://img.shields.io/discord/805147867924267018?logo=discord&color=7289DA)](https://discord.com/channels/691052431525675048/1447681362722033816)
 [![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
@@ -6,11 +6,6 @@
 [![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
 
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [Bevy game engine](https://bevy.org/). 
-
-## Important Note - HDR !
-HDR support is planned as being part of the next big update that I'm working on, `0.18.1`. However, mainly due to the Bevy Jam having started and the full update still being far from done, I've released a `0.18.1-alpha` version 
-which just adds HDR support and a couple of other things. Check out the [release notes](https://github.com/PVDoriginal/firefly/blob/main/release-notes/0.18.1-alpha.md) for more details. I'm adding this here because cargo seems to still default to 
-`0.18.0` as the newest version, so you'll need to manually change it to have access to HDR. It is a pretty huge visual improvement with almost no performance cost! 
 
 ## Objective
 
