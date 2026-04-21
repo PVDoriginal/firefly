@@ -1,4 +1,4 @@
-# Firefly
+# Firefly - 2D Lighting for Bevy 
 
 [![Discord](https://img.shields.io/discord/805147867924267018?logo=discord&color=7289DA)](https://discord.com/channels/691052431525675048/1447681362722033816)
 [![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
