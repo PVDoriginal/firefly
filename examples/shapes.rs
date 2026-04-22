@@ -124,17 +124,23 @@ fn setup(mut commands: Commands) {
     ));
 
     commands.spawn((
-        Occluder2d::polygon(vec![
-            vec2(-428., 135.),
-            vec2(-482., 158.),
-            vec2(-475., 231.),
-            vec2(-438., 290.),
-            vec2(-388., 299.),
-            vec2(-380., 278.),
-            vec2(-358., 276.),
-            vec2(-342., 208.),
-            vec2(-429., 172.),
-        ])
+        Occluder2d::polygon(
+            vec![
+                vec2(-428., 135.),
+                vec2(-482., 158.),
+                vec2(-475., 231.),
+                vec2(-438., 290.),
+                vec2(-388., 299.),
+                vec2(-380., 278.),
+                vec2(-358., 276.),
+                vec2(-342., 208.),
+                vec2(-429., 172.),
+            ]
+            .iter()
+            .rev()
+            .cloned()
+            .collect::<Vec<_>>(),
+        )
         .unwrap(),
         Transform::default(),
     ));

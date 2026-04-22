@@ -109,13 +109,70 @@ impl Occluder2d {
     ///
     /// The points should be relative to the entity's translation.
     ///
-    /// # Failure
+    /// ## Vertex Ordering
+    /// This method will perform an extra `O(N)` check to determine if
+    /// the vertices are in clockwise or counter-clockwise order.
+    ///
+    /// If you wish to bypass this check, you can use the [`polygon_cc`](Occluder2d::polygon_cc)
+    /// and [`polygon_ccw`](Occluder2d::polygon_ccw) methods.
+    ///
+    /// ## Failure
     /// This returns None if the provided list doesn't contain at least 2 vertices.
     pub fn polygon(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
         let vertices = vertices.into();
 
-        normalize_vertices(vertices)
-            .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polygon { vertices })))
+        if vertices.len() < 2 {
+            return None;
+        }
+
+        Some(Self::from_shape(Occluder2dShape::Polygon {
+            vertices: normalize_vertices(vertices),
+        }))
+    }
+
+    /// Construct a polygonal occluder from the given points.
+    ///
+    /// The points can form a convex or concave polygon. However,
+    /// having self-intersections can cause unexpected behavior.
+    ///
+    /// The points should be relative to the entity's translation.
+    ///
+    /// ## Vertex Ordering
+    /// Compared to [`polygon`](Occluder2d::polygon), this method assumed the vertices are in **clockwise** order.
+    ///
+    /// ## Failure
+    /// This returns None if the provided list doesn't contain at least 2 vertices.
+    pub fn polygon_cc(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
+        let vertices = vertices.into();
+
+        if vertices.len() < 2 {
+            return None;
+        }
+
+        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
+    }
+
+    /// Construct a polygonal occluder from the given points.
+    ///
+    /// The points can form a convex or concave polygon. However,
+    /// having self-intersections can cause unexpected behavior.
+    ///
+    /// The points should be relative to the entity's translation.
+    ///
+    /// ## Vertex Ordering
+    /// Compared to [`polygon`](Occluder2d::polygon), this method assumed the vertices are in **counter-clockwise** order.
+    ///
+    /// ## Failure
+    /// This returns None if the provided list doesn't contain at least 2 vertices.
+    pub fn polygon_ccw(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
+        let mut vertices = vertices.into();
+
+        if vertices.len() < 2 {
+            return None;
+        }
+        vertices.reverse();
+
+        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
     }
 
     /// Construct a polyline occluder from the given points.
@@ -128,13 +185,16 @@ impl Occluder2d {
     /// This returns None if the provided list doesn't contain at least 2 vertices.
     pub fn polyline(vertices: impl Into<Vec<Vec2>>) -> Option<Self> {
         let mut vertices = vertices.into();
+
+        if vertices.len() < 2 {
+            return None;
+        }
+
         let mut vertices_clone = vertices.clone();
 
         vertices_clone.reverse();
         vertices.extend_from_slice(&vertices_clone[1..vertices_clone.len() - 1]);
-
-        normalize_vertices(vertices)
-            .and_then(|vertices| Some(Self::from_shape(Occluder2dShape::Polyline { vertices })))
+        Some(Self::from_shape(Occluder2dShape::Polyline { vertices }))
     }
 
     /// Construct a rectangle occluder from width and height.
@@ -211,42 +271,21 @@ impl ExtractedOccluder {
     }
 }
 
-// rotates vertices to be clockwise
-fn normalize_vertices(vertices: Vec<Vec2>) -> Option<Vec<Vec2>> {
-    if vertices.len() < 2 {
-        warn!("Not enough vertices to form shape");
-        return None;
+/// Rotates vertices to be clockwise.
+fn normalize_vertices(mut vertices: Vec<Vec2>) -> Vec<Vec2> {
+    let mut sum = 0.0;
+
+    for i in 0..vertices.len() {
+        let j = (i + 1) % vertices.len();
+        sum += (vertices[j].x - vertices[i].x) * (vertices[j].y + vertices[i].y);
     }
 
-    if vertices.len() < 3 {
-        return Some(vertices.to_vec());
+    if sum >= 0.0 {
+        return vertices;
+    } else {
+        vertices.reverse();
+        return vertices;
     }
-
-    let mut orientations: Vec<_> = vertices
-        .windows(3)
-        .map(|line| orientation(line[0], line[1], line[2]))
-        .collect();
-
-    orientations.push(orientation(
-        vertices[vertices.len() - 2],
-        vertices[vertices.len() - 1],
-        vertices[0],
-    ));
-    orientations.push(orientation(
-        vertices[vertices.len() - 1],
-        vertices[0],
-        vertices[1],
-    ));
-
-    if orientations.contains(&Orientation::Left) && orientations.contains(&Orientation::Right) {
-        return Some(vertices.to_vec());
-    }
-
-    if orientations.contains(&Orientation::Left) {
-        return Some(vertices.iter().rev().map(|x| *x).collect());
-    }
-
-    Some(vertices.to_vec())
 }
 
 #[derive(PartialEq, Eq)]
