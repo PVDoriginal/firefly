@@ -10,9 +10,10 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()));
-    app.add_plugins((FireflyPlugin, FireflyGizmosPlugin));
+    app.add_plugins(FireflyPlugin);
 
     app.add_systems(Startup, setup);
+    app.add_systems(Update, toggle_layers);
 
     app.run();
 }
@@ -29,11 +30,12 @@ fn setup(mut commands: Commands) {
             ambient_brightness: 0.1,
             ..default()
         },
+        RenderLayers::layer(1).union(&RenderLayers::layer(0)),
     ));
 
     commands.spawn((
         PointLight2d {
-            radius: 50.0,
+            radius: 100.0,
             intensity: 4.0,
             color: Color::Srgba(RED),
             core: LightCore::from_radius_boost(5.0, 5.0),
@@ -45,7 +47,7 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         PointLight2d {
-            radius: 50.0,
+            radius: 100.0,
             intensity: 4.0,
             color: Color::Srgba(BLUE),
             core: LightCore::from_radius_boost(10.0, 4.0),
@@ -66,4 +68,40 @@ fn setup(mut commands: Commands) {
         Transform::from_translation(vec3(30.0, -20.0, 0.0)),
         RenderLayers::layer(1),
     ));
+}
+
+#[derive(Default)]
+enum LayerState {
+    First,
+    Second,
+    #[default]
+    Both,
+}
+
+impl LayerState {
+    fn toggle(&self) -> LayerState {
+        match *self {
+            LayerState::First => LayerState::Second,
+            LayerState::Second => LayerState::Both,
+            LayerState::Both => LayerState::First,
+        }
+    }
+}
+
+fn toggle_layers(
+    mut state: Local<LayerState>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut camera: Single<&mut RenderLayers, With<Camera2d>>,
+) {
+    if !keys.just_pressed(KeyCode::Space) {
+        return;
+    }
+
+    *state = state.toggle();
+
+    **camera = match *state {
+        LayerState::First => RenderLayers::layer(0),
+        LayerState::Second => RenderLayers::layer(1),
+        LayerState::Both => RenderLayers::layer(0).union(&RenderLayers::layer(1)),
+    }
 }

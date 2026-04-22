@@ -14,6 +14,7 @@ use std::{
 };
 
 use bevy::{
+    platform::collections::HashMap,
     prelude::*,
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
@@ -22,6 +23,7 @@ use bevy::{
             encase::private::WriteInto,
         },
         renderer::{RenderDevice, RenderQueue},
+        view::RetainedViewEntity,
     },
 };
 use bytemuck::{NoUninit, Pod, Zeroable};
@@ -481,10 +483,13 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 pub const N_BINS: usize = 128;
 pub const N_BINS_FLOAT: f32 = 128.0;
 
-/// A component that each light has, containing sets of bins of occluders for faster iteration.
+/// A component that each light has, containing the [BinBuffer]s for each camera view.
+#[derive(Component, Default)]
+pub struct BinBuffers(pub HashMap<RetainedViewEntity, BinBuffer>);
+
+/// A struct containing sets of bins of occluders for faster iteration.
 /// This is the most important acceleration structure used by Firefly. It is used in a custom
 /// type of angular sweep with BVH-inspired elements.
-#[derive(Component)]
 pub struct BinBuffer {
     /// List of all Occluders that will be written to the GPU.
     buffer: RawBufferVec<OccluderPointer>,
@@ -605,6 +610,7 @@ impl BinBuffer {
 }
 
 /// CPU struct describing an occluder or edge.
+#[derive(Clone)]
 pub struct OccluderData {
     pub pointer: OccluderPointer,
     pub min_angle: f32,

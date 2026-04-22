@@ -1,6 +1,7 @@
 use std::usize;
 
 use bevy::{
+    camera::visibility::RenderLayers,
     color::palettes::css::WHITE,
     prelude::*,
     render::{extract_component::ExtractComponent, render_resource::ShaderType},
@@ -17,7 +18,7 @@ pub(crate) struct ExtractedWorldData {
 /// Panics if added to multiple cameras at once.
 #[derive(Debug, Component, ExtractComponent, Clone, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[require(Transform)]
+#[require(Transform, RenderLayers)]
 pub struct FireflyConfig {
     /// Ambient light that will be added over all other lights.  
     ///

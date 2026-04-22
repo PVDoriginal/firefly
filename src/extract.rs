@@ -1,6 +1,7 @@
 //! This module extracts data from the Main World to the Render World.
 
 use bevy::{
+    camera::visibility::RenderLayers,
     platform::collections::HashSet,
     prelude::*,
     render::{
@@ -217,10 +218,13 @@ fn extract_lights(
             &ViewVisibility,
             &VisibilityTimer,
             &Changes,
+            &RenderLayers,
         )>,
     >,
 ) {
-    for (entity, transform, light, height, visibility, visibility_timer, changes) in &lights {
+    for (entity, transform, light, height, visibility, visibility_timer, changes, render_layers) in
+        &lights
+    {
         if !visibility.get() {
             if visibility_timer.0.just_finished() {
                 commands.entity(entity).insert(NotVisible);
@@ -242,6 +246,7 @@ fn extract_lights(
             dir: (transform.rotation() * Vec3::Y).xy(),
             height: height.0,
             changes: changes.clone(),
+            render_layers: render_layers.clone(),
         });
     }
 }
@@ -258,13 +263,22 @@ fn extract_occluders(
             &ViewVisibility,
             &VisibilityTimer,
             &Changes,
+            &RenderLayers,
         )>,
     >,
 ) {
     let mut values = Vec::with_capacity(*previous_len);
 
-    for (entity, occluder, global_transform, aabb, visibility, visibility_timer, changes) in
-        &occluders
+    for (
+        entity,
+        occluder,
+        global_transform,
+        aabb,
+        visibility,
+        visibility_timer,
+        changes,
+        render_layers,
+    ) in &occluders
     {
         if !visibility.get() {
             if visibility_timer.0.just_finished() {
@@ -285,6 +299,7 @@ fn extract_occluders(
             opacity: occluder.opacity,
             z_sorting: occluder.z_sorting,
             changes: changes.clone(),
+            render_layers: render_layers.clone(),
         };
 
         values.push((entity, extracted_occluder));

@@ -1,5 +1,5 @@
 use bevy::{
-    camera::visibility::{VisibilityClass, add_visibility_class},
+    camera::visibility::{RenderLayers, VisibilityClass, add_visibility_class},
     color::palettes::css::WHITE,
     core_pipeline::tonemapping::{DebandDither, Tonemapping},
     ecs::{
@@ -31,7 +31,7 @@ use bytemuck::NoUninit;
 
 use crate::{
     LightBatchSetKey,
-    buffers::{BinBuffer, BufferIndex},
+    buffers::{BinBuffer, BinBuffers, BufferIndex},
     change::Changes,
     phases::LightmapPhase,
     pipelines::{LightPipelineKey, LightmapCreationPipeline},
@@ -48,7 +48,8 @@ use crate::{
     ViewVisibility,
     VisibilityTimer,
     LightHeight,
-    Changes
+    Changes,
+    RenderLayers
 )]
 #[component(on_add = add_visibility_class::<PointLight2d>)]
 pub struct PointLight2d {
@@ -257,7 +258,7 @@ impl LightCore {
 
 /// The data that is extracted to the render world from a [`PointLight2d`].
 #[derive(Component, Clone)]
-#[require(BinBuffer, LightIndex, LightPointer)]
+#[require(BinBuffers, LightIndex, LightPointer)]
 pub struct ExtractedPointLight {
     pub pos: Vec2,
     pub color: Color,
@@ -271,6 +272,7 @@ pub struct ExtractedPointLight {
     pub z: f32,
     pub height: f32,
     pub changes: Changes,
+    pub render_layers: RenderLayers,
 }
 
 impl PartialEq for ExtractedPointLight {
@@ -348,7 +350,7 @@ pub(crate) struct LightBatch {
 
 #[derive(Resource, Default)]
 pub(crate) struct LightBindGroups {
-    pub values: HashMap<Entity, BindGroup>,
+    pub values: HashMap<Entity, HashMap<RetainedViewEntity, BindGroup>>,
 }
 
 #[derive(Component)]
@@ -442,7 +444,16 @@ impl<P: PhaseItem> RenderCommand<P> for SetLightTextureBindGroup {
         };
 
         pass.set_bind_group(0, &lut.0, &[view_uniform_offset.offset]);
-        pass.set_bind_group(1, image_bind_groups.values.get(&batch.id).unwrap(), &[]);
+        pass.set_bind_group(
+            1,
+            image_bind_groups
+                .values
+                .get(&batch.id)
+                .unwrap()
+                .get(&view.retained_view_entity)
+                .unwrap(),
+            &[],
+        );
 
         RenderCommandResult::Success
     }

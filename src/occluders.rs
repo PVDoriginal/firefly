@@ -1,7 +1,7 @@
 //! Module containing structs and functions relevant to Occluders.
 
 use bevy::{
-    camera::visibility::{VisibilityClass, add_visibility_class},
+    camera::visibility::{RenderLayers, VisibilityClass, add_visibility_class},
     color::palettes::css::BLACK,
     math::bounding::{Aabb2d, BoundingVolume},
     prelude::*,
@@ -30,7 +30,8 @@ use crate::{buffers::BufferIndex, change::Changes};
     ViewVisibility,
     VisibilityTimer,
     OccluderAabb,
-    Changes
+    Changes,
+    RenderLayers
 )]
 #[component(on_add = add_visibility_class::<Occluder2d>)]
 pub struct Occluder2d {
@@ -250,6 +251,7 @@ pub struct ExtractedOccluder {
     pub opacity: f32,
     pub z_sorting: bool,
     pub changes: Changes,
+    pub render_layers: RenderLayers,
 }
 
 impl PartialEq for ExtractedOccluder {
