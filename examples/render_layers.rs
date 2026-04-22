@@ -1,19 +1,20 @@
 use bevy::{
-    camera::visibility::RenderLayers,
+    camera::{RenderTarget, visibility::RenderLayers},
     color::palettes::css::{BLUE, RED},
+    ecs::entity_disabling::Disabled,
     prelude::*,
     render::view::Hdr,
+    window::{PrimaryWindow, WindowRef},
 };
 use bevy_firefly::prelude::*;
 
 fn main() {
     let mut app = App::new();
 
-    app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()));
+    app.add_plugins(DefaultPlugins);
     app.add_plugins(FireflyPlugin);
 
     app.add_systems(Startup, setup);
-    app.add_systems(Update, toggle_layers);
 
     app.run();
 }
@@ -22,15 +23,45 @@ fn setup(mut commands: Commands) {
     let mut proj = OrthographicProjection::default_2d();
     proj.scale = 0.15;
 
+    let window2 = commands
+        .spawn(Window {
+            title: "Second window".into(),
+            ..default()
+        })
+        .id();
+
+    let window3 = commands
+        .spawn(Window {
+            title: "Third window".into(),
+            ..default()
+        })
+        .id();
+
     commands.spawn((
         Camera2d,
         Hdr::default(),
-        Projection::Orthographic(proj),
-        FireflyConfig {
-            ambient_brightness: 0.1,
-            ..default()
-        },
-        RenderLayers::layer(1).union(&RenderLayers::layer(0)),
+        Projection::Orthographic(proj.clone()),
+        FireflyConfig::default(),
+        RenderTarget::Window(WindowRef::Primary),
+        RenderLayers::layer(0),
+    ));
+
+    commands.spawn((
+        Camera2d,
+        Hdr::default(),
+        Projection::Orthographic(proj.clone()),
+        FireflyConfig::default(),
+        RenderTarget::Window(WindowRef::Entity(window2)),
+        RenderLayers::layer(1),
+    ));
+
+    commands.spawn((
+        Camera2d,
+        Hdr::default(),
+        Projection::Orthographic(proj.clone()),
+        FireflyConfig::default(),
+        RenderTarget::Window(WindowRef::Entity(window3)),
+        RenderLayers::layer(0).union(&RenderLayers::layer(1)),
     ));
 
     commands.spawn((
@@ -68,40 +99,4 @@ fn setup(mut commands: Commands) {
         Transform::from_translation(vec3(30.0, -20.0, 0.0)),
         RenderLayers::layer(1),
     ));
-}
-
-#[derive(Default)]
-enum LayerState {
-    First,
-    Second,
-    #[default]
-    Both,
-}
-
-impl LayerState {
-    fn toggle(&self) -> LayerState {
-        match *self {
-            LayerState::First => LayerState::Second,
-            LayerState::Second => LayerState::Both,
-            LayerState::Both => LayerState::First,
-        }
-    }
-}
-
-fn toggle_layers(
-    mut state: Local<LayerState>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut camera: Single<&mut RenderLayers, With<Camera2d>>,
-) {
-    if !keys.just_pressed(KeyCode::Space) {
-        return;
-    }
-
-    *state = state.toggle();
-
-    **camera = match *state {
-        LayerState::First => RenderLayers::layer(0),
-        LayerState::Second => RenderLayers::layer(1),
-        LayerState::Both => RenderLayers::layer(0).union(&RenderLayers::layer(1)),
-    }
 }
