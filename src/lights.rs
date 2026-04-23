@@ -195,6 +195,7 @@ impl Falloff {
 
 /// The light's core. This is what determines the softness of shadows if [soft_shadows](crate::prelude::FireflyConfig::soft_shadows) is enabled.
 #[derive(Clone, Copy, Debug, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LightCore {
     /// The radius of the core. This must be less than the actual radius of the light.
     ///
