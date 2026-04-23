@@ -249,7 +249,6 @@ fn prepare_lightmap(
                     view_formats: &[],
                 },
             );
-            info!("inserting texture");
 
             commands
                 .entity(entity)

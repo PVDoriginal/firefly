@@ -64,8 +64,6 @@ impl ViewNode for CreateLightmapNode {
                 .unwrap()
                 .hdr;
 
-            info!("writing texture");
-
             let format = match hdr {
                 true => ViewTarget::TEXTURE_FORMAT_HDR,
                 false => TextureFormat::bevy_default(),
