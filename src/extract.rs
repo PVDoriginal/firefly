@@ -2,12 +2,13 @@
 
 use bevy::{
     camera::visibility::RenderLayers,
+    ecs::entity::MapEntities,
     platform::collections::HashSet,
     prelude::*,
     render::{
         Extract, RenderApp,
         batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
-        extract_component::ExtractComponentPlugin,
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
@@ -19,7 +20,10 @@ use bevy::{
 use crate::{
     LightmapPhase,
     change::Changes,
-    data::{ExtractedWorldData, FireflyConfig},
+    data::{
+        CombineLightmapTo, CombinedLightmaps, ExtractedCombineLightmapTo,
+        ExtractedCombinedLightmaps, ExtractedWorldData, FireflyConfig,
+    },
     lights::{ExtractedPointLight, LightHeight, PointLight2d},
     occluders::ExtractedOccluder,
     phases::SpritePhase,
@@ -198,12 +202,35 @@ fn extract_sprites(
 
 fn extract_world_data(
     mut commands: Commands,
-    camera: Extract<Query<(&RenderEntity, &GlobalTransform, &FireflyConfig, &Camera2d)>>,
+    cameras: Extract<Query<&RenderEntity, With<CombineLightmapTo>>>,
+    camera: Extract<
+        Query<(
+            &RenderEntity,
+            &GlobalTransform,
+            &FireflyConfig,
+            Option<&CombinedLightmaps>,
+        )>,
+    >,
 ) {
-    for (entity, transform, _, _) in &camera {
+    for (entity, transform, _, combined_lightmaps) in &camera {
         commands.entity(entity.id()).insert(ExtractedWorldData {
             camera_pos: transform.translation().truncate(),
         });
+
+        if let Some(combined_lightmaps) = combined_lightmaps {
+            let mut extracted_collection = vec![];
+            for (i, main_entity) in combined_lightmaps.collection().iter().enumerate() {
+                let render_entity = **cameras.get(*main_entity).unwrap();
+                commands
+                    .entity(render_entity)
+                    .insert(ExtractedCombineLightmapTo(entity.id(), i as u32));
+                extracted_collection.push(render_entity);
+            }
+
+            commands
+                .entity(entity.id())
+                .insert(ExtractedCombinedLightmaps(extracted_collection));
+        }
     }
 }
 

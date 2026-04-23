@@ -16,7 +16,9 @@ use bevy::{
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             SpecializedRenderPipeline, SpecializedRenderPipelines, TextureFormat,
             TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
-            binding_types::{sampler, storage_buffer_read_only, texture_2d, uniform_buffer},
+            binding_types::{
+                sampler, storage_buffer_read_only, texture_2d, texture_2d_array, uniform_buffer,
+            },
         },
         renderer::RenderDevice,
         view::{ViewTarget, ViewUniform},
@@ -42,6 +44,7 @@ impl Plugin for PipelinePlugin {
 
         embedded_asset!(app, "shaders/create_lightmap.wgsl");
         embedded_asset!(app, "shaders/apply_lightmap.wgsl");
+        embedded_asset!(app, "shaders/combine_lightmaps.wgsl");
         embedded_asset!(app, "shaders/sprite.wgsl");
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -51,6 +54,7 @@ impl Plugin for PipelinePlugin {
         render_app
             .init_resource::<SpecializedRenderPipelines<LightmapCreationPipeline>>()
             .init_resource::<SpecializedRenderPipelines<LightmapApplicationPipeline>>()
+            .init_resource::<SpecializedRenderPipelines<LightmapCombinationPipeline>>()
             .init_resource::<SpecializedRenderPipelines<SpritePipeline>>();
 
         render_app.add_systems(
@@ -58,6 +62,7 @@ impl Plugin for PipelinePlugin {
             (
                 init_lightmap_creation_pipeline,
                 init_lightmap_application_pipeline,
+                init_lightmap_combination_pipeline,
                 init_sprite_pipeline,
             ),
         );
@@ -161,12 +166,13 @@ bitflags::bitflags! {
         const TONEMAP_METHOD_SOMEWHAT_BORING_DISPLAY_TRANSFORM = 5 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_TONY_MC_MAPFACE    = 6 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_BLENDER_FILMIC     = 7 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const COMBINE_LIGHTMAPS                 = 1 << 31;
     }
 }
 
 impl LightPipelineKey {
     const MSAA_MASK_BITS: u32 = 0b111;
-    const MSAA_SHIFT_BITS: u32 = 32 - Self::MSAA_MASK_BITS.count_ones();
+    const MSAA_SHIFT_BITS: u32 = 16 - Self::MSAA_MASK_BITS.count_ones();
     const TONEMAP_METHOD_MASK_BITS: u32 = 0b111;
     const TONEMAP_METHOD_SHIFT_BITS: u32 =
         Self::MSAA_SHIFT_BITS - Self::TONEMAP_METHOD_MASK_BITS.count_ones();
@@ -274,14 +280,18 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
 /// Pipeline that applies the lightmap over the fullscreen view.
 #[derive(Resource)]
 pub struct LightmapApplicationPipeline {
-    pub layout: BindGroupLayoutDescriptor,
+    pub layout_simple: BindGroupLayoutDescriptor,
+    pub layout_combined: BindGroupLayoutDescriptor,
     pub sampler: Sampler,
     pub vertex_state: VertexState,
     pub shader: Handle<Shader>,
 }
 
 #[derive(Component)]
-pub struct SpecializedApplicationPipeline(pub CachedRenderPipelineId);
+pub struct SpecializedApplicationPipeline {
+    pub id: CachedRenderPipelineId,
+    pub is_combined: bool,
+}
 
 fn init_lightmap_application_pipeline(
     mut commands: Commands,
@@ -289,8 +299,8 @@ fn init_lightmap_application_pipeline(
     fullscreen_shader: Res<FullscreenShader>,
     asset_server: Res<AssetServer>,
 ) {
-    let layout = BindGroupLayoutDescriptor::new(
-        "apply lightmap layout",
+    let layout_simple = BindGroupLayoutDescriptor::new(
+        "apply lightmap layout simple",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::FRAGMENT,
             (
@@ -302,11 +312,26 @@ fn init_lightmap_application_pipeline(
         ),
     );
 
+    let layout_combined = BindGroupLayoutDescriptor::new(
+        "apply lightmap layout combined",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                texture_2d(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                uniform_buffer::<UniformFireflyConfig>(false),
+                texture_2d_array(TextureSampleType::Float { filterable: true }),
+            ),
+        ),
+    );
+
     let sampler = render_device.create_sampler(&SamplerDescriptor::default());
     let vertex_state = fullscreen_shader.to_vertex_state();
 
     commands.insert_resource(LightmapApplicationPipeline {
-        layout,
+        layout_simple,
+        layout_combined,
         sampler,
         vertex_state,
         shader: load_embedded_asset!(asset_server.as_ref(), "shaders/apply_lightmap.wgsl"),
@@ -322,8 +347,91 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
             false => TextureFormat::bevy_default(),
         };
 
+        let mut shader_defs = vec![];
+        if key.contains(LightPipelineKey::COMBINE_LIGHTMAPS) {
+            shader_defs.push("IS_COMBINED".into());
+        }
         RenderPipelineDescriptor {
             label: Some(Cow::Borrowed("lightmap application pipeline")),
+            layout: match key.contains(LightPipelineKey::COMBINE_LIGHTMAPS) {
+                false => vec![self.layout_simple.clone()],
+                true => vec![self.layout_combined.clone()],
+            },
+            vertex: self.vertex_state.clone(),
+            fragment: Some(FragmentState {
+                shader: self.shader.clone(),
+                targets: vec![Some(ColorTargetState {
+                    format,
+                    blend: None,
+                    write_mask: ColorWrites::ALL,
+                })],
+                shader_defs,
+                entry_point: Some(Cow::Borrowed("fragment")),
+            }),
+            push_constant_ranges: default(),
+            primitive: default(),
+            depth_stencil: default(),
+            multisample: MultisampleState {
+                count: key.msaa_samples(),
+                ..default()
+            },
+            zero_initialize_workgroup_memory: default(),
+        }
+    }
+}
+
+/// Pipeline that multiplies an array of lightmaps.
+#[derive(Resource)]
+pub struct LightmapCombinationPipeline {
+    pub layout: BindGroupLayoutDescriptor,
+    pub sampler: Sampler,
+    pub vertex_state: VertexState,
+    pub shader: Handle<Shader>,
+}
+
+#[derive(Component)]
+pub struct SpecializedCombinationPipeline(pub CachedRenderPipelineId);
+
+fn init_lightmap_combination_pipeline(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    fullscreen_shader: Res<FullscreenShader>,
+    asset_server: Res<AssetServer>,
+) {
+    let layout = BindGroupLayoutDescriptor::new(
+        "`combine lightmaps layout",
+        &BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (
+                texture_2d_array(TextureSampleType::Float { filterable: true }),
+                sampler(SamplerBindingType::Filtering),
+                uniform_buffer::<UniformFireflyConfig>(false),
+            ),
+        ),
+    );
+
+    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let vertex_state = fullscreen_shader.to_vertex_state();
+
+    commands.insert_resource(LightmapCombinationPipeline {
+        layout,
+        sampler,
+        vertex_state,
+        shader: load_embedded_asset!(asset_server.as_ref(), "shaders/combine_lightmaps.wgsl"),
+    });
+}
+
+impl SpecializedRenderPipeline for LightmapCombinationPipeline {
+    type Key = LightPipelineKey;
+
+    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
+        let format = match key.contains(LightPipelineKey::HDR) {
+            true => ViewTarget::TEXTURE_FORMAT_HDR,
+            false => TextureFormat::bevy_default(),
+        };
+
+        RenderPipelineDescriptor {
+            label: Some(Cow::Borrowed("lightmap combination pipeline")),
             layout: vec![self.layout.clone()],
             vertex: self.vertex_state.clone(),
             fragment: Some(FragmentState {

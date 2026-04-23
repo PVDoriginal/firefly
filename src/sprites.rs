@@ -7,10 +7,11 @@
 use std::ops::Range;
 
 use crate::phases::SpritePhase;
-use crate::pipelines::SpritePipeline;
+use crate::pipelines::{LightPipelineKey, SpritePipeline};
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
 use bevy::asset::{AssetEventSystems, AssetPath};
+use bevy::ecs::schedule::ScheduleCleanupPolicy;
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
 use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
@@ -248,6 +249,14 @@ impl Plugin for SpritesPlugin {
         );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+            // render_app
+            //     .remove_systems_in_set(
+            //         Render,
+            //         bevy::sprite_render::queue_sprites,
+            //         ScheduleCleanupPolicy::RemoveSystemsOnly,
+            //     )
+            //     .unwrap();
+
             render_app
                 .init_resource::<ImageBindGroups>()
                 .init_resource::<DrawFunctions<SpritePhase>>()

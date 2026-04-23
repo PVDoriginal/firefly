@@ -128,4 +128,19 @@ pub struct UniformFireflyConfig {
     pub z_sorting_error_margin: f32,
     pub normal_mode: u32,
     pub normal_attenuation: f32,
+    pub n_combined_lightmaps: u32,
 }
+
+#[derive(Component)]
+#[relationship(relationship_target = CombinedLightmaps)]
+pub struct CombineLightmapTo(pub Entity);
+
+#[derive(Component)]
+#[relationship_target(relationship = CombineLightmapTo, linked_spawn)]
+pub struct CombinedLightmaps(Vec<Entity>);
+
+#[derive(Component)]
+pub struct ExtractedCombinedLightmaps(pub Vec<Entity>);
+
+#[derive(Component)]
+pub struct ExtractedCombineLightmapTo(pub Entity, pub u32);

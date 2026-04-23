@@ -115,7 +115,7 @@ pub(crate) use phases::*;
 
 pub mod prelude {
     pub use crate::app::{FireflyGizmoStyle, FireflyGizmosPlugin, FireflyPlugin};
-    pub use crate::data::{FireflyConfig, NormalMode};
+    pub use crate::data::{CombineLightmapTo, CombinedLightmaps, FireflyConfig, NormalMode};
     pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
@@ -125,6 +125,10 @@ pub mod prelude {
 /// Camera component that stores the texture of the lightmap.
 #[derive(Component)]
 pub struct LightMapTexture(pub CachedTexture);
+
+/// Camera component that stores an array of lightmaps that will be combined.
+#[derive(Component)]
+pub struct CombinedLightMapTextures(pub CachedTexture);
 
 /// Camera component that stores the sprite stencil.
 #[derive(Component)]

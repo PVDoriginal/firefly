@@ -1,5 +1,10 @@
 use bevy::{
-    color::palettes::css::RED, prelude::*, render::view::Hdr, sprite::Anchor, window::PrimaryWindow,
+    color::palettes::css::RED,
+    ecs::schedule::ScheduleCleanupPolicy,
+    prelude::*,
+    render::{Render, RenderApp, view::Hdr},
+    sprite::Anchor,
+    window::PrimaryWindow,
 };
 use bevy_firefly::{data::NormalMode, prelude::*};
 

@@ -4,9 +4,9 @@ use core::f32;
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use crate::{
-    LightmapPhase, NormalMapTexture, SpriteStencilTexture,
+    CombinedLightMapTextures, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BinBuffers, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
-    data::{ExtractedWorldData, NormalMode},
+    data::{CombinedLightmaps, ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
@@ -93,29 +93,36 @@ impl Plugin for PreparePlugin {
 }
 
 fn specialize_light_application_pipeline(
-    views: Query<(Entity, &ExtractedView)>,
+    views: Query<(Entity, &ExtractedView, &Msaa, Has<CombinedLightMapTextures>)>,
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<LightmapApplicationPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<LightmapApplicationPipeline>>,
     mut commands: Commands,
 ) {
-    for (entity, view) in views {
-        let key = LightPipelineKey::from_hdr(view.hdr);
+    for (entity, view, msaa, is_combined) in views {
+        let mut key = LightPipelineKey::from_hdr(view.hdr);
+        if is_combined {
+            key |= LightPipelineKey::COMBINE_LIGHTMAPS;
+        }
+
         let pipeline_id = pipelines.specialize(&pipeline_cache, &pipeline, key);
 
         commands
             .entity(entity)
-            .insert(SpecializedApplicationPipeline(pipeline_id));
+            .insert(SpecializedApplicationPipeline {
+                id: pipeline_id,
+                is_combined,
+            });
     }
 }
 
 fn prepare_config(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    configs: Query<(Entity, &FireflyConfig)>,
+    configs: Query<(Entity, &FireflyConfig, Option<&ExtractedCombinedLightmaps>)>,
     mut commands: Commands,
 ) {
-    for (entity, config) in &configs {
+    for (entity, config, combined_lightmap) in &configs {
         let uniform = UniformFireflyConfig {
             ambient_color: config.ambient_color.to_linear().to_vec3(),
             ambient_brightness: config.ambient_brightness,
@@ -145,6 +152,11 @@ fn prepare_config(
             },
 
             normal_attenuation: config.normal_attenuation,
+
+            n_combined_lightmaps: match combined_lightmap {
+                None => 0,
+                Some(x) => x.0.len() as u32,
+            },
         };
         let mut buffer = UniformBuffer::<UniformFireflyConfig>::from(uniform);
         buffer.write_buffer(&render_device, &render_queue);
@@ -158,9 +170,15 @@ fn prepare_lightmap(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     mut texture_cache: ResMut<TextureCache>,
-    view_targets: Query<(Entity, &ViewTarget, &ExtractedView)>,
+    view_targets: Query<(
+        Entity,
+        &ViewTarget,
+        &ExtractedView,
+        Option<&ExtractedCombinedLightmaps>,
+        &Msaa,
+    )>,
 ) {
-    for (entity, view_target, view) in &view_targets {
+    for (entity, view_target, view, combined_lightmaps, msaa) in &view_targets {
         let format = match view.hdr {
             true => ViewTarget::TEXTURE_FORMAT_HDR,
             false => TextureFormat::bevy_default(),
@@ -213,6 +231,30 @@ fn prepare_lightmap(
             SpriteStencilTexture(sprite_stencil_texture),
             NormalMapTexture(normal_map_texture),
         ));
+
+        if let Some(combined_lightmaps) = combined_lightmaps {
+            let mut size = view_target.main_texture().size();
+            size.depth_or_array_layers = combined_lightmaps.0.len() as u32;
+
+            let texture = texture_cache.get(
+                &render_device,
+                TextureDescriptor {
+                    label: Some("combined"),
+                    size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: TextureDimension::D2,
+                    format,
+                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                },
+            );
+            info!("inserting texture");
+
+            commands
+                .entity(entity)
+                .insert(CombinedLightMapTextures(texture));
+        }
     }
 }
 
@@ -418,29 +460,28 @@ pub(crate) fn prepare_data(
 
                 let mut bind_group = HashMap::default();
                 for (camera, _) in cameras {
-                    for bins in bins.0.get_mut(&camera.0.retained_view_entity) {
-                        bins.write(&render_device, &render_queue);
-                        bind_group.insert(
-                            camera.0.retained_view_entity,
-                            render_device.create_bind_group(
-                                "light bind group",
-                                &pipeline_cache.get_bind_group_layout(&lightmap_pipeline.layout),
-                                &BindGroupEntries::sequential((
-                                    &lightmap_pipeline.sampler,
-                                    light_buffer.binding(),
-                                    light_pointer_binding.clone(),
-                                    round_occluders.binding(),
-                                    poly_occluders.binding(),
-                                    vertices.binding(),
-                                    bins.bin_binding(),
-                                    bins.bin_indices_binding(),
-                                    &camera.4.0.default_view,
-                                    &camera.5.0.default_view,
-                                    camera.6.0.binding().unwrap(),
-                                )),
-                            ),
-                        );
-                    }
+                    let bins = bins.0.get_mut(&camera.0.retained_view_entity).unwrap();
+                    bins.write(&render_device, &render_queue);
+                    bind_group.insert(
+                        camera.0.retained_view_entity,
+                        render_device.create_bind_group(
+                            "light bind group",
+                            &pipeline_cache.get_bind_group_layout(&lightmap_pipeline.layout),
+                            &BindGroupEntries::sequential((
+                                &lightmap_pipeline.sampler,
+                                light_buffer.binding(),
+                                light_pointer_binding.clone(),
+                                round_occluders.binding(),
+                                poly_occluders.binding(),
+                                vertices.binding(),
+                                bins.bin_binding(),
+                                bins.bin_indices_binding(),
+                                &camera.4.0.default_view,
+                                &camera.5.0.default_view,
+                                camera.6.0.binding().unwrap(),
+                            )),
+                        ),
+                    );
                 }
 
                 bind_groups.push((*entity, bind_group));

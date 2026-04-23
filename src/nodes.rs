@@ -8,6 +8,8 @@ use bevy::{
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
             BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
+            SpecializedRenderPipelines, TextureAspect, TextureDimension, TextureFormat,
+            TextureUsages, TextureViewDescriptor, TextureViewDimension,
         },
         renderer::RenderContext,
         view::{ExtractedView, ViewTarget},
@@ -15,7 +17,9 @@ use bevy::{
 };
 
 use crate::{
-    LightMapTexture, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
+    CombinedLightMapTextures, LightMapTexture, LightmapPhase, NormalMapTexture,
+    SpriteStencilTexture,
+    data::{CombinedLightmaps, ExtractedCombineLightmapTo},
     phases::SpritePhase,
     pipelines::{LightmapApplicationPipeline, SpecializedApplicationPipeline},
     prepare::BufferedFireflyConfig,
@@ -25,18 +29,18 @@ use crate::{
 #[derive(Default)]
 pub struct CreateLightmapNode;
 
-/// Node used to apply the lightmap over the fullscreen view.
-#[derive(Default)]
-pub struct ApplyLightmapNode;
-
 impl ViewNode for CreateLightmapNode {
-    type ViewQuery = (&'static ExtractedView, Read<LightMapTexture>);
+    type ViewQuery = (
+        &'static ExtractedView,
+        Read<LightMapTexture>,
+        Option<Read<ExtractedCombineLightmapTo>>,
+    );
 
     fn run<'w>(
         &self,
         graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view, lightmap_texture): QueryItem<'w, '_, Self::ViewQuery>,
+        (view, lightmap_texture, combine_lightmap_to): QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let Some(lightmap_phases) = world.get_resource::<ViewBinnedRenderPhases<LightmapPhase>>()
@@ -50,10 +54,41 @@ impl ViewNode for CreateLightmapNode {
             return Ok(());
         };
 
+        let view = if let Some(combine_lightmap_to) = combine_lightmap_to {
+            let lightmap = world
+                .get::<CombinedLightMapTextures>(combine_lightmap_to.0)
+                .unwrap();
+
+            let hdr = world
+                .get::<ExtractedView>(combine_lightmap_to.0)
+                .unwrap()
+                .hdr;
+
+            info!("writing texture");
+
+            let format = match hdr {
+                true => ViewTarget::TEXTURE_FORMAT_HDR,
+                false => TextureFormat::bevy_default(),
+            };
+            // &lightmap.0.default_view
+            &lightmap.0.texture.create_view(&TextureViewDescriptor {
+                label: "layer of combined lightmap texture array".into(),
+                format: Some(format),
+                dimension: Some(TextureViewDimension::D2Array),
+                usage: Some(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING),
+                aspect: TextureAspect::All,
+                base_mip_level: 0,
+                mip_level_count: Some(1),
+                base_array_layer: combine_lightmap_to.1,
+                array_layer_count: Some(1),
+            })
+        } else {
+            &lightmap_texture.0.default_view
+        };
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("lightmap pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: &lightmap_texture.0.default_view,
+                view,
                 resolve_target: None,
                 ops: default(),
                 depth_slice: None,
@@ -66,10 +101,13 @@ impl ViewNode for CreateLightmapNode {
         if let Err(err) = lightmap_phase.render(&mut render_pass, world, view_entity) {
             error!("Error encountered while rendering the stencil phase {err:?}");
         }
-
         Ok(())
     }
 }
+
+/// Node used to apply the lightmap over the fullscreen view.
+#[derive(Default)]
+pub struct ApplyLightmapNode;
 
 impl ViewNode for ApplyLightmapNode {
     type ViewQuery = (
@@ -77,23 +115,32 @@ impl ViewNode for ApplyLightmapNode {
         Read<BufferedFireflyConfig>,
         Read<ViewTarget>,
         Read<LightMapTexture>,
+        Option<Read<CombinedLightMapTextures>>,
+        Has<ExtractedCombineLightmapTo>,
     );
 
     fn run<'w>(
         &self,
         _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (pipeline_id, config, view_target, light_map_texture): bevy::ecs::query::QueryItem<
-            'w,
-            '_,
-            Self::ViewQuery,
-        >,
+        (
+            pipeline_id,
+            config,
+            view_target,
+            light_map_texture,
+            combined_textures,
+            is_combined_to
+        ): bevy::ecs::query::QueryItem<'w, '_, Self::ViewQuery>,
         world: &'w World,
     ) -> std::result::Result<(), NodeRunError> {
+        if is_combined_to {
+            return Ok(());
+        }
+
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = world.resource::<LightmapApplicationPipeline>();
 
-        let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline_id.0) else {
+        let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline_id.id) else {
             return Ok(());
         };
 
@@ -102,16 +149,54 @@ impl ViewNode for ApplyLightmapNode {
             return Ok(());
         };
 
-        let bind_group = render_context.render_device().create_bind_group(
-            "apply lightmap bind group",
-            &pipeline_cache.get_bind_group_layout(&pipeline.layout),
-            &BindGroupEntries::sequential((
-                post_process.source,
-                &light_map_texture.0.default_view,
-                &pipeline.sampler,
-                config,
-            )),
-        );
+        let format = match view_target.is_hdr() {
+            true => ViewTarget::TEXTURE_FORMAT_HDR,
+            false => TextureFormat::bevy_default(),
+        };
+
+        let bind_group = if !pipeline_id.is_combined {
+            render_context.render_device().create_bind_group(
+                "apply lightmap bind group simple",
+                &pipeline_cache.get_bind_group_layout(&pipeline.layout_simple),
+                &BindGroupEntries::sequential((
+                    post_process.source,
+                    &light_map_texture.0.default_view,
+                    &pipeline.sampler,
+                    config,
+                )),
+            )
+        } else {
+            let combined_view =
+                combined_textures
+                    .unwrap()
+                    .0
+                    .texture
+                    .create_view(&TextureViewDescriptor {
+                        label: "combined lightmap texture array".into(),
+                        format: Some(format),
+                        dimension: Some(TextureViewDimension::D2Array),
+                        usage: Some(
+                            TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                        ),
+                        aspect: TextureAspect::All,
+                        base_mip_level: 0,
+                        mip_level_count: Some(1),
+                        base_array_layer: 0,
+                        array_layer_count: None,
+                    });
+
+            render_context.render_device().create_bind_group(
+                "apply lightmap bind group combined",
+                &pipeline_cache.get_bind_group_layout(&pipeline.layout_combined),
+                &BindGroupEntries::sequential((
+                    post_process.source,
+                    &light_map_texture.0.default_view,
+                    &pipeline.sampler,
+                    config,
+                    &combined_view,
+                )),
+            )
+        };
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("apply lightmap pass"),
@@ -129,7 +214,6 @@ impl ViewNode for ApplyLightmapNode {
         render_pass.set_render_pipeline(render_pipeline);
         render_pass.set_bind_group(0, &bind_group, &[]);
         render_pass.draw(0..3, 0..1);
-
         Ok(())
     }
 }

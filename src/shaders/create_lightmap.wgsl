@@ -58,6 +58,7 @@ const PIDIV2: f32 = 1.57079632679489661923132169163975144;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
+    // return vec4f(100.0);
     let light = lights[light_index];
 
     var res = vec4f(0);

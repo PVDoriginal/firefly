@@ -33,6 +33,7 @@ use crate::{
     LightBatchSetKey,
     buffers::{BinBuffer, BinBuffers, BufferIndex},
     change::Changes,
+    data::{CombinedLightmaps, ExtractedCombineLightmapTo},
     phases::LightmapPhase,
     pipelines::{LightPipelineKey, LightmapCreationPipeline},
     visibility::VisibilityTimer,
@@ -367,20 +368,28 @@ fn queue_lights(
         &Msaa,
         Option<&Tonemapping>,
         Option<&DebandDither>,
+        Option<&ExtractedCombineLightmapTo>,
     )>,
     pipeline_cache: Res<PipelineCache>,
 ) {
     let draw_lightmap_function = light_draw_functions.read().id::<DrawLightmap>();
 
-    for (view, visible_entities, msaa, tonemapping, dither) in &views {
+    for (view, visible_entities, msaa, tonemapping, dither, combined_lightmap) in &views {
         let Some(lightmap_phase) = lightmap_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
-        let msaa_key = LightPipelineKey::from_msaa_samples(msaa.samples());
-        let mut view_key = LightPipelineKey::from_hdr(view.hdr) | msaa_key;
+        let (hdr, msaa) = if let Some(combined_lightmap) = combined_lightmap {
+            let view = views.get(combined_lightmap.0).unwrap();
+            (view.0.hdr, view.2)
+        } else {
+            (view.hdr, msaa)
+        };
 
-        if !view.hdr {
+        let msaa_key = LightPipelineKey::from_msaa_samples(msaa.samples());
+        let mut view_key = LightPipelineKey::from_hdr(hdr) | msaa_key;
+
+        if !hdr {
             if let Some(tonemapping) = tonemapping {
                 view_key |= LightPipelineKey::TONEMAP_IN_SHADER;
                 view_key |= match tonemapping {

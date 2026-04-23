@@ -11,5 +11,6 @@ var texture_sampler: sampler;
 
 @fragment
 fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(main_lightmap, texture_sampler, vo.uv) * textureSample(visibility_lightmap, texture_sampler, vo.uv);
+    return vec4f(1.0);
+    // return textureSample(main_lightmap, texture_sampler, vo.uv) * textureSample(visibility_lightmap, texture_sampler, vo.uv);
 }
