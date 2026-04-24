@@ -81,10 +81,11 @@ fn on_light_removed(
     mut light_manager: ResMut<BufferManager<UniformPointLight>>,
 ) {
     if let Ok(mut index) = lights.get_mut(trigger.entity)
-        && let Some(old_index) = index.0 {
-            light_manager.free_index(old_index);
-            index.0 = None;
-        }
+        && let Some(old_index) = index.0
+    {
+        light_manager.free_index(old_index);
+        index.0 = None;
+    }
 }
 
 // handles buffer when the occluder gets despawned or the component is removed
@@ -429,10 +430,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
                 self.buffer.write_buffer(device, queue);
             } else {
                 self.buffer
-                    .write_buffer_range(
-                        queue,
-                        self.write_min..(self.write_max + 1),
-                    )
+                    .write_buffer_range(queue, self.write_min..(self.write_max + 1))
                     .expect("couldn't write to buffer");
             }
         }
@@ -452,9 +450,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
         self.write(device, queue);
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
-        if self.free_indices.len() > 500
-            && self.free_indices.len() > self.buffer.capacity() / 2
-        {
+        if self.free_indices.len() > 500 && self.free_indices.len() > self.buffer.capacity() / 2 {
             let old_generation = self.current_generation;
             *self = Self::new(device, queue);
             self.current_generation = old_generation + 1;
@@ -577,7 +573,7 @@ impl BinBuffer {
         }
     }
 
-    const SCALE: f32 = N_BINS_FLOAT / TAU;
+    // const SCALE: f32 = N_BINS_FLOAT / TAU;
     /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
     pub fn add_occluder(&mut self, data: &OccluderData) {
         if data.angle.ceil() >= TAU {

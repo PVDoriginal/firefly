@@ -2,13 +2,12 @@
 
 use bevy::{
     camera::visibility::RenderLayers,
-    ecs::entity::MapEntities,
     platform::collections::HashSet,
     prelude::*,
     render::{
         Extract, RenderApp,
         batching::gpu_preprocessing::{GpuPreprocessingMode, GpuPreprocessingSupport},
-        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        extract_component::ExtractComponentPlugin,
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         sync_world::RenderEntity,
         view::{NoIndirectDrawing, RetainedViewEntity},
