@@ -58,8 +58,8 @@ struct OccluderPointer {
 struct RoundOccluder {
     pos: vec2f,
     rot: f32,
-    width: f32,
-    height: f32, 
+    half_width: f32,
+    half_height: f32, 
     radius: f32,
     z: f32, 
     @size(16)

@@ -384,8 +384,8 @@ pub(crate) fn prepare_data(
                         .collect::<Vec<_>>();
 
                     if let Occluder2dShape::RoundRectangle {
-                        width,
-                        height,
+                        half_width,
+                        half_height,
                         radius,
                     } = occluder.shape
                     {
@@ -394,18 +394,18 @@ pub(crate) fn prepare_data(
                         };
 
                         let vertices = vec![
-                            vec2(-width / 2.0 - radius, -height / 2.0 - radius),
-                            vec2(-width / 2.0 - radius, height / 2.0 + radius),
-                            vec2(width / 2.0 + radius, height / 2.0 + radius),
-                            vec2(width / 2.0 + radius, -height / 2.0 - radius),
+                            vec2(-half_width - radius, -half_height - radius),
+                            vec2(-half_width - radius, half_height + radius),
+                            vec2(half_width + radius, half_height + radius),
+                            vec2(half_width + radius, -half_height - radius),
                         ];
 
                         let light_pos =
                             Vec2::from_angle(-occluder.rot).rotate(light.pos - occluder.pos);
 
                         let aabb = Aabb2d {
-                            min: vec2(-width / 2.0 - radius, -height / 2.0 - radius),
-                            max: vec2(width / 2.0 + radius, height / 2.0 + radius),
+                            min: vec2(-half_width - radius, -half_height - radius),
+                            max: vec2(half_width + radius, half_height + radius),
                         };
 
                         let isometry = Isometry2d {

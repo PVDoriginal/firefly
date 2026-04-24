@@ -211,8 +211,8 @@ impl Occluder2d {
     /// is a round rectangle with only height or only width (and radius).
     pub fn round_rectangle(width: f32, height: f32, radius: f32) -> Self {
         Self::from_shape(Occluder2dShape::RoundRectangle {
-            width,
-            height,
+            half_width: width * 0.5,
+            half_height: height * 0.5,
             radius,
         })
     }
@@ -361,8 +361,8 @@ pub struct UniformOccluder {
 pub struct UniformRoundOccluder {
     pub pos: Vec2,
     pub rot: f32,
-    pub width: f32,
-    pub height: f32,
+    pub half_width: f32,
+    pub half_height: f32,
     pub radius: f32,
     pub z: f32,
     pub color: Vec3,
@@ -391,8 +391,8 @@ pub enum Occluder2dShape {
         vertices: Vec<Vec2>,
     },
     RoundRectangle {
-        width: f32,
-        height: f32,
+        half_width: f32,
+        half_height: f32,
         radius: f32,
     },
 }
@@ -400,8 +400,8 @@ pub enum Occluder2dShape {
 impl Default for Occluder2dShape {
     fn default() -> Self {
         Self::RoundRectangle {
-            width: 10.,
-            height: 10.,
+            half_width: 5.,
+            half_height: 5.,
             radius: 0.,
         }
     }

@@ -172,12 +172,12 @@ fn occluder_aabb(
 
         rect.0 = match occluder.shape() {
             Occluder2dShape::RoundRectangle {
-                width,
-                height,
+                half_width,
+                half_height,
                 radius,
             } => Aabb2d {
-                min: vec2(-width / 2.0, -height / 2.0) - radius,
-                max: vec2(width / 2.0, height / 2.0) + radius,
+                min: vec2(-half_width, -half_height) - radius,
+                max: vec2(*half_width, *half_height) + radius,
             }
             .transformed_by(isometry.translation, isometry.rotation),
 

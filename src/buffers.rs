@@ -232,16 +232,16 @@ fn prepare_occluders(
         let changed = occluder.changes.0;
 
         if let Occluder2dShape::RoundRectangle {
-            width,
-            height,
+            half_width,
+            half_height,
             radius,
         } = occluder.shape
         {
             let value = UniformRoundOccluder {
                 pos: occluder.pos,
                 rot: occluder.rot,
-                width,
-                height,
+                half_width,
+                half_height,
                 radius,
                 // padding: default(),
                 z: occluder.z,

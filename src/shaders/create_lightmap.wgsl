@@ -448,8 +448,8 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
     let light = lights[light_index];
 
     let occ = round_occluders[occluder];
-    let half_w = occ.width * 0.5;
-    let half_h = occ.height * 0.5;
+    let half_w = occ.half_width;
+    let half_h = occ.half_height;
     let radius = occ.radius;
 
     let relative_pos = pos - occ.pos; 
@@ -474,7 +474,7 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
     //     return 0.0;
     // }
 
-    if (occ.width > 0) {
+    if (half_w > 0) {
         let top_edge = intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false);
 
         if top_edge.full_intersection {
@@ -492,7 +492,7 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
         half_intersection |= bottom_edge.half_intersection;
     }
 
-    if (occ.height > 0) {
+    if (half_h > 0) {
         let right_edge = intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true);
 
         if right_edge.full_intersection {
