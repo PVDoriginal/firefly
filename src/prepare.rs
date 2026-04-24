@@ -366,20 +366,17 @@ pub(crate) fn prepare_data(
 
                     let mut retained_views: HashSet<_, FixedHasher> = HashSet::default();
 
-                    let _cameras = cameras
-                        .iter()
-                        .filter_map(|(camera, light_aabb)| {
-                            if !occluder.aabb.intersects(light_aabb) {
-                                return None;
-                            }
+                    cameras.iter().for_each(|(camera, light_aabb)| {
+                        if !occluder.aabb.intersects(light_aabb)
+                            || !camera.1.intersects(&occluder.render_layers)
+                        {
+                            return;
+                        }
 
-                            any_soft_shadows |= camera.7.soft_shadows;
+                        any_soft_shadows |= camera.7.soft_shadows;
 
-                            retained_views.insert(camera.0.retained_view_entity);
-
-                            Some(camera)
-                        })
-                        .collect::<Vec<_>>();
+                        retained_views.insert(camera.0.retained_view_entity);
+                    });
 
                     let bins = bins
                         .0

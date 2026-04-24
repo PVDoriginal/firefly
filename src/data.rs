@@ -81,7 +81,7 @@ pub struct FireflyConfig {
     pub combination_mode: CombinationMode,
 }
 
-/// Specifies how multiple textures will be comvbined.
+/// Specifies how multiple textures will be combined.
 ///
 /// **Default:** Multiply.
 #[derive(Clone, Copy, Reflect, Default, Debug)]
