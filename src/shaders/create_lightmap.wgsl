@@ -141,9 +141,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         let left = bin_indices.indices[bin]; 
         let right = bin_indices.indices[bin + 1];
 
-        if left >= right {
-            return vec4f(1.0, 0.0, 0.0, 1.0);
-        }
+        // if left >= right {
+            // return vec4f(1.0, 0.0, 0.0, 1.0);
+        // }
 
         var prev_index = 0u; 
         var accumulated_occlusion = 0.0;
@@ -511,17 +511,29 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
     }
 
     if (radius > 0) {
-        let quadrants = array<vec2f, 4>(vec2f(1,1), vec2f(-1,1), vec2f(1,-1), vec2f(-1,-1));
-        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-        for(var i = 0u; i < 4u; i++) {
-            let arc = intersects_corner_arc(p_local, l_local, centers[i], radius, quadrants[i]); 
-
-            if arc.full_intersection { 
-                return 1.0;
-            }
-
-            half_intersection |= arc.half_intersection;
+        let arc1 = intersects_corner_arc(p_local, l_local, vec2f(half_w, half_h), radius, vec2f(1,1)); 
+        if arc1.full_intersection { 
+            return 1.0;
         }
+        half_intersection |= arc1.half_intersection;
+
+        let arc2 = intersects_corner_arc(p_local, l_local, vec2f(-half_w, half_h), radius, vec2f(-1,1)); 
+        if arc2.full_intersection { 
+            return 1.0;
+        }
+        half_intersection |= arc2.half_intersection;
+
+        let arc3 = intersects_corner_arc(p_local, l_local, vec2f(half_w, -half_h), radius, vec2f(1,-1)); 
+        if arc3.full_intersection { 
+            return 1.0;
+        }
+        half_intersection |= arc3.half_intersection;
+
+        let arc4 = intersects_corner_arc(p_local, l_local, vec2f(-half_w, -half_h), radius, vec2f(-1,-1)); 
+        if arc4.full_intersection { 
+            return 1.0;
+        }
+        half_intersection |= arc4.half_intersection;
     }
 
     if config.soft_shadows > 0 && light.core_radius > 0.0 && !half_intersection {
@@ -549,21 +561,37 @@ fn get_round_extreme_angle(half_w: f32, half_h: f32, p_local: vec2f, l_local: ve
         }
     }
     else {
-        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-        let arc_tangents = array<ArcTangents, 4>(
-            get_arc_extremes(l_local, centers[0], radius, 0.0, PIDIV2),
-            get_arc_extremes(l_local, centers[1], radius, PIDIV2, PI),
-            get_arc_extremes(l_local, centers[2], radius, -PIDIV2, 0.0),
-            get_arc_extremes(l_local, centers[3], radius, -PI, -PIDIV2),
-        );
-    
-        for (var i = 0; i < 4; i += 1) {
-            if arc_tangents[i].is_a {
-                left_right = update_left_right(l_local, left_right, arc_tangents[i].a);
-            }
-            if arc_tangents[i].is_b {
-                left_right = update_left_right(l_local, left_right, arc_tangents[i].b);
-            }
+        let arc_tangents1 = get_arc_extremes(l_local, vec2f(half_w, half_h), radius, 0.0, PIDIV2);
+        let arc_tangents2 = get_arc_extremes(l_local, vec2f(-half_w, half_h), radius, PIDIV2, PI);
+        let arc_tangents3 = get_arc_extremes(l_local, vec2f(half_w, -half_h), radius, -PIDIV2, 0.0);
+        let arc_tangents4 = get_arc_extremes(l_local, vec2f(-half_w, -half_h), radius, -PI, -PIDIV2);
+
+        if arc_tangents1.is_a {
+            left_right = update_left_right(l_local, left_right, arc_tangents1.a);
+        }
+        if arc_tangents1.is_b {
+            left_right = update_left_right(l_local, left_right, arc_tangents1.b);
+        }
+
+        if arc_tangents2.is_a {
+            left_right = update_left_right(l_local, left_right, arc_tangents2.a);
+        }
+        if arc_tangents2.is_b {
+            left_right = update_left_right(l_local, left_right, arc_tangents2.b);
+        }
+
+        if arc_tangents3.is_a {
+            left_right = update_left_right(l_local, left_right, arc_tangents3.a);
+        }
+        if arc_tangents3.is_b {
+            left_right = update_left_right(l_local, left_right, arc_tangents3.b);
+        }
+
+        if arc_tangents4.is_a {
+            left_right = update_left_right(l_local, left_right, arc_tangents4.a);
+        }
+        if arc_tangents4.is_b {
+            left_right = update_left_right(l_local, left_right, arc_tangents4.b);
         }
     }
 

@@ -753,6 +753,7 @@ impl VertexBuffer {
             for vertex in occluder.vertices_iter() {
                 if last_index >= self.vertices.len() {
                     self.vertices.push(vertex);
+                    warn!("hmm.. what?");
                 } else {
                     self.vertices.set(last_index as u32, vertex);
                 }
