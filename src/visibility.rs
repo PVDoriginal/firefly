@@ -181,7 +181,9 @@ fn occluder_aabb(
             }
             .transformed_by(isometry.translation, isometry.rotation),
 
-            Occluder2dShape::Polygon { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
+            Occluder2dShape::Polygon { vertices, .. } => {
+                Aabb2d::from_point_cloud(isometry, vertices)
+            }
             Occluder2dShape::Polyline { vertices } => Aabb2d::from_point_cloud(isometry, vertices),
         }
     }

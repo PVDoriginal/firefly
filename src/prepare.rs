@@ -421,7 +421,7 @@ pub(crate) fn prepare_data(
 
                         push_vertices(
                             bins,
-                            vertices,
+                            &vertices,
                             light.pos,
                             light.core.radius,
                             0,
@@ -431,6 +431,7 @@ pub(crate) fn prepare_data(
                             light_inside_occluder,
                             false,
                             any_soft_shadows,
+                            true,
                         );
                     } else {
                         let Some(occluder_index) = poly_index.occluder else {
@@ -441,15 +442,22 @@ pub(crate) fn prepare_data(
                             continue;
                         };
 
+                        let vertices = occluder.vertices();
+
                         let light_inside_occluder =
                             matches!(occluder.shape, Occluder2dShape::Polygon { .. })
-                                && point_inside_poly(light.pos, occluder.vertices(), occluder.aabb);
+                                && point_inside_poly(
+                                    light.pos,
+                                    &vertices,
+                                    occluder.aabb,
+                                    occluder.shape.is_concave(),
+                                );
 
                         let closest = occluder.aabb.closest_point(light.pos);
 
                         push_vertices(
                             bins,
-                            occluder.vertices(),
+                            &vertices,
                             light.pos,
                             light.core.radius,
                             vertex_index.index as u32,
@@ -458,6 +466,7 @@ pub(crate) fn prepare_data(
                             light_inside_occluder,
                             true,
                             any_soft_shadows,
+                            occluder.shape.is_concave(),
                         );
                     }
                 }
@@ -542,7 +551,7 @@ struct Vertex {
 
 fn push_vertices(
     mut bins: Vec<&mut BinBuffer>,
-    occluder_vertices: Vec<Vec2>,
+    occluder_vertices: &Vec<Vec2>,
     light_pos: Vec2,
     light_radius: f32,
     start_vertex: u32,
@@ -551,6 +560,7 @@ fn push_vertices(
     rev: bool,
     poly: bool,
     soft_shadows: bool,
+    concave: bool,
 ) {
     let index = match poly {
         true => (1 << 31) | index as u32,
@@ -587,23 +597,25 @@ fn push_vertices(
 
     let mut round_occlusion = false;
 
-    // info!("vertices: {vertices:?}");
+    if concave && rev {
+        round_occlusion = true;
+    } else {
+        loop {
+            let last = vertices.last().unwrap().angle;
+            let vertex = vertices.first().unwrap().angle;
 
-    loop {
-        let last = vertices.last().unwrap().angle;
-        let vertex = vertices.first().unwrap().angle;
+            let loops = (vertex - last).abs() > PI;
 
-        let loops = (vertex - last).abs() > PI;
+            if (!loops && vertex <= last) || (loops && vertex >= last) {
+                break;
+            }
 
-        if (!loops && vertex <= last) || (loops && vertex >= last) {
-            break;
-        }
+            vertices.rotate_right(1);
 
-        vertices.rotate_right(1);
-
-        if rev && vertices.last().unwrap().index == 0 {
-            round_occlusion = true;
-            break;
+            if rev && vertices.last().unwrap().index == 0 {
+                round_occlusion = true;
+                break;
+            }
         }
     }
 

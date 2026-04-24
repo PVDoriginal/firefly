@@ -127,6 +127,7 @@ impl Occluder2d {
         }
 
         Some(Self::from_shape(Occluder2dShape::Polygon {
+            concave: is_concave(&vertices),
             vertices: normalize_vertices(vertices),
         }))
     }
@@ -150,7 +151,10 @@ impl Occluder2d {
             return None;
         }
 
-        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
+        Some(Self::from_shape(Occluder2dShape::Polygon {
+            concave: is_concave(&vertices),
+            vertices,
+        }))
     }
 
     /// Construct a polygonal occluder from the given points.
@@ -173,7 +177,10 @@ impl Occluder2d {
         }
         vertices.reverse();
 
-        Some(Self::from_shape(Occluder2dShape::Polygon { vertices }))
+        Some(Self::from_shape(Occluder2dShape::Polygon {
+            concave: is_concave(&vertices),
+            vertices,
+        }))
     }
 
     /// Construct a polyline occluder from the given points.
@@ -290,6 +297,27 @@ fn normalize_vertices(mut vertices: Vec<Vec2>) -> Vec<Vec2> {
     }
 }
 
+fn is_concave(vertices: &Vec<Vec2>) -> bool {
+    let n = vertices.len();
+    let mut first_orientation = orientation(vertices[0], vertices[1 % n], vertices[2 % n]);
+
+    for i in 1..n {
+        let new_orientation = orientation(
+            vertices[i % n],
+            vertices[(i + 1) % n],
+            vertices[(i + 2) % n],
+        );
+
+        if matches!(first_orientation, Orientation::Touch) {
+            first_orientation = new_orientation;
+        } else if first_orientation != new_orientation {
+            return false;
+        }
+    }
+
+    true
+}
+
 #[derive(PartialEq, Eq)]
 enum Orientation {
     Touch,
@@ -308,29 +336,46 @@ fn orientation(a: Vec2, b: Vec2, p: Vec2) -> Orientation {
     Orientation::Touch
 }
 
-pub(crate) fn point_inside_poly(p: Vec2, mut poly: Vec<Vec2>, aabb: Aabb2d) -> bool {
+pub(crate) fn point_inside_poly(p: Vec2, poly: &Vec<Vec2>, aabb: Aabb2d, concave: bool) -> bool {
     if !aabb.contains(&Aabb2d { min: p, max: p }) {
         return false;
     }
+    let n = poly.len();
 
-    poly.push(poly[0]);
+    if !concave {
+        let mut inside = false;
 
-    let mut inside = false;
+        for i in 0..n {
+            let line = [poly[i % n], poly[(i + 1) % n]];
 
-    for line in poly.windows(2) {
-        if p.y > line[0].y.min(line[1].y)
-            && p.y <= line[0].y.max(line[1].y)
-            && p.x <= line[0].x.max(line[1].x)
-        {
-            let x_intersection =
-                (p.y - line[0].y) * (line[1].x - line[0].x) / (line[1].y - line[0].y) + line[0].x;
+            if p.y > line[0].y.min(line[1].y)
+                && p.y <= line[0].y.max(line[1].y)
+                && p.x <= line[0].x.max(line[1].x)
+            {
+                let x_intersection = (p.y - line[0].y) * (line[1].x - line[0].x)
+                    / (line[1].y - line[0].y)
+                    + line[0].x;
 
-            if line[0].x == line[1].x || p.x <= x_intersection {
-                inside = !inside;
+                if line[0].x == line[1].x || p.x <= x_intersection {
+                    inside = !inside;
+                }
             }
         }
+        return inside;
+    } else {
+        for i in 0..n {
+            let ori = orientation(poly[i % n], poly[(i + 1) % n], p);
+            if matches!(ori, Orientation::Left) {
+                return false;
+            }
+
+            if matches!(ori, Orientation::Touch) {
+                return true;
+            }
+        }
+
+        return true;
     }
-    inside
 }
 
 /// Plugin that adds general main-world behavior relating to occluders. This is mainly responsible for
@@ -386,6 +431,7 @@ pub(crate) struct UniformVertex {
 pub enum Occluder2dShape {
     Polygon {
         vertices: Vec<Vec2>,
+        concave: bool,
     },
     Polyline {
         vertices: Vec<Vec2>,
@@ -410,7 +456,7 @@ impl Default for Occluder2dShape {
 impl Occluder2dShape {
     pub(crate) fn n_vertices(&self) -> u32 {
         match &self {
-            Self::Polygon { vertices } => vertices.len() as u32,
+            Self::Polygon { vertices, .. } => vertices.len() as u32,
             Self::Polyline { vertices } => vertices.len() as u32,
             Self::RoundRectangle { .. } => 0,
         }
@@ -440,6 +486,13 @@ impl Occluder2dShape {
                 rot,
             )),
             Self::RoundRectangle { .. } => None,
+        }
+    }
+
+    pub(crate) fn is_concave(&self) -> bool {
+        match self {
+            Self::Polygon { concave, .. } => *concave,
+            _ => false,
         }
     }
 }
