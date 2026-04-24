@@ -455,12 +455,6 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
     let relative_pos = pos - occ.pos; 
     let relative_light = light.pos - occ.pos; 
 
-    var rot = round_occluders[occluder].rot;
-    
-    if (rot > PI2) {
-        rot = rot - PI2 * floor(rot / PI2);
-    }
-
     let c = cos(occ.rot);
     let s = sin(occ.rot);
 

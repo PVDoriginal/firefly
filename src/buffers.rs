@@ -546,11 +546,17 @@ impl BinBuffer {
         let mut count = 1;
 
         let values = self.buffer.values_mut();
-        for (index, bin) in self.occluders.iter_mut().enumerate() {
-            values.extend_from_slice(&bin.clone().into_sorted_vec());
 
+        for (index, bin) in self.occluders.iter_mut().enumerate() {
             bin_indices[index] = count as u32;
             count += bin.len();
+            // info!("{:?}", &bin.clone().into_sorted_vec());
+            // values.extend_from_slice(&bin.clone().into_sorted_vec());
+
+            loop {
+                let Some(x) = bin.pop() else { break };
+                values.push(x);
+            }
         }
         bin_indices[N_BINS] = count as u32;
 
@@ -567,9 +573,12 @@ impl BinBuffer {
         self.buffer.clear();
         self.buffer.push(OccluderPointer::default());
 
-        self.occluders = array::from_fn(|_| default());
+        for bin in self.occluders.iter_mut() {
+            bin.clear();
+        }
     }
 
+    const SCALE: f32 = N_BINS_FLOAT / TAU;
     /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
     pub fn add_occluder(&mut self, data: &OccluderData) {
         if data.angle.ceil() >= TAU {
@@ -617,7 +626,7 @@ pub struct OccluderData {
 
 /// Compact struct pointing to a round occluder, or a chain of vertices from a polygonal occluder.  
 #[repr(C)]
-#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType)]
+#[derive(Default, Pod, Zeroable, Clone, Copy, ShaderType, Debug)]
 pub struct OccluderPointer {
     /// The index's first bit is the type of occluder: 0 for round, 1 for polygonal.
     pub index: u32,
@@ -652,13 +661,13 @@ impl Eq for OccluderPointer {}
 
 impl PartialOrd for OccluderPointer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (self.distance).partial_cmp(&other.distance)
+        (-self.distance).partial_cmp(&-other.distance)
     }
 }
 
 impl Ord for OccluderPointer {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        (self.distance).total_cmp(&other.distance)
+        (-self.distance).total_cmp(&-other.distance)
     }
 }
 
@@ -742,7 +751,12 @@ impl VertexBuffer {
         if index < self.next_index {
             let mut last_index = index;
             for vertex in occluder.vertices_iter() {
-                self.vertices.set(last_index as u32, vertex);
+                if last_index >= self.vertices.len() {
+                    self.vertices.push(vertex);
+                } else {
+                    self.vertices.set(last_index as u32, vertex);
+                }
+
                 last_index += 1;
             }
 

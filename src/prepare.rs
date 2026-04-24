@@ -354,7 +354,6 @@ pub(crate) fn prepare_data(
                     if !light.cast_shadows
                         || !light.render_layers.intersects(&occluder.render_layers)
                     {
-                        //|| !occluder.aabb.intersects(&light_aabb) {
                         continue;
                     }
 
