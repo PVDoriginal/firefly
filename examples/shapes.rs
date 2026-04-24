@@ -253,9 +253,15 @@ fn move_light(
 const CAMERA_SPEED: f32 = 60.0;
 fn move_camera(
     mut camera: Single<&mut Transform, With<FireflyConfig>>,
+    occluders: Populated<Entity, With<Occluder2d>>,
     keys: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
     time: Res<Time>,
 ) {
+    if keys.just_pressed(KeyCode::Enter) {
+        commands.entity(occluders.iter().last().unwrap()).despawn();
+    }
+
     if keys.pressed(KeyCode::KeyA) {
         camera.translation.x -= time.delta_secs() * CAMERA_SPEED;
     }

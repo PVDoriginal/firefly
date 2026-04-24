@@ -536,7 +536,7 @@ struct Vertex {
 }
 
 fn push_vertices(
-    bins: Vec<&mut BinBuffer>,
+    mut bins: Vec<&mut BinBuffer>,
     occluder_vertices: Vec<Vec2>,
     light_pos: Vec2,
     light_radius: f32,
@@ -588,7 +588,6 @@ fn push_vertices(
         false => (0 << 31) | index as u32,
     };
 
-    let mut edges: Vec<OccluderData> = vec![];
     // info!("");
     // info!("---------");
     let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
@@ -648,7 +647,7 @@ fn push_vertices(
 
             match slice.split {
                 None => {
-                    edges.push(OccluderData {
+                    let data = OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v,
@@ -658,10 +657,14 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
+                    };
+
+                    bins.iter_mut().for_each(|bins| {
+                        bins.add_occluder(&data);
                     });
                 }
                 Some(split) => {
-                    edges.push(OccluderData {
+                    let data1 = OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v: (1 << 30) | min_v,
@@ -671,8 +674,9 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
-                    });
-                    edges.push(OccluderData {
+                    };
+
+                    let data2 = OccluderData {
                         pointer: OccluderPointer {
                             index,
                             min_v: (2 << 30) | min_v,
@@ -682,6 +686,11 @@ fn push_vertices(
                         },
                         min_angle: slice.start_angle - angle_left,
                         angle: slice.angle + angle_left + angle_right,
+                    };
+
+                    bins.iter_mut().for_each(|bins| {
+                        bins.add_occluder(&data1);
+                        bins.add_occluder(&data2);
                     });
                 }
             }
@@ -743,10 +752,6 @@ fn push_vertices(
             last = Some(vertex);
         }
         push_slice(&slice, &vertices);
-    }
-
-    for bins in bins {
-        bins.add_occluder(edges.clone());
     }
 }
 

@@ -430,7 +430,10 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
                 self.buffer.write_buffer(device, queue);
             } else {
                 self.buffer
-                    .write_buffer_range(queue, self.write_min as usize..self.write_max as usize + 1)
+                    .write_buffer_range(
+                        queue,
+                        self.write_min as usize..(self.write_max as usize + 1),
+                    )
                     .expect("couldn't write to buffer");
             }
         }
@@ -480,8 +483,8 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 }
 
 /// The amount of bins that each [`Bins`] will have.
-pub const N_BINS: usize = 128;
-pub const N_BINS_FLOAT: f32 = 128.0;
+pub const N_BINS: usize = 256;
+pub const N_BINS_FLOAT: f32 = 256.0;
 
 /// A component that each light has, containing the [BinBuffer]s for each camera view.
 #[derive(Component, Default)]
@@ -568,36 +571,31 @@ impl BinBuffer {
     }
 
     /// Add an occluder to this buffer. Or a set of edges, in case of a polygonal occluder.
-    pub fn add_occluder(&mut self, edges: Vec<OccluderData>) {
-        // let lengths: Vec<usize> = self.occluders.iter().map(|v| v.len()).collect();
+    pub fn add_occluder(&mut self, data: &OccluderData) {
+        if data.angle.ceil() >= TAU {
+            self.add_to_bins(0, N_BINS - 1, data.pointer);
+            return;
+        }
 
-        for edge in edges {
-            // info!("min angle: {}, angle: {}", edge.min_angle, edge.angle);
-            if edge.angle.ceil() >= TAU {
-                self.add_to_bins(0, N_BINS - 1, edge.pointer);
-                continue;
-            }
+        // info!("init min angle: {}", edge.min_angle);
 
-            // info!("init min angle: {}", edge.min_angle);
+        let min_angle = if data.min_angle < -PI {
+            data.min_angle + TAU
+        } else {
+            data.min_angle
+        };
 
-            let min_angle = if edge.min_angle < -PI {
-                edge.min_angle + TAU as f32
-            } else {
-                edge.min_angle
-            };
+        let min_bin = (((min_angle + PI) / TAU) * N_BINS_FLOAT).floor() as usize;
+        let n_bins = ((data.angle / TAU) * N_BINS_FLOAT).ceil() as usize;
 
-            let min_bin = (((min_angle + PI) / TAU) * N_BINS_FLOAT).floor() as usize;
-            let n_bins = ((edge.angle / TAU) * N_BINS_FLOAT).ceil() as usize;
+        // info!("min bin: {min_bin}, n_bins: {n_bins}");
 
-            // info!("min bin: {min_bin}, n_bins: {n_bins}");
-
-            // self.add_to_bins(0, N_BINS - 1, edge.pointer);
-            if min_bin + n_bins >= N_BINS {
-                self.add_to_bins(min_bin, N_BINS - 1, edge.pointer);
-                self.add_to_bins(0, min_bin + n_bins - N_BINS, edge.pointer);
-            } else {
-                self.add_to_bins(min_bin, min_bin + n_bins, edge.pointer);
-            }
+        // self.add_to_bins(0, N_BINS - 1, edge.pointer);
+        if min_bin + n_bins >= N_BINS {
+            self.add_to_bins(min_bin, N_BINS - 1, data.pointer);
+            self.add_to_bins(0, min_bin + n_bins - N_BINS, data.pointer);
+        } else {
+            self.add_to_bins(min_bin, min_bin + n_bins, data.pointer);
         }
     }
 

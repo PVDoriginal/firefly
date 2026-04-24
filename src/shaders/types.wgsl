@@ -82,7 +82,7 @@ struct FireflyConfig {
 }
 
 // Should correspond to the value in buffers.rs!
-const N_BINS: u32 = 128;
+const N_BINS: u32 = 256;
 
 struct BinIndices {
     indices: array<u32, N_BINS + 1>,

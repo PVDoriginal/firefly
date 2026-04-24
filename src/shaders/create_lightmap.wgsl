@@ -141,6 +141,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         let left = bin_indices.indices[bin]; 
         let right = bin_indices.indices[bin + 1];
 
+        if left >= right {
+            return vec4f(1.0, 0.0, 0.0, 1.0);
+        }
+
         var prev_index = 0u; 
         var accumulated_occlusion = 0.0;
 
@@ -463,20 +467,18 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
     let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
     let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
 
-    var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
-
-    var extreme_angle = 10.0;
+    // var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
 
     var half_intersection = false; 
 
-    if !rect_line_intersection(p_local, l_local, rect) {
+    // if !rect_line_intersection(p_local, l_local, rect) {
 
-        if config.soft_shadows > 0 && light.core_radius > 0.0 {
-            return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
-        }
+    //     if config.soft_shadows > 0 && light.core_radius > 0.0 {
+    //         return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
+    //     }
 
-        return 0.0;
-    }
+    //     return 0.0;
+    // }
 
     if (occ.width > 0) {
         let top_edge = intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false);
@@ -536,83 +538,42 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
 }
 
 fn get_round_extreme_angle(half_w: f32, half_h: f32, p_local: vec2f, l_local: vec2f, light_radius: f32, radius: f32) -> f32 {
-    var extreme_angle = 10.0;
-
     var left_right = vec4<f32>(half_w + radius, half_h, half_w + radius, half_h);
 
-    left_right = update_left_right(l_local, left_right, vec2f(half_w + radius, -half_h));
-    left_right = update_left_right(l_local, left_right, vec2f(-(half_w + radius), half_h));
-    left_right = update_left_right(l_local, left_right, vec2f(-(half_w + radius), -half_h));
-    
-    left_right = update_left_right(l_local, left_right, vec2f(half_w, half_h + radius));
-    left_right = update_left_right(l_local, left_right, vec2f(-half_w, half_h + radius));
-    left_right = update_left_right(l_local, left_right, vec2f(half_w, -(half_h + radius)));
-    left_right = update_left_right(l_local, left_right, vec2f(-half_w, -(half_h + radius)));
-
-    let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-    let arc_tangents = array<ArcTangents, 4>(
-        get_arc_extremes(l_local, centers[0], radius, 0.0, PIDIV2),
-        get_arc_extremes(l_local, centers[1], radius, PIDIV2, PI),
-        get_arc_extremes(l_local, centers[2], radius, -PIDIV2, 0.0),
-        get_arc_extremes(l_local, centers[3], radius, -PI, -PIDIV2),
-    );
-
-    for (var i = 0; i < 4; i += 1) {
-        if arc_tangents[i].is_a {
-            left_right = update_left_right(l_local, left_right, arc_tangents[i].a);
+    if radius == 0.0 {
+        if half_h > 0 {
+            left_right = update_left_right(l_local, left_right, vec2f(half_w + radius, -half_h));
+            left_right = update_left_right(l_local, left_right, vec2f(-(half_w + radius), half_h));
+            left_right = update_left_right(l_local, left_right, vec2f(-(half_w + radius), -half_h));
         }
-        if arc_tangents[i].is_b {
-            left_right = update_left_right(l_local, left_right, arc_tangents[i].b);
+
+        if half_w > 0 {
+            left_right = update_left_right(l_local, left_right, vec2f(half_w, half_h + radius));
+            left_right = update_left_right(l_local, left_right, vec2f(-half_w, half_h + radius));
+            left_right = update_left_right(l_local, left_right, vec2f(half_w, -(half_h + radius)));
+            left_right = update_left_right(l_local, left_right, vec2f(-half_w, -(half_h + radius)));
+        }
+    }
+    else {
+        let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
+        let arc_tangents = array<ArcTangents, 4>(
+            get_arc_extremes(l_local, centers[0], radius, 0.0, PIDIV2),
+            get_arc_extremes(l_local, centers[1], radius, PIDIV2, PI),
+            get_arc_extremes(l_local, centers[2], radius, -PIDIV2, 0.0),
+            get_arc_extremes(l_local, centers[3], radius, -PI, -PIDIV2),
+        );
+    
+        for (var i = 0; i < 4; i += 1) {
+            if arc_tangents[i].is_a {
+                left_right = update_left_right(l_local, left_right, arc_tangents[i].a);
+            }
+            if arc_tangents[i].is_b {
+                left_right = update_left_right(l_local, left_right, arc_tangents[i].b);
+            }
         }
     }
 
-    // return 0.5;
     return get_softness_multi(light_radius, l_local, p_local, left_right.xy, left_right.zw);
-
-    // extreme_angle = min(
-    //     extreme_angle, 
-    //     min(
-    //         min(
-    //             get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, half_h)),
-    //             get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, -half_h))
-    //         ),
-    //         min(
-    //             get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), half_h)),
-    //             get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), -half_h))
-    //         )
-    //     )
-    // );
-
-    // extreme_angle = min(
-    //     extreme_angle, 
-    //     min(
-    //         min(
-    //             get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, half_h)),
-    //             get_extreme_angle_local(p_local, l_local, vec2f(half_w + radius, -half_h))
-    //         ),
-    //         min(
-    //             get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), half_h)),
-    //             get_extreme_angle_local(p_local, l_local, vec2f(-(half_w + radius), -half_h))
-    //         )
-    //     )
-    // );
-
-    // let centers = array<vec2f, 4>(vec2f(half_w, half_h), vec2f(-half_w, half_h), vec2f(half_w, -half_h), vec2f(-half_w, -half_h));
-    // extreme_angle = min(
-    //     extreme_angle, 
-    //     min(
-    //         min(
-    //             get_arc_extremes(p_local, l_local, centers[0], radius, 0.0, PIDIV2),
-    //             get_arc_extremes(p_local, l_local, centers[1], radius, PIDIV2, PI),
-    //         ),
-    //         min(
-    //             get_arc_extremes(p_local, l_local, centers[2], radius, -PIDIV2, 0.0),
-    //             get_arc_extremes(p_local, l_local, centers[3], radius, -PI, -PIDIV2),
-    //         )
-    //     )
-    // );
-
-    return 0.5;
 }
 
 fn update_left_right(light_pos: vec2<f32>, left_right: vec4<f32>, p: vec2<f32>) -> vec4<f32> {

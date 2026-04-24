@@ -16,7 +16,7 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, FireflyPlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, move_light)
+        .add_systems(Update, (move_light, move_camera))
         .run();
 }
 
@@ -50,6 +50,7 @@ fn setup(mut commands: Commands) {
         },
         FireflyConfig::default(),
         RenderLayers::layer(1),
+        ChildOf(main_camera),
         CombineLightmapTo(main_camera),
     ));
 
@@ -99,4 +100,24 @@ fn move_light(
     gizmos.circle_2d(Isometry2d::from_translation(cursor_position), 5., RED);
 
     light.translation = cursor_position.extend(0.);
+}
+
+const CAMERA_SPEED: f32 = 60.0;
+fn move_camera(
+    mut camera: Single<&mut Transform, With<MainCamera>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+) {
+    if keys.pressed(KeyCode::KeyA) {
+        camera.translation.x -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyD) {
+        camera.translation.x += time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyS) {
+        camera.translation.y -= time.delta_secs() * CAMERA_SPEED;
+    }
+    if keys.pressed(KeyCode::KeyW) {
+        camera.translation.y += time.delta_secs() * CAMERA_SPEED;
+    }
 }
