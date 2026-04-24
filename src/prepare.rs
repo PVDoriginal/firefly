@@ -6,7 +6,7 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 use crate::{
     CombinedLightMapTextures, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BinBuffers, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
-    data::{CombinedLightmaps, ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
+    data::{ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
@@ -99,7 +99,7 @@ fn specialize_light_application_pipeline(
     mut pipelines: ResMut<SpecializedRenderPipelines<LightmapApplicationPipeline>>,
     mut commands: Commands,
 ) {
-    for (entity, view, msaa, is_combined) in views {
+    for (entity, view, _msaa, is_combined) in views {
         let mut key = LightPipelineKey::from_hdr(view.hdr);
         if is_combined {
             key |= LightPipelineKey::COMBINE_LIGHTMAPS;
@@ -175,7 +175,7 @@ fn prepare_lightmap(
         &Msaa,
     )>,
 ) {
-    for (entity, view_target, view, combined_lightmaps, msaa) in &view_targets {
+    for (entity, view_target, view, combined_lightmaps, _msaa) in &view_targets {
         let format = match view.hdr {
             true => ViewTarget::TEXTURE_FORMAT_HDR,
             false => TextureFormat::bevy_default(),
@@ -275,7 +275,7 @@ pub(crate) fn prepare_data(
         &BufferedFireflyConfig,
         &FireflyConfig,
     )>,
-    phases: Res<ViewBinnedRenderPhases<LightmapPhase>>,
+    _phases: Res<ViewBinnedRenderPhases<LightmapPhase>>,
     lightmap_pipeline: Res<LightmapCreationPipeline>,
     mut light_bind_groups: ResMut<LightBindGroups>,
     mut batches: ResMut<LightBatches>,
@@ -358,7 +358,7 @@ pub(crate) fn prepare_data(
 
                     let mut retained_views: HashSet<_, FixedHasher> = HashSet::default();
 
-                    let cameras = cameras
+                    let _cameras = cameras
                         .iter()
                         .filter_map(|(camera, light_aabb)| {
                             if !occluder.aabb.intersects(light_aabb) {
@@ -376,7 +376,7 @@ pub(crate) fn prepare_data(
                     let bins = bins
                         .0
                         .iter_mut()
-                        .filter(|(retained_view, bin)| retained_views.contains(*retained_view))
+                        .filter(|(retained_view, _bin)| retained_views.contains(*retained_view))
                         .map(|(_, x)| x)
                         .collect::<Vec<_>>();
 
@@ -632,7 +632,7 @@ fn push_vertices(
             //     slice.start_vertex, slice.length
             // );
 
-            let min_v = (rev << 29) | slice.start_vertex + start_vertex;
+            let min_v = (rev << 29) | (slice.start_vertex + start_vertex);
             let length = slice.length;
 
             let angle_left = if !soft_shadows || light_radius <= 0.0 {

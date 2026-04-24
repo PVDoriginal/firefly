@@ -80,12 +80,11 @@ fn on_light_removed(
     mut lights: Query<&mut LightIndex>,
     mut light_manager: ResMut<BufferManager<UniformPointLight>>,
 ) {
-    if let Ok(mut index) = lights.get_mut(trigger.entity) {
-        if let Some(old_index) = index.0 {
+    if let Ok(mut index) = lights.get_mut(trigger.entity)
+        && let Some(old_index) = index.0 {
             light_manager.free_index(old_index);
             index.0 = None;
         }
-    }
 }
 
 // handles buffer when the occluder gets despawned or the component is removed
@@ -432,7 +431,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
                 self.buffer
                     .write_buffer_range(
                         queue,
-                        self.write_min as usize..(self.write_max as usize + 1),
+                        self.write_min..(self.write_max + 1),
                     )
                     .expect("couldn't write to buffer");
             }
@@ -454,7 +453,7 @@ impl<T: ShaderType + WriteInto + Default + NoUninit> BufferManager<T> {
 
         // Refragmentation. Because of wasted space the buffer will empty itself and pass all-new data next frame. This can be optimized
         if self.free_indices.len() > 500
-            && self.free_indices.len() > self.buffer.capacity() as usize / 2
+            && self.free_indices.len() > self.buffer.capacity() / 2
         {
             let old_generation = self.current_generation;
             *self = Self::new(device, queue);

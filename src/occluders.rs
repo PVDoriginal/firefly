@@ -290,10 +290,10 @@ fn normalize_vertices(mut vertices: Vec<Vec2>) -> Vec<Vec2> {
     }
 
     if sum >= 0.0 {
-        return vertices;
+        vertices
     } else {
         vertices.reverse();
-        return vertices;
+        vertices
     }
 }
 
@@ -361,7 +361,7 @@ pub(crate) fn point_inside_poly(p: Vec2, poly: &Vec<Vec2>, aabb: Aabb2d, concave
                 }
             }
         }
-        return inside;
+        inside
     } else {
         for i in 0..n {
             let ori = orientation(poly[i % n], poly[(i + 1) % n], p);
@@ -374,7 +374,7 @@ pub(crate) fn point_inside_poly(p: Vec2, poly: &Vec<Vec2>, aabb: Aabb2d, concave
             }
         }
 
-        return true;
+        true
     }
 }
 
@@ -476,12 +476,12 @@ impl Occluder2dShape {
     ) -> Option<Box<dyn 'a + DoubleEndedIterator<Item = Vec2>>> {
         match self {
             Self::Polygon { vertices, .. } => Some(translate_vertices_iter(
-                Box::new(vertices.iter().map(|v| *v)),
+                Box::new(vertices.iter().copied()),
                 pos,
                 rot,
             )),
             Self::Polyline { vertices, .. } => Some(translate_vertices_iter(
-                Box::new(vertices.iter().map(|v| *v)),
+                Box::new(vertices.iter().copied()),
                 pos,
                 rot,
             )),

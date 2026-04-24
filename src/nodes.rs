@@ -7,8 +7,7 @@ use bevy::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
-            SpecializedRenderPipelines, TextureAspect, TextureDimension, TextureFormat,
+            BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor, TextureAspect, TextureFormat,
             TextureUsages, TextureViewDescriptor, TextureViewDimension,
         },
         renderer::RenderContext,
@@ -19,7 +18,7 @@ use bevy::{
 use crate::{
     CombinedLightMapTextures, LightMapTexture, LightmapPhase, NormalMapTexture,
     SpriteStencilTexture,
-    data::{CombinedLightmaps, ExtractedCombineLightmapTo},
+    data::ExtractedCombineLightmapTo,
     phases::SpritePhase,
     pipelines::{LightmapApplicationPipeline, SpecializedApplicationPipeline},
     prepare::BufferedFireflyConfig,

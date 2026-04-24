@@ -31,9 +31,9 @@ use bytemuck::NoUninit;
 
 use crate::{
     LightBatchSetKey,
-    buffers::{BinBuffer, BinBuffers, BufferIndex},
+    buffers::{BinBuffers, BufferIndex},
     change::Changes,
-    data::{CombinedLightmaps, ExtractedCombineLightmapTo},
+    data::ExtractedCombineLightmapTo,
     phases::LightmapPhase,
     pipelines::{LightPipelineKey, LightmapCreationPipeline},
     visibility::VisibilityTimer,
@@ -417,7 +417,7 @@ fn queue_lights(
 
         for (render_entity, visible_entity) in visible_entities.iter::<PointLight2d>() {
             let batch_set_key = LightBatchSetKey {
-                pipeline: pipeline,
+                pipeline,
                 draw_function: draw_lightmap_function,
             };
 

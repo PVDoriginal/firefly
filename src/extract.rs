@@ -261,7 +261,7 @@ fn extract_lights(
 
         let pos = transform.translation().truncate() - vec2(0.0, height.0) + light.offset.xy();
         commands.entity(entity).insert(ExtractedPointLight {
-            pos: pos,
+            pos,
             color: light.color,
             intensity: light.intensity,
             radius: light.radius,

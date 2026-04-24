@@ -143,15 +143,13 @@ fn mark_visible_occluders(
     };
 
     for (aabb, mut visibility, mut visibility_timer) in &mut occluders {
-        if aabb.0.intersects(&light_rect_aabb) {
-            if !visibility.get() {
-                visibility.set_visible();
+        if aabb.0.intersects(&light_rect_aabb) && !visibility.get() {
+            visibility.set_visible();
 
-                // let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());
-                // visible_occluders.push(entity);
+            // let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());
+            // visible_occluders.push(entity);
 
-                *visibility_timer = default();
-            }
+            *visibility_timer = default();
         }
 
         visibility_timer.0.tick(time.delta());

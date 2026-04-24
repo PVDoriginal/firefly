@@ -7,11 +7,10 @@
 use std::ops::Range;
 
 use crate::phases::SpritePhase;
-use crate::pipelines::{LightPipelineKey, SpritePipeline};
+use crate::pipelines::SpritePipeline;
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
 use bevy::asset::{AssetEventSystems, AssetPath};
-use bevy::ecs::schedule::ScheduleCleanupPolicy;
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
 use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
@@ -359,8 +358,8 @@ fn queue_sprites(
 
             // Add the item to the render phase
             phase.add(SpritePhase {
-                draw_function: draw_function,
-                pipeline: pipeline,
+                draw_function,
+                pipeline,
                 entity: (
                     extracted_sprite.render_entity,
                     extracted_sprite.main_entity.into(),
