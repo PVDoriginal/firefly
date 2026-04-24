@@ -557,20 +557,20 @@ fn push_vertices(
         false => (0 << 31) | index as u32,
     };
 
-    // if !poly && rev {
-    //     bins.iter_mut().for_each(|bins| {
-    //         bins.add_occluder(&OccluderData {
-    //             pointer: OccluderPointer {
-    //                 index,
-    //                 distance,
-    //                 ..default()
-    //             },
-    //             min_angle: 0.0,
-    //             angle: TAU,
-    //         })
-    //     });
-    //     return;
-    // }
+    if !poly && rev {
+        bins.iter_mut().for_each(|bins| {
+            bins.add_occluder(&OccluderData {
+                pointer: OccluderPointer {
+                    index,
+                    distance,
+                    ..default()
+                },
+                min_angle: 0.0,
+                angle: TAU,
+            })
+        });
+        return;
+    }
     // info!("pushing vertices: {occluder_vertices:?}");
     // info!("start vertex: {start_vertex}");
 
