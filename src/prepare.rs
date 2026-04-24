@@ -6,7 +6,7 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 use crate::{
     CombinedLightMapTextures, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BinBuffers, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
-    data::{ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
+    data::{CombinationMode, ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
@@ -153,6 +153,14 @@ fn prepare_config(
             n_combined_lightmaps: match combined_lightmap {
                 None => 0,
                 Some(x) => x.0.len() as u32,
+            },
+
+            combination_mode: match config.combination_mode {
+                CombinationMode::Multiply => 0,
+                CombinationMode::Add => 1,
+                CombinationMode::Max => 2,
+                CombinationMode::Min => 3,
+                CombinationMode::None => 4,
             },
         };
         let mut buffer = UniformBuffer::<UniformFireflyConfig>::from(uniform);

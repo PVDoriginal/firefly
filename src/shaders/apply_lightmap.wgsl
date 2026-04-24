@@ -27,7 +27,18 @@ fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 #ifdef IS_COMBINED
     for (var i = 0u; i < config.n_combined_lightmaps; i += 1) {
         let extra_light_frag = textureSample(light_map_textures, texture_sampler, vo.uv, i);
-        light_frag *= extra_light_frag;
+        if config.combination_mode == 0u {
+            light_frag *= extra_light_frag;
+        }
+        else if config.combination_mode == 1u {
+            light_frag += extra_light_frag; 
+        }
+        else if config.combination_mode == 2u {
+            light_frag = max(light_frag, extra_light_frag);
+        }
+        else if config.combination_mode == 3u {
+            light_frag = min(light_frag, extra_light_frag);
+        }
     }
 #endif    
 

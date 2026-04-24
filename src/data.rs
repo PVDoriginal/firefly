@@ -73,6 +73,25 @@ pub struct FireflyConfig {
     ///
     /// **Default:** 0.5.
     pub normal_attenuation: f32,
+
+    /// Specifies how other firefly cameras connected to this camera via the [`CombineLightmapTo`] component will
+    /// be combined to the resulting lightmap.
+    ///
+    /// **Default:** Multiply.
+    pub combination_mode: CombinationMode,
+}
+
+/// Specifies how multiple textures will be comvbined.
+///
+/// **Default:** Multiply.
+#[derive(Clone, Copy, Reflect, Default, Debug)]
+pub enum CombinationMode {
+    #[default]
+    Multiply,
+    Max,
+    Min,
+    Add,
+    None,
 }
 
 /// Options for how the normal maps should be read and used.
@@ -113,6 +132,7 @@ impl Default for FireflyConfig {
             z_sorting_error_margin: 0.0,
             normal_mode: NormalMode::None,
             normal_attenuation: 0.5,
+            combination_mode: CombinationMode::Multiply,
         }
     }
 }
@@ -129,6 +149,7 @@ pub struct UniformFireflyConfig {
     pub normal_mode: u32,
     pub normal_attenuation: f32,
     pub n_combined_lightmaps: u32,
+    pub combination_mode: u32,
 }
 
 #[derive(Component)]

@@ -79,6 +79,9 @@ struct FireflyConfig {
     normal_mode: u32, 
     normal_attenuation: f32,
     n_combined_lightmaps: u32,
+
+    // 0 - multiply, 1 - add, 2 - max, 3 - min, 4 - none
+    combination_mode: u32,
 }
 
 // Should correspond to the value in buffers.rs!
