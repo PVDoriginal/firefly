@@ -127,10 +127,7 @@ fn prepare_config(
             ambient_color: config.ambient_color.to_linear().to_vec3(),
             ambient_brightness: config.ambient_brightness,
 
-            light_bands: match config.light_bands {
-                None => 0.0,
-                Some(x) => x,
-            },
+            light_bands: config.light_bands.unwrap_or(0.0),
 
             soft_shadows: match config.soft_shadows {
                 true => 1,
@@ -551,7 +548,7 @@ struct Vertex {
 
 fn push_vertices(
     mut bins: Vec<&mut BinBuffer>,
-    occluder_vertices: &Vec<Vec2>,
+    occluder_vertices: &[Vec2],
     light_pos: Vec2,
     light_radius: f32,
     start_vertex: u32,
@@ -563,8 +560,8 @@ fn push_vertices(
     concave: bool,
 ) {
     let index = match poly {
-        true => (1 << 31) | index as u32,
-        false => (0 << 31) | index as u32,
+        true => (1 << 31) | index,
+        false => index,
     };
 
     if !poly && rev {
@@ -621,7 +618,7 @@ fn push_vertices(
 
     // info!("");
     // info!("---------");
-    let mut push_slice = |slice: &OccluderSlice, vertices: &Vec<Vertex>| {
+    let mut push_slice = |slice: &OccluderSlice, vertices: &[Vertex]| {
         if slice.length > 1 {
             let rev: u32 = match rev {
                 true => 1,
@@ -641,7 +638,7 @@ fn push_vertices(
             let angle_left = if !soft_shadows || light_radius <= 0.0 {
                 0.0
             } else {
-                let left = occluder_vertices[vertices[slice.start_index as usize].index as usize];
+                let left = occluder_vertices[vertices[slice.start_index].index as usize];
                 (light_pos - left)
                     .normalize()
                     .dot(
@@ -659,9 +656,8 @@ fn push_vertices(
             let angle_right = if !soft_shadows || light_radius <= 0.0 {
                 0.0
             } else {
-                let right = occluder_vertices[vertices
-                    [slice.start_index as usize + slice.length as usize - 1]
-                    .index as usize];
+                let right = occluder_vertices
+                    [vertices[slice.start_index + slice.length as usize - 1].index as usize];
                 (light_pos - right)
                     .normalize()
                     .dot(
