@@ -400,19 +400,24 @@ pub(crate) fn prepare_data(
                             vec2(width / 2.0 + radius, -height / 2.0 - radius),
                         ];
 
+                        let light_pos =
+                            Vec2::from_angle(-occluder.rot).rotate(light.pos - occluder.pos);
+
+                        let aabb = Aabb2d {
+                            min: vec2(-width / 2.0 - radius, -height / 2.0 - radius),
+                            max: vec2(width / 2.0 + radius, height / 2.0 + radius),
+                        };
+
                         let isometry = Isometry2d {
                             translation: occluder.pos,
                             rotation: Rot2::radians(occluder.rot),
                         };
-                        let aabb = Aabb2d::from_point_cloud(isometry, &vertices);
 
                         let vertices =
                             translate_vertices(vertices, isometry.translation, isometry.rotation);
 
-                        let light_inside_occluder =
-                            point_inside_poly(light.pos, vertices.clone(), aabb);
-
-                        let closest = aabb.closest_point(light.pos);
+                        let closest = aabb.closest_point(light_pos);
+                        let light_inside_occluder = closest == light_pos;
 
                         push_vertices(
                             bins,
@@ -421,7 +426,8 @@ pub(crate) fn prepare_data(
                             light.core.radius,
                             0,
                             occluder_index.index as u32,
-                            closest.distance(light.pos),
+                            closest.distance(light_pos),
+                            // 0.0,
                             light_inside_occluder,
                             false,
                             any_soft_shadows,
@@ -546,6 +552,25 @@ fn push_vertices(
     poly: bool,
     soft_shadows: bool,
 ) {
+    let index = match poly {
+        true => (1 << 31) | index as u32,
+        false => (0 << 31) | index as u32,
+    };
+
+    // if !poly && rev {
+    //     bins.iter_mut().for_each(|bins| {
+    //         bins.add_occluder(&OccluderData {
+    //             pointer: OccluderPointer {
+    //                 index,
+    //                 distance,
+    //                 ..default()
+    //             },
+    //             min_angle: 0.0,
+    //             angle: TAU,
+    //         })
+    //     });
+    //     return;
+    // }
     // info!("pushing vertices: {occluder_vertices:?}");
     // info!("start vertex: {start_vertex}");
 
@@ -581,11 +606,6 @@ fn push_vertices(
             break;
         }
     }
-
-    let index = match poly {
-        true => (1 << 31) | index as u32,
-        false => (0 << 31) | index as u32,
-    };
 
     // info!("");
     // info!("---------");

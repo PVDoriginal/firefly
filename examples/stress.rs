@@ -190,7 +190,7 @@ fn spawn_occluders(mut commands: Commands, mut timers: ResMut<Timers>, time: Res
 
         let x = rng.random_range(-WIDTH / 2.0..WIDTH / 2.0);
 
-        let occluder_type = rng.random_range(0..5);
+        let occluder_type = rng.random_range(0..1);
         let occluder =
             match occluder_type {
                 0 => Occluder2d::round_rectangle(
