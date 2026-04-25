@@ -84,7 +84,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     // light_color = pow(light_color, vec4<f32>(2.2));
 
     if (dist < light.radius && angle <= light.outer_angle / 2.) {
-
+        
         var angle_multi = 1.0; 
 
         if angle > light.inner_angle / 2. {
@@ -127,6 +127,10 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         else {
             let x = (dist - light.core_radius) / (light.radius - light.core_radius);
             res = vec4f(light_color.xyz, 0) * light.intensity * angle_multi * normal_multi * falloff(x, light.falloff, light.falloff_intensity);
+        }
+
+        if dot(res, res) < 0.0001 {
+            return res;
         }
 
         var round_index = 0u;
@@ -457,6 +461,9 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
 
     let c = cos(occ.rot);
     let s = sin(occ.rot);
+
+    // let c = 1.0; 
+    // let s = 0.0;
 
     let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
     let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);

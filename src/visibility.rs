@@ -31,7 +31,7 @@ pub struct NotVisible;
 
 impl Default for VisibilityTimer {
     fn default() -> Self {
-        Self(Timer::from_seconds(2.0, TimerMode::Once))
+        Self(Timer::from_seconds(0.1, TimerMode::Once))
     }
 }
 

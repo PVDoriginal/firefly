@@ -223,7 +223,7 @@ fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, 
         
         if y_hit >= min_v && y_hit <= max_v && t <= 1.0 {
             res.half_intersection = true;
-            res.full_intersection = t >= 0.0 && t <= 1.0;
+            res.full_intersection = t >= 0.0;
         }
     } else {
         // Horizontal edge (fixed y)
@@ -233,7 +233,7 @@ fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, 
         
         if x_hit >= min_v && x_hit <= max_v && t <= 1.0 {
             res.half_intersection = true;
-            res.full_intersection = t >= 0.0 && t <= 1.0;
+            res.full_intersection = t >= 0.0;
         }
     }
     return res;
