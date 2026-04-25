@@ -53,6 +53,8 @@ impl Plugin for BuffersPlugin {
                 .in_set(RenderSystems::Prepare)
                 .before(crate::prepare::prepare_data),
         );
+
+        render_app.add_systems(Render, handle_not_visible_entities);
     }
 
     fn finish(&self, app: &mut App) {
@@ -70,8 +72,6 @@ impl Plugin for BuffersPlugin {
 fn spawn_observers(mut commands: Commands) {
     commands.spawn(Observer::new(on_occluder_removed));
     commands.spawn(Observer::new(on_light_removed));
-
-    commands.spawn(Observer::new(on_entity_not_visible));
 }
 
 // handles buffer when the light gets despawned or the component is removed
@@ -123,8 +123,7 @@ fn on_occluder_removed(
 }
 
 // handles buffer when entity is not visible anymore
-fn on_entity_not_visible(
-    trigger: On<Add, NotVisible>,
+fn handle_not_visible_entities(
     mut occluders: Query<
         (
             Entity,
@@ -134,14 +133,14 @@ fn on_entity_not_visible(
         ),
         With<NotVisible>,
     >,
-    mut lights: Query<(Entity, &mut LightIndex)>,
+    mut lights: Query<(Entity, &mut LightIndex), With<NotVisible>>,
     mut round_manager: ResMut<BufferManager<UniformRoundOccluder>>,
     mut poly_manager: ResMut<BufferManager<UniformOccluder>>,
     mut vertex_buffer: ResMut<VertexBuffer>,
     mut light_manager: ResMut<BufferManager<UniformPointLight>>,
     mut commands: Commands,
 ) {
-    if let Ok((id, occluder, mut round_index, mut poly_index)) = occluders.get_mut(trigger.entity) {
+    for (id, occluder, mut round_index, mut poly_index) in &mut occluders {
         if matches!(occluder.shape, Occluder2dShape::RoundRectangle { .. }) {
             if let Some(old_index) = round_index.0 {
                 round_manager.free_index(old_index);
@@ -160,7 +159,9 @@ fn on_entity_not_visible(
 
         commands.entity(id).remove::<ExtractedOccluder>();
         commands.entity(id).remove::<NotVisible>();
-    } else if let Ok((id, mut index)) = lights.get_mut(trigger.entity) {
+    }
+
+    for (id, mut index) in &mut lights {
         if let Some(old_index) = index.0 {
             light_manager.free_index(old_index);
             index.0 = None;

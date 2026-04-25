@@ -58,7 +58,7 @@ const PIDIV2: f32 = 1.57079632679489661923132169163975144;
 
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
-    // return vec4f(100.0);
+    // return vec4f(0.5);
     let light = lights[light_index];
 
     var res = vec4f(0);
@@ -203,7 +203,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 accumulated_occlusion = max(accumulated_occlusion, result);
             }
 
-            if dot(shadow, shadow) < 0.0001 {
+            if dot(shadow, shadow) < 0.001 {
                 break;
             }
         }
@@ -460,19 +460,19 @@ fn round_check(pos: vec2f, occluder: u32) -> f32 {
 
     let p_local = vec2f(relative_pos.x * c + relative_pos.y * s, -relative_pos.x * s + relative_pos.y * c);
     let l_local = vec2f(relative_light.x * c + relative_light.y * s, -relative_light.x * s + relative_light.y * c);
-
-    // var rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
-
+    
     var half_intersection = false; 
+    
+    let rect = vec4f(-(half_w + radius), -(half_h + radius), half_w + radius, half_h + radius);
 
-    // if !rect_line_intersection(p_local, l_local, rect) {
+    if !rect_line_intersection(p_local, l_local, rect) {
 
-    //     if config.soft_shadows > 0 && light.core_radius > 0.0 {
-    //         return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
-    //     }
+        if config.soft_shadows > 0 && light.core_radius > 0.0 {
+            return get_round_extreme_angle(half_w, half_h, p_local, l_local, light.core_radius, radius);
+        }
 
-    //     return 0.0;
-    // }
+        return 0.0;
+    }
 
     if (half_w > 0) {
         let top_edge = intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false);
