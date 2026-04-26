@@ -10,11 +10,11 @@
 @group(0) @binding(2) var dt_lut_sampler: sampler;
 
 struct PointLight {
-    pos: vec2f,
+    pos: vec2<f32>,
     intensity: f32,
     radius: f32,
 
-    color: vec4f, 
+    color: vec4<f32>, 
 
     core_radius: f32,
     core_boost: f32, 
@@ -30,7 +30,7 @@ struct PointLight {
     inner_angle: f32,
     outer_angle: f32,
 
-    dir: vec2f, 
+    dir: vec2<f32>, 
 
     z: f32,
     height: f32,
@@ -42,7 +42,7 @@ struct PolyOccluder {
     n_vertices: u32,
     z: f32,
     @size(16)
-    color: vec3f, 
+    color: vec3<f32>, 
     opacity: f32,
     z_sorting: u32,
 }
@@ -56,7 +56,7 @@ struct OccluderPointer {
 }
 
 struct RoundOccluder {
-    pos: vec2f,
+    pos: vec2<f32>,
     rot: f32,
     half_width: f32,
     half_height: f32, 
@@ -69,7 +69,7 @@ struct RoundOccluder {
 }
 
 struct FireflyConfig {
-    ambient_color: vec3f,
+    ambient_color: vec3<f32>,
     ambient_brightness: f32, 
     light_bands: f32,
     soft_shadows: u32,
@@ -82,6 +82,8 @@ struct FireflyConfig {
 
     // 0 - multiply, 1 - add, 2 - max, 3 - min, 4 - none
     combination_mode: u32,
+
+    texture_scale: vec2<f32>
 }
 
 // Should correspond to the value in buffers.rs!

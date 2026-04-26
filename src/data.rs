@@ -79,6 +79,8 @@ pub struct FireflyConfig {
     ///
     /// **Default:** Multiply.
     pub combination_mode: CombinationMode,
+
+    pub lightmap_size: LightmapSize,
 }
 
 /// Specifies how multiple textures will be combined.
@@ -92,6 +94,14 @@ pub enum CombinationMode {
     Min,
     Add,
     None,
+}
+
+#[derive(Clone, Copy, Reflect, Default, Debug)]
+pub enum LightmapSize {
+    #[default]
+    Window,
+    Fixed(UVec2),
+    Scaled(f32),
 }
 
 /// Options for how the normal maps should be read and used.
@@ -133,6 +143,7 @@ impl Default for FireflyConfig {
             normal_mode: NormalMode::None,
             normal_attenuation: 0.5,
             combination_mode: CombinationMode::Multiply,
+            lightmap_size: LightmapSize::Window,
         }
     }
 }
@@ -150,6 +161,7 @@ pub struct UniformFireflyConfig {
     pub normal_attenuation: f32,
     pub n_combined_lightmaps: u32,
     pub combination_mode: u32,
+    pub texture_scale: Vec2,
 }
 
 #[derive(Component)]

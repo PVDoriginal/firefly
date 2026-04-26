@@ -63,7 +63,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
     var res = vec4f(0);
     
-    let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy));
+    let pos = ndc_to_world(frag_coord_to_ndc(in.position.xy * config.texture_scale));
     let normal = textureLoad(normal_map, vec2<i32>(in.uv * vec2<f32>(textureDimensions(normal_map))), 0);
     let stencil = textureSample(sprite_stencil, texture_sampler, in.uv);
 

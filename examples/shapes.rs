@@ -2,7 +2,7 @@ use bevy::{
     color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
     window::PrimaryWindow,
 };
-use bevy_firefly::{app::FireflyGizmoStyle, prelude::*};
+use bevy_firefly::{app::FireflyGizmoStyle, data::LightmapSize, prelude::*};
 
 // A simple example showcasing the different occluder shapes.
 // You can click around the screen to reposition the light.
@@ -41,6 +41,8 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
+            // lightmap_size: LightmapSize::Fixed(UVec2 { x: 800, y: 800 }),
+            // lightmap_size: LightmapSize::Scaled(0.2),
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),

@@ -6,7 +6,9 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 use crate::{
     CombinedLightMapTextures, LightmapPhase, NormalMapTexture, SpriteStencilTexture,
     buffers::{BinBuffer, BinBuffers, BufferManager, OccluderData, OccluderPointer, VertexBuffer},
-    data::{CombinationMode, ExtractedCombinedLightmaps, ExtractedWorldData, NormalMode},
+    data::{
+        CombinationMode, ExtractedCombinedLightmaps, ExtractedWorldData, LightmapSize, NormalMode,
+    },
     lights::{LightBatch, LightBatches, LightBindGroups, LightIndex, LightLut, LightPointer},
     occluders::{PolyOccluderIndex, RoundOccluderIndex, point_inside_poly, translate_vertices},
     phases::SpritePhase,
@@ -38,7 +40,7 @@ use bevy::{
         render_asset::RenderAssets,
         render_phase::{PhaseItem, ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroup, BindGroupEntries, PipelineCache, SpecializedRenderPipelines,
+            BindGroup, BindGroupEntries, Extent3d, PipelineCache, SpecializedRenderPipelines,
             TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, UniformBuffer,
         },
         renderer::{RenderDevice, RenderQueue},
@@ -119,10 +121,25 @@ fn specialize_light_application_pipeline(
 fn prepare_config(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    configs: Query<(Entity, &FireflyConfig, Option<&ExtractedCombinedLightmaps>)>,
+    configs: Query<(
+        Entity,
+        &FireflyConfig,
+        &ViewTarget,
+        Option<&ExtractedCombinedLightmaps>,
+    )>,
     mut commands: Commands,
 ) {
-    for (entity, config, combined_lightmap) in &configs {
+    for (entity, config, view_target, combined_lightmap) in &configs {
+        let window_size = view_target.main_texture().size();
+        let scale = match config.lightmap_size {
+            LightmapSize::Window => vec2(1.0, 1.0),
+            LightmapSize::Fixed(size) => vec2(
+                size.x as f32 / window_size.width as f32,
+                size.y as f32 / window_size.height as f32,
+            ),
+            LightmapSize::Scaled(scale) => vec2(1.0 / scale, 1.0 / scale),
+        };
+
         let uniform = UniformFireflyConfig {
             ambient_color: config.ambient_color.to_linear().to_vec3(),
             ambient_brightness: config.ambient_brightness,
@@ -162,6 +179,8 @@ fn prepare_config(
                 CombinationMode::Min => 3,
                 CombinationMode::None => 4,
             },
+
+            texture_scale: scale,
         };
         let mut buffer = UniformBuffer::<UniformFireflyConfig>::from(uniform);
         buffer.write_buffer(&render_device, &render_queue);
@@ -180,20 +199,41 @@ fn prepare_lightmap(
         &ViewTarget,
         &ExtractedView,
         Option<&ExtractedCombinedLightmaps>,
+        &FireflyConfig,
         &Msaa,
     )>,
 ) {
-    for (entity, view_target, view, combined_lightmaps, _msaa) in &view_targets {
+    for (entity, view_target, view, combined_lightmaps, config, _msaa) in &view_targets {
         let format = match view.hdr {
             true => ViewTarget::TEXTURE_FORMAT_HDR,
             false => TextureFormat::bevy_default(),
         };
 
+        let window_size = view_target.main_texture().size();
+
+        info!("window size: {window_size:?}");
+
+        let size = match config.lightmap_size {
+            LightmapSize::Window => window_size,
+            LightmapSize::Fixed(size) => Extent3d {
+                width: size.x,
+                height: size.y,
+                depth_or_array_layers: 1,
+            },
+            LightmapSize::Scaled(scale) => Extent3d {
+                width: (window_size.width as f32 * scale) as u32,
+                height: (window_size.height as f32 * scale) as u32,
+                depth_or_array_layers: 1,
+            },
+        };
+
+        info!("size: {size:?}");
+
         let light_map_texture = texture_cache.get(
             &render_device,
             TextureDescriptor {
                 label: Some("lightmap"),
-                size: view_target.main_texture().size(),
+                size,
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
@@ -238,7 +278,7 @@ fn prepare_lightmap(
         ));
 
         if let Some(combined_lightmaps) = combined_lightmaps {
-            let mut size = view_target.main_texture().size();
+            let mut size = size;
             size.depth_or_array_layers = combined_lightmaps.0.len() as u32;
 
             let texture = texture_cache.get(
