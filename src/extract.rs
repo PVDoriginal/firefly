@@ -201,7 +201,7 @@ fn extract_sprites(
 
 fn extract_world_data(
     mut commands: Commands,
-    cameras: Extract<Query<&RenderEntity, With<CombineLightmapTo>>>,
+    cameras: Extract<Query<(&RenderEntity, &Camera), With<CombineLightmapTo>>>,
     camera: Extract<
         Query<(
             &RenderEntity,
@@ -219,11 +219,15 @@ fn extract_world_data(
         if let Some(combined_lightmaps) = combined_lightmaps {
             let mut extracted_collection = vec![];
             for (i, main_entity) in combined_lightmaps.collection().iter().enumerate() {
-                let render_entity = **cameras.get(*main_entity).unwrap();
+                let (render_entity, camera) = cameras.get(*main_entity).unwrap();
+                if !camera.is_active {
+                    continue;
+                }
+
                 commands
-                    .entity(render_entity)
+                    .entity(render_entity.entity())
                     .insert(ExtractedCombineLightmapTo(entity.id(), i as u32));
-                extracted_collection.push(render_entity);
+                extracted_collection.push(**render_entity);
             }
 
             commands

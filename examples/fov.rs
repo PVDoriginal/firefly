@@ -105,6 +105,7 @@ fn move_light(
 const CAMERA_SPEED: f32 = 60.0;
 fn move_camera(
     mut camera: Single<&mut Transform, With<MainCamera>>,
+    mut camera_fov: Single<&mut Camera, Without<MainCamera>>,
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
@@ -119,5 +120,9 @@ fn move_camera(
     }
     if keys.pressed(KeyCode::KeyW) {
         camera.translation.y += time.delta_secs() * CAMERA_SPEED;
+    }
+
+    if keys.just_pressed(KeyCode::Space) {
+        camera_fov.is_active = !camera_fov.is_active;
     }
 }

@@ -284,7 +284,9 @@ fn prepare_lightmap(
             NormalMapTexture(normal_map_texture),
         ));
 
-        if let Some(combined_lightmaps) = combined_lightmaps {
+        if let Some(combined_lightmaps) = combined_lightmaps
+            && !combined_lightmaps.0.is_empty()
+        {
             let mut size = size;
             size.depth_or_array_layers = combined_lightmaps.0.len() as u32;
 
