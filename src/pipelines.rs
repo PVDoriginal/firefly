@@ -10,12 +10,12 @@ use bevy::{
     render::{
         RenderApp, RenderStartup,
         render_resource::{
-            BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendComponent, BlendFactor,
-            BlendOperation, BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            FragmentState, FrontFace, MultisampleState, PolygonMode, PrimitiveState,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            SpecializedRenderPipeline, SpecializedRenderPipelines, TextureFormat,
-            TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntries, BindGroupLayoutEntry,
+            BlendComponent, BlendFactor, BlendOperation, BlendState, CachedRenderPipelineId,
+            ColorTargetState, ColorWrites, FilterMode, FragmentState, FrontFace, MultisampleState,
+            PolygonMode, PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, SpecializedRenderPipeline, SpecializedRenderPipelines,
+            TextureFormat, TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{
                 sampler, storage_buffer_read_only, texture_2d, texture_2d_array, uniform_buffer,
             },
@@ -167,6 +167,7 @@ bitflags::bitflags! {
         const TONEMAP_METHOD_TONY_MC_MAPFACE    = 6 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_BLENDER_FILMIC     = 7 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const COMBINE_LIGHTMAPS                 = 1 << 31;
+        const LIGHTMAP_FILTERING                = 1 << 30;
     }
 }
 
@@ -271,7 +272,10 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
             push_constant_ranges: default(),
             primitive: default(),
             depth_stencil: default(),
-            multisample: default(),
+            multisample: MultisampleState {
+                count: 1,
+                ..default()
+            },
             zero_initialize_workgroup_memory: default(),
         }
     }
@@ -280,17 +284,42 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
 /// Pipeline that applies the lightmap over the fullscreen view.
 #[derive(Resource)]
 pub struct LightmapApplicationPipeline {
-    pub layout_simple: BindGroupLayoutDescriptor,
-    pub layout_combined: BindGroupLayoutDescriptor,
-    pub sampler: Sampler,
+    pub layout: BindGroupLayoutDescriptor,
+    pub filtering_sampler: Sampler,
+    pub non_filtering_sampler: Sampler,
     pub vertex_state: VertexState,
     pub shader: Handle<Shader>,
+}
+
+impl LightmapApplicationPipeline {
+    pub(crate) fn specialize_layout(
+        &self,
+        combined: bool,
+        filter_lightmap: bool,
+    ) -> BindGroupLayoutDescriptor {
+        let mut layout = self.layout.clone();
+
+        if !filter_lightmap {
+            layout.entries[3] =
+                sampler(SamplerBindingType::NonFiltering).build(3, ShaderStages::FRAGMENT);
+        }
+
+        if combined {
+            layout.entries.push(
+                texture_2d_array(TextureSampleType::Float { filterable: true })
+                    .build(5, ShaderStages::FRAGMENT),
+            );
+        }
+
+        layout
+    }
 }
 
 #[derive(Component)]
 pub struct SpecializedApplicationPipeline {
     pub id: CachedRenderPipelineId,
     pub is_combined: bool,
+    pub filter_lightmap: bool,
 }
 
 fn init_lightmap_application_pipeline(
@@ -299,40 +328,39 @@ fn init_lightmap_application_pipeline(
     fullscreen_shader: Res<FullscreenShader>,
     asset_server: Res<AssetServer>,
 ) {
-    let layout_simple = BindGroupLayoutDescriptor::new(
+    let layout = BindGroupLayoutDescriptor::new(
         "apply lightmap layout simple",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::FRAGMENT,
             (
+                // screen texture
                 texture_2d(TextureSampleType::Float { filterable: true }),
+                // lightmap texture
                 texture_2d(TextureSampleType::Float { filterable: true }),
+                // screen filter
                 sampler(SamplerBindingType::Filtering),
+                // lightmap filter
+                sampler(SamplerBindingType::Filtering),
+                // config
                 uniform_buffer::<UniformFireflyConfig>(false),
             ),
         ),
     );
 
-    let layout_combined = BindGroupLayoutDescriptor::new(
-        "apply lightmap layout combined",
-        &BindGroupLayoutEntries::sequential(
-            ShaderStages::FRAGMENT,
-            (
-                texture_2d(TextureSampleType::Float { filterable: true }),
-                texture_2d(TextureSampleType::Float { filterable: true }),
-                sampler(SamplerBindingType::Filtering),
-                uniform_buffer::<UniformFireflyConfig>(false),
-                texture_2d_array(TextureSampleType::Float { filterable: true }),
-            ),
-        ),
-    );
+    let filtering_sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let non_filtering_sampler = render_device.create_sampler(&SamplerDescriptor {
+        mag_filter: FilterMode::Nearest,
+        min_filter: FilterMode::Nearest,
+        mipmap_filter: FilterMode::Nearest,
+        ..default()
+    });
 
-    let sampler = render_device.create_sampler(&SamplerDescriptor::default());
     let vertex_state = fullscreen_shader.to_vertex_state();
 
     commands.insert_resource(LightmapApplicationPipeline {
-        layout_simple,
-        layout_combined,
-        sampler,
+        layout,
+        filtering_sampler,
+        non_filtering_sampler,
         vertex_state,
         shader: load_embedded_asset!(asset_server.as_ref(), "shaders/apply_lightmap.wgsl"),
     });
@@ -348,15 +376,22 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
         };
 
         let mut shader_defs = vec![];
+        let mut combined = false;
+
         if key.contains(LightPipelineKey::COMBINE_LIGHTMAPS) {
             shader_defs.push("IS_COMBINED".into());
+            combined = true;
         }
+
+        if key.contains(LightPipelineKey::LIGHTMAP_FILTERING) {
+            shader_defs.push("FILTER_LIGHTMAP".into());
+        }
+
+        let filter_lightmap = key.contains(LightPipelineKey::LIGHTMAP_FILTERING);
+
         RenderPipelineDescriptor {
             label: Some(Cow::Borrowed("lightmap application pipeline")),
-            layout: match key.contains(LightPipelineKey::COMBINE_LIGHTMAPS) {
-                false => vec![self.layout_simple.clone()],
-                true => vec![self.layout_combined.clone()],
-            },
+            layout: vec![self.specialize_layout(combined, filter_lightmap)],
             vertex: self.vertex_state.clone(),
             fragment: Some(FragmentState {
                 shader: self.shader.clone(),

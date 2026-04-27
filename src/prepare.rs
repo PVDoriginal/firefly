@@ -95,16 +95,26 @@ impl Plugin for PreparePlugin {
 }
 
 fn specialize_light_application_pipeline(
-    views: Query<(Entity, &ExtractedView, &Msaa, Has<CombinedLightMapTextures>)>,
+    views: Query<(
+        Entity,
+        &ExtractedView,
+        &Msaa,
+        &FireflyConfig,
+        Has<CombinedLightMapTextures>,
+    )>,
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<LightmapApplicationPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<LightmapApplicationPipeline>>,
     mut commands: Commands,
 ) {
-    for (entity, view, _msaa, is_combined) in views {
+    for (entity, view, _msaa, config, is_combined) in views {
         let mut key = LightPipelineKey::from_hdr(view.hdr);
         if is_combined {
             key |= LightPipelineKey::COMBINE_LIGHTMAPS;
+        }
+
+        if config.lightmap_filtering {
+            key |= LightPipelineKey::LIGHTMAP_FILTERING;
         }
 
         let pipeline_id = pipelines.specialize(&pipeline_cache, &pipeline, key);
@@ -114,6 +124,7 @@ fn specialize_light_application_pipeline(
             .insert(SpecializedApplicationPipeline {
                 id: pipeline_id,
                 is_combined,
+                filter_lightmap: config.lightmap_filtering,
             });
     }
 }
@@ -211,8 +222,6 @@ fn prepare_lightmap(
 
         let window_size = view_target.main_texture().size();
 
-        info!("window size: {window_size:?}");
-
         let size = match config.lightmap_size {
             LightmapSize::Window => window_size,
             LightmapSize::Fixed(size) => Extent3d {
@@ -226,8 +235,6 @@ fn prepare_lightmap(
                 depth_or_array_layers: 1,
             },
         };
-
-        info!("size: {size:?}");
 
         let light_map_texture = texture_cache.get(
             &render_device,

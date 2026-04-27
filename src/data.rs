@@ -81,12 +81,15 @@ pub struct FireflyConfig {
     pub combination_mode: CombinationMode,
 
     pub lightmap_size: LightmapSize,
+
+    pub lightmap_filtering: bool,
 }
 
 /// Specifies how multiple textures will be combined.
 ///
 /// **Default:** Multiply.
 #[derive(Clone, Copy, Reflect, Default, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CombinationMode {
     #[default]
     Multiply,
@@ -97,6 +100,7 @@ pub enum CombinationMode {
 }
 
 #[derive(Clone, Copy, Reflect, Default, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LightmapSize {
     #[default]
     Window,
@@ -144,6 +148,7 @@ impl Default for FireflyConfig {
             normal_attenuation: 0.5,
             combination_mode: CombinationMode::Multiply,
             lightmap_size: LightmapSize::Window,
+            lightmap_filtering: true,
         }
     }
 }

@@ -41,8 +41,8 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            // lightmap_size: LightmapSize::Fixed(UVec2 { x: 800, y: 800 }),
-            // lightmap_size: LightmapSize::Scaled(0.2),
+            // lightmap_size: LightmapSize::Scaled(0.1),
+            lightmap_filtering: true,
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
@@ -52,11 +52,11 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         PointLight2d {
             color: Color::srgb(1.0, 0.5, 1.0),
-            intensity: 7.0,
+            intensity: 10.0,
             radius: 450.0,
             core: LightCore {
                 radius: 30.0,
-                boost: 10.0,
+                boost: 50.0,
                 ..default()
             },
             ..default()
@@ -254,26 +254,26 @@ fn move_light(
 
 const CAMERA_SPEED: f32 = 60.0;
 fn move_camera(
-    mut camera: Single<&mut Transform, With<FireflyConfig>>,
+    mut camera: Single<(&mut Transform, &mut FireflyConfig)>,
     occluders: Populated<Entity, With<Occluder2d>>,
     keys: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    if keys.just_pressed(KeyCode::Enter) {
-        commands.entity(occluders.iter().last().unwrap()).despawn();
+    if keys.just_pressed(KeyCode::Space) {
+        camera.1.lightmap_filtering = !camera.1.lightmap_filtering;
     }
 
     if keys.pressed(KeyCode::KeyA) {
-        camera.translation.x -= time.delta_secs() * CAMERA_SPEED;
+        camera.0.translation.x -= time.delta_secs() * CAMERA_SPEED;
     }
     if keys.pressed(KeyCode::KeyD) {
-        camera.translation.x += time.delta_secs() * CAMERA_SPEED;
+        camera.0.translation.x += time.delta_secs() * CAMERA_SPEED;
     }
     if keys.pressed(KeyCode::KeyS) {
-        camera.translation.y -= time.delta_secs() * CAMERA_SPEED;
+        camera.0.translation.y -= time.delta_secs() * CAMERA_SPEED;
     }
     if keys.pressed(KeyCode::KeyW) {
-        camera.translation.y += time.delta_secs() * CAMERA_SPEED;
+        camera.0.translation.y += time.delta_secs() * CAMERA_SPEED;
     }
 }

@@ -7,8 +7,9 @@ use bevy::{
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_phase::{ViewBinnedRenderPhases, ViewSortedRenderPhases},
         render_resource::{
-            BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor, TextureAspect, TextureFormat,
-            TextureUsages, TextureViewDescriptor, TextureViewDimension,
+            BindGroupEntries, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
+            TextureAspect, TextureFormat, TextureUsages, TextureViewDescriptor,
+            TextureViewDimension,
         },
         renderer::RenderContext,
         view::{ExtractedView, ViewTarget},
@@ -154,11 +155,19 @@ impl ViewNode for ApplyLightmapNode {
         let bind_group = if !pipeline_id.is_combined {
             render_context.render_device().create_bind_group(
                 "apply lightmap bind group simple",
-                &pipeline_cache.get_bind_group_layout(&pipeline.layout_simple),
+                &pipeline_cache.get_bind_group_layout(
+                    &pipeline
+                        .specialize_layout(pipeline_id.is_combined, pipeline_id.filter_lightmap),
+                ),
                 &BindGroupEntries::sequential((
                     post_process.source,
                     &light_map_texture.0.default_view,
-                    &pipeline.sampler,
+                    &pipeline.filtering_sampler,
+                    if pipeline_id.filter_lightmap {
+                        &pipeline.filtering_sampler
+                    } else {
+                        &pipeline.non_filtering_sampler
+                    },
                     config,
                 )),
             )
@@ -184,11 +193,15 @@ impl ViewNode for ApplyLightmapNode {
 
             render_context.render_device().create_bind_group(
                 "apply lightmap bind group combined",
-                &pipeline_cache.get_bind_group_layout(&pipeline.layout_combined),
+                &pipeline_cache.get_bind_group_layout(
+                    &pipeline
+                        .specialize_layout(pipeline_id.is_combined, pipeline_id.filter_lightmap),
+                ),
                 &BindGroupEntries::sequential((
                     post_process.source,
                     &light_map_texture.0.default_view,
-                    &pipeline.sampler,
+                    &pipeline.filtering_sampler,
+                    &pipeline.filtering_sampler,
                     config,
                     &combined_view,
                 )),

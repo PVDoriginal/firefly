@@ -13,17 +13,20 @@ var light_map_texture: texture_2d<f32>;
 var texture_sampler: sampler;
 
 @group(0) @binding(3)
+var texture_sampler2: sampler;
+
+@group(0) @binding(4)
 var<uniform> config: FireflyConfig;
 
 #ifdef IS_COMBINED
-@group(0) @binding(4)
+@group(0) @binding(5)
 var light_map_textures: texture_2d_array<f32>;
 #endif
 
 @fragment
 fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
-    var light_frag = blend(textureSample(light_map_texture, texture_sampler, vo.uv), vec4f(config.ambient_color, 0), config.ambient_brightness);
-    
+    var light_frag = blend(textureSample(light_map_texture, texture_sampler2, vo.uv), vec4f(config.ambient_color, 0), config.ambient_brightness);
+
 #ifdef IS_COMBINED
     for (var i = 0u; i < config.n_combined_lightmaps; i += 1) {
         let extra_light_frag = textureSample(light_map_textures, texture_sampler, vo.uv, i);
