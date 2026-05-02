@@ -347,7 +347,13 @@ fn init_lightmap_application_pipeline(
         ),
     );
 
-    let filtering_sampler = render_device.create_sampler(&SamplerDescriptor::default());
+    let filtering_sampler = render_device.create_sampler(&SamplerDescriptor {
+        mag_filter: FilterMode::Linear,
+        min_filter: FilterMode::Linear,
+        mipmap_filter: FilterMode::Linear,
+        ..default()
+    });
+
     let non_filtering_sampler = render_device.create_sampler(&SamplerDescriptor {
         mag_filter: FilterMode::Nearest,
         min_filter: FilterMode::Nearest,

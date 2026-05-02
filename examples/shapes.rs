@@ -41,7 +41,7 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            // lightmap_size: LightmapSize::Scaled(0.1),
+            lightmap_size: LightmapSize::Scaled(0.5),
             lightmap_filtering: true,
             ..default()
         },
@@ -255,9 +255,7 @@ fn move_light(
 const CAMERA_SPEED: f32 = 60.0;
 fn move_camera(
     mut camera: Single<(&mut Transform, &mut FireflyConfig)>,
-    occluders: Populated<Entity, With<Occluder2d>>,
     keys: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands,
     time: Res<Time>,
 ) {
     if keys.just_pressed(KeyCode::Space) {
