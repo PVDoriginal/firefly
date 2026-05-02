@@ -1092,7 +1092,10 @@ fn prepare_sprite_image_bind_groups(
                             extracted_sprite.transform.translation().y,
                         ));
 
-                    current_batch.as_mut().unwrap().get_mut().range.end += 1;
+                    if let Some(batch) = current_batch.as_mut() {
+                        batch.get_mut().range.end += 1;
+                    }
+                    // current_batch.as_mut().unwrap().get_mut().range.end += 1;
                     index += 1;
                 }
                 ExtractedSpriteKind::Slices { ref indices } => {
@@ -1139,7 +1142,10 @@ fn prepare_sprite_image_bind_groups(
                                 extracted_sprite.transform.translation().y,
                             ));
 
-                        current_batch.as_mut().unwrap().get_mut().range.end += 1;
+                        if let Some(batch) = current_batch.as_mut() {
+                            batch.get_mut().range.end += 1;
+                        }
+                        // current_batch.as_mut().unwrap().get_mut().range.end += 1;
                         index += 1;
                     }
                 }
