@@ -253,7 +253,6 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
     let d = p2 - p1;
     let f = p1 - c;
 
-    // Quadratic equation: at^2 + bt + c = 0
     let a_quad = dot(d, d);
     let b_quad = 2.0 * dot(f, d);
     let c_quad = dot(f, f) - r * r;
@@ -261,15 +260,13 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
     let discriminant = b_quad * b_quad - 4.0 * a_quad * c_quad;
 
     if (discriminant < 0.0) {
-        return res; // No intersection with the infinite circle
+        return res; 
     }
 
     let sqrt_d = sqrt(discriminant);
     let t1 = (-b_quad - sqrt_d) / (2.0 * a_quad);
     let t2 = (-b_quad + sqrt_d) / (2.0 * a_quad);
 
-    // Check if the intersection points are on the segment (t in [0, 1])
-    // and if they lie within the correct quadrant
     let ts = vec2f(t1, t2);
     for (var i = 0; i < 2; i++) {
         let t = ts[i];
@@ -279,8 +276,6 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
             
             res.half_intersection = true; 
 
-            // Fast Quadrant Check: Instead of atan2, just check the sign of the vector components
-            // If quadrant is vec2(1, 1), we check if local_hit.x > 0 and local_hit.y > 0
             if sign(local_hit.x) == quadrant.x && sign(local_hit.y) == quadrant.y {
                 res.full_intersection = true;
                 return res; 

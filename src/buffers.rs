@@ -231,7 +231,6 @@ fn prepare_occluders(
 ) {
     for (occluder, mut round_index, mut poly_index) in &mut occluders {
         let changed = occluder.changes.0;
-
         if let Occluder2dShape::RoundRectangle {
             half_width,
             half_height,
@@ -281,8 +280,7 @@ fn prepare_occluders(
                 vertex_start: vertex_index.index as u32,
                 n_vertices: occluder.shape.n_vertices(),
                 z: occluder.z,
-                color: occluder.color.to_linear().to_vec3(),
-                _pad0: 0.0,
+                color: occluder.color.to_linear().to_vec4(),
                 opacity: occluder.opacity,
                 z_sorting: match occluder.z_sorting {
                     true => 1,

@@ -10,12 +10,12 @@ use bevy::{
     render::{
         RenderApp, RenderStartup,
         render_resource::{
-            BindGroupLayoutDescriptor, BindGroupLayoutEntries, BindGroupLayoutEntry,
-            BlendComponent, BlendFactor, BlendOperation, BlendState, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FilterMode, FragmentState, FrontFace, MultisampleState,
-            PolygonMode, PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, SpecializedRenderPipeline, SpecializedRenderPipelines,
-            TextureFormat, TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntries, BlendComponent, BlendFactor,
+            BlendOperation, BlendState, CachedRenderPipelineId, ColorTargetState, ColorWrites,
+            FilterMode, FragmentState, FrontFace, MultisampleState, PolygonMode, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            SpecializedRenderPipeline, SpecializedRenderPipelines, TextureFormat,
+            TextureSampleType, VertexAttribute, VertexState, VertexStepMode,
             binding_types::{
                 sampler, storage_buffer_read_only, texture_2d, texture_2d_array, uniform_buffer,
             },
