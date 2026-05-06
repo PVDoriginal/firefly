@@ -96,7 +96,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..default()
             },
             color: Color::srgb(0.8, 0.8, 1.0),
-            offset: vec3(0., 22., 0.),
             ..default()
         },
         LightHeight(22.),
