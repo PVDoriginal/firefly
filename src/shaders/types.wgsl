@@ -41,9 +41,8 @@ struct PolyOccluder {
     start_vertex: u32,
     n_vertices: u32,
     z: f32,
-    @size(16)
-    color: vec3<f32>, 
     opacity: f32,
+    color: vec4<f32>, 
     z_sorting: u32,
 }
 

@@ -176,7 +176,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 let result = round_check(pos, occluder_index); 
 
                 if result > 0.0 {
-                    shadow = shadow_blend(shadow, round_occluders[occluder_index].color, round_occluders[occluder_index].opacity * result);
+                    shadow = shadow_blend(shadow, round_occluders[occluder_index].color.rgb, round_occluders[occluder_index].opacity * result);
                 }            
             }
             // poly occluder
@@ -189,7 +189,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
                 if prev_index != occluder_index {
                     if prev_index != 0u && accumulated_occlusion > 0.0 {
-                        shadow = shadow_blend(shadow, poly_occluders[prev_index].color, poly_occluders[prev_index].opacity * accumulated_occlusion);
+                        shadow = shadow_blend(shadow, poly_occluders[prev_index].color.rgb, poly_occluders[prev_index].opacity * accumulated_occlusion);
                     }
                     accumulated_occlusion = 0.0;
                     prev_index = occluder_index;
@@ -213,7 +213,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         }
             
         if prev_index != 0u && accumulated_occlusion > 0.0 {
-            shadow = shadow_blend(shadow, poly_occluders[prev_index].color, poly_occluders[prev_index].opacity * accumulated_occlusion);
+            shadow = shadow_blend(shadow, poly_occluders[prev_index].color.rgb, poly_occluders[prev_index].opacity * accumulated_occlusion);
         }
 
         res *= vec4f(shadow, 1);

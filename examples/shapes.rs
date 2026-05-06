@@ -2,7 +2,7 @@ use bevy::{
     color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
     window::PrimaryWindow,
 };
-use bevy_firefly::{app::FireflyGizmoStyle, data::LightmapSize, prelude::*};
+use bevy_firefly::{app::FireflyGizmoStyle, prelude::*};
 
 // A simple example showcasing the different occluder shapes.
 // You can click around the screen to reposition the light.
@@ -11,10 +11,12 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins((
-        DefaultPlugins.set(AssetPlugin {
-            watch_for_changes_override: Some(true),
-            ..default()
-        }),
+        DefaultPlugins
+            .set(AssetPlugin {
+                watch_for_changes_override: Some(true),
+                ..default()
+            })
+            .set(ImagePlugin::default_nearest()),
         FireflyPlugin,
         FireflyGizmosPlugin,
     ));
@@ -30,7 +32,7 @@ fn main() {
     app.run();
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut projection = OrthographicProjection::default_2d();
     projection.scale = 0.7;
 
@@ -41,12 +43,13 @@ fn setup(mut commands: Commands) {
         Hdr,
         FireflyConfig {
             ambient_brightness: 0.3,
-            lightmap_size: LightmapSize::Scaled(0.5),
             lightmap_filtering: true,
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
     ));
+
+    commands.spawn(Sprite::from_image(asset_server.load("crate.png")));
 
     // light
     commands.spawn((
@@ -254,7 +257,7 @@ fn move_light(
 
 const CAMERA_SPEED: f32 = 60.0;
 fn move_camera(
-    mut camera: Single<(&mut Transform, &mut FireflyConfig)>,
+    mut camera: Single<(&mut Transform, &mut FireflyConfig, &mut Projection)>,
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
@@ -273,5 +276,16 @@ fn move_camera(
     }
     if keys.pressed(KeyCode::KeyW) {
         camera.0.translation.y += time.delta_secs() * CAMERA_SPEED;
+    }
+
+    let Projection::Orthographic(ref mut projection) = *camera.2 else {
+        return;
+    };
+
+    if keys.pressed(KeyCode::ArrowLeft) {
+        projection.scale += time.delta_secs();
+    }
+    if keys.pressed(KeyCode::ArrowRight) {
+        projection.scale = (projection.scale - time.delta_secs()).max(0.01);
     }
 }
