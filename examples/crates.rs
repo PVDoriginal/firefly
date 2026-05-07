@@ -28,6 +28,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         FireflyConfig {
             // normal maps need to be explicitly enabled
             normal_mode: NormalMode::TopDownY,
+            // enable_32bit_stencils: true,
             ..default()
         },
     ));

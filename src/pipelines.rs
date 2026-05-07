@@ -24,7 +24,6 @@ use bevy::{
         view::{ViewTarget, ViewUniform},
     },
     shader::{ShaderDefVal, load_shader_library},
-    sprite_render::SpritePipelineKey,
 };
 
 use crate::{
@@ -642,6 +641,11 @@ impl SpecializedRenderPipeline for SpritePipeline {
             ],
         };
 
+        let stencil_format = match key.contains(SpritePipelineKey::ENABLED_32BIT_STENCIL) {
+            false => TextureFormat::Rgba16Float,
+            true => TextureFormat::Rgba32Float,
+        };
+
         RenderPipelineDescriptor {
             vertex: VertexState {
                 shader: self.shader.clone(),
@@ -655,7 +659,7 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 entry_point: Some("fragment".into()),
                 targets: vec![
                     Some(ColorTargetState {
-                        format: TextureFormat::Rgba16Float, //format,
+                        format: stencil_format,
                         blend: Some(BlendState::ALPHA_BLENDING),
                         write_mask: ColorWrites::ALL,
                     }),
@@ -682,6 +686,59 @@ impl SpecializedRenderPipeline for SpritePipeline {
             label: Some("sprite_stencil_pipeline".into()),
             push_constant_ranges: Vec::new(),
             zero_initialize_workgroup_memory: false,
+        }
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    #[repr(transparent)]
+    // NOTE: Apparently quadro drivers support up to 64x MSAA.
+    // MSAA uses the highest 3 bits for the MSAA log2(sample count) to support up to 128x MSAA.
+    pub struct SpritePipelineKey: u32 {
+        const NONE                              = 0;
+        const HDR                               = 1 << 0;
+        const TONEMAP_IN_SHADER                 = 1 << 1;
+        const DEBAND_DITHER                     = 1 << 2;
+        const MSAA_RESERVED_BITS                = Self::MSAA_MASK_BITS << Self::MSAA_SHIFT_BITS;
+        const TONEMAP_METHOD_RESERVED_BITS      = Self::TONEMAP_METHOD_MASK_BITS << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_NONE               = 0 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_REINHARD           = 1 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_REINHARD_LUMINANCE = 2 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_ACES_FITTED        = 3 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_AGX                = 4 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_SOMEWHAT_BORING_DISPLAY_TRANSFORM = 5 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_TONY_MC_MAPFACE    = 6 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_BLENDER_FILMIC     = 7 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const ENABLED_32BIT_STENCIL = 1 << 31;
+    }
+}
+
+impl SpritePipelineKey {
+    const MSAA_MASK_BITS: u32 = 0b111;
+    const MSAA_SHIFT_BITS: u32 = 30 - Self::MSAA_MASK_BITS.count_ones();
+    const TONEMAP_METHOD_MASK_BITS: u32 = 0b111;
+    const TONEMAP_METHOD_SHIFT_BITS: u32 =
+        Self::MSAA_SHIFT_BITS - Self::TONEMAP_METHOD_MASK_BITS.count_ones();
+
+    #[inline]
+    pub const fn from_msaa_samples(msaa_samples: u32) -> Self {
+        let msaa_bits =
+            (msaa_samples.trailing_zeros() & Self::MSAA_MASK_BITS) << Self::MSAA_SHIFT_BITS;
+        Self::from_bits_retain(msaa_bits)
+    }
+
+    #[inline]
+    pub const fn msaa_samples(&self) -> u32 {
+        1 << ((self.bits() >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS)
+    }
+
+    #[inline]
+    pub const fn from_hdr(hdr: bool) -> Self {
+        if hdr {
+            SpritePipelineKey::HDR
+        } else {
+            SpritePipelineKey::NONE
         }
     }
 }

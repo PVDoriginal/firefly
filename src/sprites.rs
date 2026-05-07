@@ -6,14 +6,15 @@
 
 use std::ops::Range;
 
+use crate::data::FireflyConfig;
 use crate::phases::SpritePhase;
-use crate::pipelines::SpritePipeline;
+use crate::pipelines::{SpritePipeline, SpritePipelineKey};
 use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_change};
 
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
-use bevy::sprite_render::{SpritePipelineKey, SpriteSystems, queue_material2d_meshes};
+use bevy::sprite_render::{SpriteSystems, queue_material2d_meshes};
 use bevy::{
     core_pipeline::{
         core_2d::{AlphaMask2d, Opaque2d},
@@ -295,6 +296,7 @@ fn queue_sprites(
     extracted_sprites: Res<ExtractedSprites>,
     mut phases: ResMut<ViewSortedRenderPhases<SpritePhase>>,
     mut views: Query<(
+        &FireflyConfig,
         &RenderVisibleEntities,
         &ExtractedView,
         &Msaa,
@@ -304,7 +306,7 @@ fn queue_sprites(
 ) {
     let draw_function = draw_functions.read().id::<DrawSprite>();
 
-    for (visible_entities, view, msaa, tonemapping, dither) in &mut views {
+    for (config, visible_entities, view, msaa, tonemapping, dither) in &mut views {
         let Some(phase) = phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
@@ -333,6 +335,10 @@ fn queue_sprites(
             if let Some(DebandDither::Enabled) = dither {
                 view_key |= SpritePipelineKey::DEBAND_DITHER;
             }
+        }
+
+        if config.enable_32bit_stencils {
+            view_key |= SpritePipelineKey::ENABLED_32BIT_STENCIL;
         }
 
         let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);

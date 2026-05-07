@@ -250,6 +250,11 @@ fn prepare_lightmap(
             },
         );
 
+        let stencil_format = match config.enable_32bit_stencils {
+            false => TextureFormat::Rgba16Float,
+            true => TextureFormat::Rgba32Float,
+        };
+
         let sprite_stencil_texture = texture_cache.get(
             &render_device,
             TextureDescriptor {
@@ -258,7 +263,7 @@ fn prepare_lightmap(
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba16Float,
+                format: stencil_format,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },

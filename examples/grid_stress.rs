@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{BLUE, RED},
+    color::palettes::css::RED,
     diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
     render::view::Hdr,

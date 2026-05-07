@@ -83,6 +83,8 @@ pub struct FireflyConfig {
     pub lightmap_size: LightmapSize,
 
     pub lightmap_filtering: bool,
+
+    pub enable_32bit_stencils: bool,
 }
 
 /// Specifies how multiple textures will be combined.
@@ -149,6 +151,7 @@ impl Default for FireflyConfig {
             combination_mode: CombinationMode::Multiply,
             lightmap_size: LightmapSize::Window,
             lightmap_filtering: true,
+            enable_32bit_stencils: false,
         }
     }
 }
