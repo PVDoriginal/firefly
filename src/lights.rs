@@ -219,7 +219,7 @@ impl Default for LightCore {
     fn default() -> Self {
         LightCore {
             radius: 5.0,
-            boost: 5.0,
+            boost: 0.0,
             falloff: Falloff::InverseSquare { intensity: 0.0 },
         }
     }
