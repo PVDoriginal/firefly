@@ -245,8 +245,7 @@ fn prepare_occluders(
                 radius,
                 // padding: default(),
                 z: occluder.z,
-                color: occluder.color.to_linear().to_vec3(),
-                _pad0: 0.0,
+                color: occluder.color.to_linear().to_vec4(),
                 opacity: occluder.opacity,
                 z_sorting: match occluder.z_sorting {
                     true => 1,

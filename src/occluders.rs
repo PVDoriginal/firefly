@@ -409,9 +409,8 @@ pub struct UniformRoundOccluder {
     pub half_height: f32,
     pub radius: f32,
     pub z: f32,
-    pub color: Vec3,
-    pub _pad0: f32,
     pub opacity: f32,
+    pub color: Vec4,
     pub z_sorting: u32,
     pub _pad1: [u32; 3],
 }
