@@ -90,11 +90,11 @@ Some of the existing features are:
   - Normal maps
   - Transparent & colored occluders
   - Light banding
+  - Multiple Lightmaps
+  - Render Layers 
 
 Some of the currently planned features are: 
   - Occluders casting sprite-based shadows
-  - Mulitple lightmaps
-  - Dithering
   - Light textures
 
 Check out my [milestone goals](https://github.com/users/PVDoriginal/projects/7/views/2) to see what features are currently planned based on the Bevy release cycle. 
@@ -120,7 +120,6 @@ Unlike Bevy, Firefly can have breaking API changes in every release.
 ## Current Limitations 
 
 Some notable limitations that Firefly currently has: 
-  - Currently the `FireflyConfig` component can only be added to a single camera at one time. Having multiple cameras in your app is fine, but only one of them can render lights for now. 
   - WebGPU only. I've chosen to drop WebGL2 support in favor of WebGPU and the many possibilities it offers, which means Firefly might not run on specific browsers / devices yet (although WebGPU support is rapidly growing). I am willing to add and maintain a WebGL2 compatibility mode if there's a significant need for it though. 
   - Firefly was mostly designed to work with Sprites, which means there is limited compatibility with 2d Meshes. While lights can be cast over them, they don't yet support normal maps or occlusion z-sorting. This will be changed very soon as Bevy's Sprite backend is being migrated to the mesh one.
   - Occluder scaling isn't supported yet. 
