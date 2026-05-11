@@ -249,14 +249,6 @@ impl Plugin for SpritesPlugin {
         );
 
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
-            // render_app
-            //     .remove_systems_in_set(
-            //         Render,
-            //         bevy::sprite_render::queue_sprites,
-            //         ScheduleCleanupPolicy::RemoveSystemsOnly,
-            //     )
-            //     .unwrap();
-
             render_app
                 .init_resource::<ImageBindGroups>()
                 .init_resource::<DrawFunctions<SpritePhase>>()
@@ -423,18 +415,15 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteTextureBindGrou
             return RenderCommandResult::Skip;
         };
 
-        pass.set_bind_group(
-            I,
-            image_bind_groups
-                .values
-                .get(&(
-                    batch.image_handle_id,
-                    batch.normal_handle_id,
-                    batch.normal_dummy,
-                ))
-                .unwrap(),
-            &[],
-        );
+        let Some(bind_group) = image_bind_groups.values.get(&(
+            batch.image_handle_id,
+            batch.normal_handle_id,
+            batch.normal_dummy,
+        )) else {
+            return RenderCommandResult::Skip;
+        };
+
+        pass.set_bind_group(I, bind_group, &[]);
         RenderCommandResult::Success
     }
 }
@@ -457,18 +446,16 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteBatch {
             return RenderCommandResult::Skip;
         };
 
-        pass.set_index_buffer(
-            sprite_meta.sprite_index_buffer.buffer().unwrap().slice(..),
-            IndexFormat::Uint32,
-        );
-        pass.set_vertex_buffer(
-            0,
-            sprite_meta
-                .sprite_instance_buffer
-                .buffer()
-                .unwrap()
-                .slice(..),
-        );
+        let Some(index_buffer) = sprite_meta.sprite_index_buffer.buffer() else {
+            return RenderCommandResult::Skip;
+        };
+
+        let Some(instance_buffer) = sprite_meta.sprite_instance_buffer.buffer() else {
+            return RenderCommandResult::Skip;
+        };
+
+        pass.set_index_buffer(index_buffer.slice(..), IndexFormat::Uint32);
+        pass.set_vertex_buffer(0, instance_buffer.slice(..));
         pass.draw_indexed(0..6, 0, batch.range.clone());
         RenderCommandResult::Success
     }
