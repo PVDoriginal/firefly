@@ -79,13 +79,18 @@
 //! - **Light Banding**: You can enable [light bands](crate::prelude::FireflyConfig::light_bands) on [FireflyConfig](crate::prelude::FireflyConfig) to
 //! reduce the lightmap to a certain number of 'bands', creating a stylized look.
 //!
+//! - **Render Layers**: You can put lights, occluders, and cameras on different [RenderLayers](bevy::camera::visibility::RenderLayers) to alter
+//! what lights each occluder blocks and what cameras are the lights rendered to.
+//!
+//! - **Multiple Lightmaps**: You can connect cameras via the [CombineLightmapTo](prelude::CombineLightmapTo) relationship component to have multiple lightmaps
+//! combined into another. This can be used to achieve, for instance, an FOV effect, where there's a visbility lightmap multiplied over the main lightmap.
+//!
 //! - **Debug**: The [FireflyGizmosPlugin](crate::prelude::FireflyGizmosPlugin) shows the exact range and shape of lights and occluders. It can be configured
 //! via the [FireflyGizmoStyle](crate::prelude::FireflyGizmoStyle) resource.
 //!
 //! # Upcoming Features
 //!
 //! Here are some of the features that are currently planned:
-//! - Multiple lightmaps.
 //! - Sprite-based shadows.
 //! - Light textures.
 
@@ -116,7 +121,8 @@ pub(crate) use phases::*;
 pub mod prelude {
     pub use crate::app::{FireflyGizmoStyle, FireflyGizmosPlugin, FireflyPlugin};
     pub use crate::data::{
-        CombinationMode, CombineLightmapTo, CombinedLightmaps, FireflyConfig, NormalMode,
+        CombinationMode, CombineLightmapTo, CombinedLightmaps, FireflyConfig, LightmapSize,
+        NormalMode,
     };
     pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
