@@ -80,10 +80,37 @@ pub struct FireflyConfig {
     /// **Default:** Multiply.
     pub combination_mode: CombinationMode,
 
+    /// Sets the lightmap to a custom size or scale.
+    ///
+    /// This can be used to significantly improve performance or achieve a pixeled lightmap effect.
+    ///
+    /// Also check the [`lightmap_filtering`](FireflyConfig::lightmap_filtering) field.
+    ///
+    /// **Default**: `LightmapSize::Window`.
     pub lightmap_size: LightmapSize,
 
+    /// Enables lightmap filtering.
+    ///
+    /// When used in combination to [`lightmap_size`](FireflyConfig::lightmap_size),
+    /// this will determine whether, when upscaled to the screen size, the lightmap will
+    /// use linear or point filtering.
+    ///
+    /// Turn off to pixelate the lightmap.
+    ///
+    /// **Default**: true.
     pub lightmap_filtering: bool,
 
+    /// Enables 32 bit sizes for the sprite stencil textures
+    /// (textures in which the sprite's z coordinate and other values are stored when
+    /// used in e.g. occluion z-sorting).
+    ///
+    /// Normally, WebGPU limits these to 16 bits, however, this can cause
+    /// imprecise z-sorting and normal maps since bevy's f32s will be limited to f16 precision.
+    ///
+    /// Enabling this fixes those precision issues; however, it will prevent your app
+    /// from running on web.    
+    ///
+    /// **Default**: false.
     pub enable_32bit_stencils: bool,
 }
 
@@ -172,6 +199,49 @@ pub struct UniformFireflyConfig {
     pub texture_scale: Vec2,
 }
 
+/// Add this **relationship** component to a camera in order to combine it's lightmap into the result of another lightmap.
+///
+/// ## Example
+/// ```
+/// let main_camera = commands.spawn((
+///     FireflyConfig {
+///         combination_mode: CombinationMode::Add,
+///         ..default()
+///     },
+///     Camera {
+///         msaa_writeback: MsaaWriteback::Off,
+///         ..default()
+///     }
+/// )).id();
+///
+/// commands.spawn((
+///     FireflyConfig::default(),
+///     Camera {
+///         order: -1,
+///         output_mode: CameraOutputMode::Skip,
+///         ..default()
+///     }
+///     CombineLightmapTo(main_camera)
+/// ));
+///
+/// commands.spawn((
+///     FireflyConfig::default(),
+///     Camera {
+///         order: -1,
+///         output_mode: CameraOutputMode::Skip,
+///         ..default()
+///     }
+///     CombineLightmapTo(main_camera)
+/// ));
+///
+/// ```
+///
+/// ## Limitations
+///
+/// A camera that is already the target of this relationship cannot combine its final result
+/// into another camera (only the pre-combination lightmap will be combined).
+///
+/// Ambient light from lightmaps is not transferred over when combined to other lightmaps.
 #[derive(Component)]
 #[relationship(relationship_target = CombinedLightmaps)]
 pub struct CombineLightmapTo(pub Entity);
