@@ -1,8 +1,7 @@
 use bevy::{
-    color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
-    window::PrimaryWindow,
+    color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr, sprite::Anchor, window::PrimaryWindow
 };
-use bevy_firefly::prelude::*;
+use bevy_firefly::{occluders::Bleed, prelude::*};
 
 // A simple example showcasing the different occluder shapes.
 // You can click around the screen to reposition the light.
@@ -32,7 +31,8 @@ fn main() {
     app.run();
 }
 
-fn setup(mut commands: Commands) {
+
+fn setup(mut commands: Commands, asset_server : Res<AssetServer>) {
     let mut projection = OrthographicProjection::default_2d();
     projection.scale = 0.7;
 
@@ -42,7 +42,10 @@ fn setup(mut commands: Commands) {
         Projection::Orthographic(projection),
         Hdr,
         FireflyConfig {
-            ambient_brightness: 0.3,
+            ambient_brightness: 0.05,
+            z_sorting: false,
+            // normal_mode: NormalMode::Simple,
+            // normal_attenuation: 0.1,
             ..default()
         },
         Transform::from_translation(vec3(-230., 75., 0.)),
@@ -51,12 +54,12 @@ fn setup(mut commands: Commands) {
     // light
     commands.spawn((
         PointLight2d {
-            color: Color::srgb(1.0, 0.5, 1.0),
-            intensity: 10.0,
+            color: Color::srgb(1.0, 1.0, 1.0),
+            intensity: 2.0,
             radius: 450.0,
             core: LightCore {
                 radius: 30.0,
-                boost: 50.0,
+                boost: 3.0,
                 ..default()
             },
             ..default()
@@ -220,6 +223,13 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Occluder2d::polyline(spline.iter_positions(samples).collect::<Vec<_>>()).unwrap(),
         Transform::from_translation(vec3(-510., -100., 0.)),
+    ));
+
+    commands.spawn((
+        Sprite::from_image(asset_server.load("tile.png")),
+        NormalMap::from_file("tile_normal.png", &asset_server),
+        Occluder2d::circle(10.0).with_bleed(Bleed {min: 10.0, max: 30.0, falloff: Falloff::inverse_square(0.0)}),
+        Transform::from_translation(vec3(50.0, 0.0, 0.0)).with_scale(vec3(2.2, 2.2, 1.0))
     ));
 }
 

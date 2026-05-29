@@ -22,7 +22,6 @@ struct PointLight {
     core_falloff: u32, 
     core_falloff_intensity: f32,
 
-
     // 0 - inverse square, 1 - linear, 2 - none
     falloff: u32,
     falloff_intensity: f32,
@@ -44,6 +43,11 @@ struct PolyOccluder {
     opacity: f32,
     color: vec4<f32>, 
     z_sorting: u32,
+
+    bleed_min: f32, 
+    bleed_max: f32, 
+    bleed_falloff: u32, 
+    bleed_falloff_intensity: f32,
 }
 
 struct OccluderPointer {
@@ -65,6 +69,11 @@ struct RoundOccluder {
     color: vec3f,
     opacity: f32, 
     z_sorting: u32, 
+
+    bleed_min: f32, 
+    bleed_max: f32, 
+    bleed_falloff: u32, 
+    bleed_falloff_intensity: f32,
 }
 
 struct FireflyConfig {

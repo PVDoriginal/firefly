@@ -10,7 +10,7 @@ use bevy::{
 use bytemuck::{NoUninit, Pod, Zeroable};
 use core::f32;
 
-use crate::visibility::{OccluderAabb, VisibilityTimer};
+use crate::{lights::Falloff, visibility::{OccluderAabb, VisibilityTimer}};
 use crate::{buffers::BufferIndex, change::Changes};
 
 /// An occluder that blocks light.
@@ -53,6 +53,8 @@ pub struct Occluder2d {
     /// This does nothing if z_sorting is set to false in the [config](crate::prelude::FireflyConfig::z_sorting).
     pub z_sorting: bool,
 
+    pub bleed: Bleed, 
+
     /// Offset to the position of the occluder.
     ///
     /// **Default**: [Vec3::ZERO].
@@ -71,6 +73,7 @@ impl Occluder2d {
             opacity: 1.,
             color: bevy::prelude::Color::Srgba(BLACK),
             z_sorting: true,
+            bleed: default(),
             offset: default(),
         }
     }
@@ -94,6 +97,12 @@ impl Occluder2d {
         let mut res = self.clone();
         res.z_sorting = z_sorting;
         res
+    }
+
+    pub fn with_bleed(&self, bleed: Bleed) -> Self {
+        let mut res = self.clone();
+        res.bleed = bleed; 
+        res 
     }
 
     /// Construct a new occluder with the specified [offset](Occluder2d::offset).
@@ -245,6 +254,20 @@ impl Occluder2d {
     }
 }
 
+#[derive(Debug, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Bleed {
+    pub min: f32,
+    pub max: f32, 
+    pub falloff: Falloff 
+} 
+
+impl Default for Bleed {
+    fn default() -> Self {
+        Bleed {min: 0.0, max: 0.0, falloff: Falloff::None}
+    }
+}
+
 /// Component with data extracted to the Render World from Occluders.
 #[derive(Component, Clone)]
 #[require(RoundOccluderIndex, PolyOccluderIndex)]
@@ -255,6 +278,7 @@ pub struct ExtractedOccluder {
     pub aabb: Aabb2d,
     pub z: f32,
     pub color: Color,
+    pub bleed: Bleed,
     pub opacity: f32,
     pub z_sorting: bool,
     pub changes: Changes,
@@ -396,6 +420,12 @@ pub struct UniformOccluder {
     pub opacity: f32,
     pub color: Vec4,
     pub z_sorting: u32,
+
+    pub bleed_min: f32, 
+    pub bleed_max: f32, 
+    pub bleed_falloff: u32, 
+    pub bleed_falloff_intensity: f32,
+
     pub _pad1: [u32; 3],
 }
 
@@ -412,8 +442,15 @@ pub struct UniformRoundOccluder {
     pub opacity: f32,
     pub color: Vec4,
     pub z_sorting: u32,
+
+    pub bleed_min: f32, 
+    pub bleed_max: f32, 
+    pub bleed_falloff: u32, 
+    pub bleed_falloff_intensity: f32,
+
     pub _pad1: [u32; 3],
 }
+
 
 #[repr(C)]
 #[derive(ShaderType, Clone, Copy, Zeroable, Pod, Default)]

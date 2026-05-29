@@ -251,6 +251,14 @@ fn prepare_occluders(
                     true => 1,
                     false => 0,
                 },
+                bleed_falloff: match occluder.bleed.falloff {
+                    Falloff::InverseSquare { .. } => 0,
+                    Falloff::Linear { .. } => 1,
+                    Falloff::None => 2,
+                },
+                bleed_falloff_intensity: occluder.bleed.falloff.intensity(), 
+                bleed_min: occluder.bleed.min,
+                bleed_max: occluder.bleed.max,
                 _pad1: [0, 0, 0],
             };
 
@@ -285,6 +293,14 @@ fn prepare_occluders(
                     true => 1,
                     false => 0,
                 },
+                bleed_falloff: match occluder.bleed.falloff {
+                    Falloff::InverseSquare { .. } => 0,
+                    Falloff::Linear { .. } => 1,
+                    Falloff::None => 2,
+                },
+                bleed_falloff_intensity: occluder.bleed.falloff.intensity(), 
+                bleed_min: occluder.bleed.min,
+                bleed_max: occluder.bleed.max,
                 _pad1: [0, 0, 0],
             };
 
