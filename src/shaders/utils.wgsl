@@ -242,7 +242,6 @@ fn intersects_axis_edge(p: vec2f, l: vec2f, coord: f32, min_v: f32, max_v: f32, 
 struct IntersectsEdge {
     full_intersection: bool,
     half_intersection: bool,
-    point: vec2<f32>, 
 }
 
 // Checks intersection between line segment [p1, p2] and a 90-degree arc 
@@ -273,8 +272,6 @@ fn intersects_corner_arc(p1: vec2f, p2: vec2f, c: vec2f, r: f32, quadrant: vec2f
         let t = ts[i];
         if (t >= 0.0 && t <= 1.0) {
             let hit_point = p1 + t * d;
-            res.point = hit_point; 
-
             let local_hit = hit_point - c;
             
             res.half_intersection = true; 

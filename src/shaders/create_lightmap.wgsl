@@ -167,17 +167,13 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
             // round occluder
             if occluder_type == 0 {
-                var bleed = false;
                 if stencil.a > 0.1 {
                     if config.z_sorting == 1 && round_occluders[occluder_index].z_sorting == 1 && stencil.g >= round_occluders[occluder_index].z - config.z_sorting_error_margin {
                         continue;
                     }
-                    else if round_occluders[occluder_index].bleed_max > 0.0 {
-                        bleed = true; 
-                    }
                 }
 
-                let result = round_check(pos, occluder_index, bleed); 
+                let result = round_check(pos, occluder_index); 
 
                 if result > 0.0 {
                     shadow = shadow_blend(shadow, round_occluders[occluder_index].color.rgb, round_occluders[occluder_index].opacity * result);
@@ -185,13 +181,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
             }
             // poly occluder
             else {
-                var bleed = false;
                 if stencil.a > 0.1 {
                     if config.z_sorting == 1 && poly_occluders[occluder_index].z_sorting == 1 && stencil.g >= poly_occluders[occluder_index].z - config.z_sorting_error_margin {
                         continue;
-                    }
-                    else if poly_occluders[occluder_index].bleed_max > 0.0 {
-                        bleed = true; 
                     }
                 }
 
@@ -211,7 +203,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
                 let split = pointer.split;
                 let length = pointer.length & 1073741823u;
 
-                let result = poly_check(pos, occluder_index, term, rev, min_v, split, length, bleed); 
+                let result = poly_check(pos, occluder_index, term, rev, min_v, split, length); 
                 accumulated_occlusion = max(accumulated_occlusion, result);
             }
 
@@ -231,7 +223,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     return res;
 }
 
-fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32, bleed: bool) -> f32 {
+fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u32, length: u32) -> f32 {
     let light = lights[light_index];
     let occluder = poly_occluders[index];
 
@@ -268,7 +260,7 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
 
     var is_occluded = false;
 
-    var out_of_bounds = maybe_prev < 0 || maybe_prev + 1 >= i32(len);
+    let out_of_bounds = maybe_prev < 0 || maybe_prev + 1 >= i32(len);
 
     if !out_of_bounds {
         if rev == 0 {
@@ -276,10 +268,6 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
             let v2 = vertices[start + u32(maybe_prev) + 1 - select(0, occluder.n_vertices, start + u32(maybe_prev) + 1 >= occluder.start_vertex + occluder.n_vertices)];
 
             is_occluded = !same_orientation(v1, v2, pos, light.pos);
-            
-            if is_occluded && bleed {
-                return apply_bleed(distance(pos, intersection_point(v1, v2, pos, light.pos)), occluder.bleed_falloff, occluder.bleed_falloff_intensity, occluder.bleed_min, occluder.bleed_max);   
-            }
         }
         else {
             let v1 = vertices[i32(start) - maybe_prev + select(0, i32(occluder.n_vertices), i32(start) - maybe_prev < i32(occluder.start_vertex))];
@@ -293,13 +281,8 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
         if rev == 0 {
             let loops = min_v + length - 1 >= occluder.start_vertex + occluder.n_vertices;
             let last = min_v + length - 1 - select(0, occluder.n_vertices, loops);
-            
-            var bleed_multi = 1.0;
-            if bleed {
-                bleed_multi = apply_bleed(distance(pos, intersection_point(vertices[min_v], vertices[last], pos, light.pos)), occluder.bleed_falloff, occluder.bleed_falloff_intensity, occluder.bleed_min, occluder.bleed_max);   
-            }
     
-            return bleed_multi * get_softness_multi(light.core_radius, light.pos, pos, vertices[min_v], vertices[last]);
+            return get_softness_multi(light.core_radius, light.pos, pos, vertices[min_v], vertices[last]);
         }
         else {
             let loops = i32(min_v) - i32(length) + 1 < i32(occluder.start_vertex);
@@ -314,18 +297,6 @@ fn poly_check(pos: vec2f, index: u32, term: u32, rev: u32, min_v: u32, split: u3
     }
 
     return 0.0;
-}
-
-fn apply_bleed(d: f32, bleed_falloff: u32, bleed_falloff_intensity: f32, bleed_min: f32, bleed_max: f32) -> f32 {
-    if d > bleed_max {
-        return 1.0;
-    } 
-
-    if d < bleed_min {
-        return 0.0;  
-    }
-    let x = (d - bleed_min) / (bleed_max - bleed_min); 
-    return 1.0 - falloff (x, bleed_falloff, bleed_falloff_intensity);    
 }
 
 fn get_softness_multi(light_range: f32, light_pos: vec2<f32>, pos: vec2<f32>, extreme_left: vec2<f32>, extreme_right: vec2<f32>) -> f32 {
@@ -477,7 +448,7 @@ fn bs_vertex_reverse(angle: f32, start: u32, length: u32, term: u32, start_verte
 }
 
 // checks if pixel is blocked by round occluder
-fn round_check(pos: vec2f, occluder: u32, bleed: bool) -> f32 {
+fn round_check(pos: vec2f, occluder: u32) -> f32 {
     let light = lights[light_index];
 
     let occ = round_occluders[occluder];
@@ -514,12 +485,6 @@ fn round_check(pos: vec2f, occluder: u32, bleed: bool) -> f32 {
         let top_edge = intersects_axis_edge(p_local, l_local, half_h + radius, -half_w, half_w, false);
 
         if top_edge.full_intersection {
-            if bleed {
-                return apply_bleed(
-                    distance(p_local, intersection_point(p_local, l_local, vec2<f32>(-half_w, half_h + radius), vec2<f32>(half_w, half_h + radius))), 
-                    occ.bleed_falloff, occ.bleed_falloff_intensity, occ.bleed_min, occ.bleed_max
-                );
-            }
             return 1.0;
         }
         
@@ -528,12 +493,6 @@ fn round_check(pos: vec2f, occluder: u32, bleed: bool) -> f32 {
         let bottom_edge = intersects_axis_edge(p_local, l_local, -(half_h + radius), -half_w, half_w, false);
 
         if bottom_edge.full_intersection {
-            if bleed {
-                return apply_bleed(
-                    distance(p_local, intersection_point(p_local, l_local, vec2<f32>(-half_w, -(half_h + radius)), vec2<f32>(half_w, -(half_h + radius)))), 
-                    occ.bleed_falloff, occ.bleed_falloff_intensity, occ.bleed_min, occ.bleed_max
-                );
-            }
             return 1.0;
         }
 
@@ -544,12 +503,6 @@ fn round_check(pos: vec2f, occluder: u32, bleed: bool) -> f32 {
         let right_edge = intersects_axis_edge(p_local, l_local, half_w + radius, -half_h, half_h, true);
 
         if right_edge.full_intersection {
-            if bleed {
-                return apply_bleed(
-                    distance(p_local, intersection_point(p_local, l_local, vec2<f32>(half_w + radius, -half_h), vec2<f32>(half_w + radius, half_h))), 
-                    occ.bleed_falloff, occ.bleed_falloff_intensity, occ.bleed_min, occ.bleed_max
-                );
-            }
             return 1.0;
         }
 
@@ -558,12 +511,6 @@ fn round_check(pos: vec2f, occluder: u32, bleed: bool) -> f32 {
         let left_edge = intersects_axis_edge(p_local, l_local, -(half_w + radius), -half_h, half_h, true);
 
         if left_edge.full_intersection {
-            if bleed {
-                return apply_bleed(
-                    distance(p_local, intersection_point(p_local, l_local, vec2<f32>(-(half_w + radius), -half_h), vec2<f32>(-(half_w + radius), half_h))), 
-                    occ.bleed_falloff, occ.bleed_falloff_intensity, occ.bleed_min, occ.bleed_max
-                );
-            }
             return 1.0;
         }
 

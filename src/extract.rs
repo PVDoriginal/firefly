@@ -330,7 +330,6 @@ fn extract_occluders(
             z_sorting: occluder.z_sorting,
             changes: changes.clone(),
             render_layers: render_layers.clone(),
-            bleed: occluder.bleed.clone()
         };
 
         values.push((entity, extracted_occluder));

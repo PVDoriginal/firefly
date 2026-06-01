@@ -125,7 +125,7 @@ pub mod prelude {
         NormalMode,
     };
     pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
-    pub use crate::occluders::{Occluder2d, Bleed};
+    pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
     pub use crate::{ApplyLightmapLabel, CreateLightmapLabel};
 }
