@@ -152,9 +152,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
         var prev_index = 0u; 
         var accumulated_occlusion = 0.0;
 
-        if left >= right {
-            return vec4<f32>(1.0, 0.0, 0.0, 1.0);
-        }
+        // if left >= right {
+        //     return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+        // }
 
         for (var pointer_index = left; pointer_index < right; pointer_index += 1) {
             let pointer = occluders[pointer_index];
