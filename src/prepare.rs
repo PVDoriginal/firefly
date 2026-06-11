@@ -803,7 +803,9 @@ fn push_vertices(
                 }
                 // if the next vertex is increasing and loops over
                 else {
-                    slice.split = Some(slice.length);
+                    if poly {
+                        slice.split = Some(slice.length);
+                    }
                     slice.length += 1;
 
                     slice.angle += vertex.angle - last.angle + TAU;

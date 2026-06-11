@@ -61,9 +61,8 @@ struct RoundOccluder {
     half_height: f32, 
     radius: f32,
     z: f32, 
-    @size(16)
-    color: vec3f,
     opacity: f32, 
+    color: vec4f,
     z_sorting: u32, 
 }
 
