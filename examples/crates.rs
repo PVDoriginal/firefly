@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::RED, prelude::*, render::view::Hdr, sprite::Anchor, window::PrimaryWindow,
+    camera::Hdr, color::palettes::css::RED, prelude::*, sprite::Anchor, window::PrimaryWindow,
 };
 use bevy_firefly::{data::NormalMode, prelude::*};
 
@@ -28,6 +28,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         FireflyConfig {
             // normal maps need to be explicitly enabled
             normal_mode: NormalMode::TopDownY,
+            enable_32bit_stencils: true,
             ..default()
         },
     ));

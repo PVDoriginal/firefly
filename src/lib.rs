@@ -94,10 +94,7 @@
 //! - Sprite-based shadows.
 //! - Light textures.
 
-use bevy::{
-    prelude::*,
-    render::{render_graph::RenderLabel, texture::CachedTexture},
-};
+use bevy::{prelude::*, render::texture::CachedTexture};
 
 pub mod app;
 pub mod buffers;
@@ -127,7 +124,6 @@ pub mod prelude {
     pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
     pub use crate::occluders::Occluder2d;
     pub use crate::sprites::{NormalMap, SpriteHeight};
-    pub use crate::{ApplyLightmapLabel, CreateLightmapLabel};
 }
 
 /// Camera component that stores the texture of the lightmap.
@@ -145,21 +141,3 @@ pub struct SpriteStencilTexture(pub CachedTexture);
 /// Camera component that stores the normal map texture.  
 #[derive(Component)]
 pub struct NormalMapTexture(pub CachedTexture);
-
-/// Render graph label for creating the lightmap.
-///
-/// Useful if you want to add your own render passes before / after it.   
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct CreateLightmapLabel;
-
-/// Render graph label for when the lightmap is applied over the view texture and fed to the camera.
-///
-/// Useful if you want to add your own render passes before / after it.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct ApplyLightmapLabel;
-
-/// Render graph label for when the normal maps and sprite stencils are created.
-///
-/// Useful if you want to add your own render passes before / after it.
-#[derive(RenderLabel, Debug, Clone, Hash, PartialEq, Eq)]
-pub struct SpriteLabel;

@@ -1,8 +1,8 @@
 use bevy::{
+    camera::Hdr,
     color::palettes::css::RED,
     diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
-    render::view::Hdr,
 };
 use bevy_firefly::prelude::*;
 use rand::{Rng, rng};

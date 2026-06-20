@@ -108,7 +108,7 @@ fn specialize_light_application_pipeline(
     mut commands: Commands,
 ) {
     for (entity, view, _msaa, config, is_combined) in views {
-        let mut key = LightPipelineKey::from_hdr(view.hdr);
+        let mut key = LightPipelineKey::from_target_format(view.target_format);
         if is_combined {
             key |= LightPipelineKey::COMBINE_LIGHTMAPS;
         }
@@ -215,11 +215,7 @@ fn prepare_lightmap(
     )>,
 ) {
     for (entity, view_target, view, combined_lightmaps, config, _msaa) in &view_targets {
-        let format = match view.hdr {
-            true => ViewTarget::TEXTURE_FORMAT_HDR,
-            false => TextureFormat::bevy_default(),
-        };
-
+        let format = view.target_format;
         let window_size = view_target.main_texture().size();
 
         let size = match config.lightmap_size {

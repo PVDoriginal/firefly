@@ -6,7 +6,7 @@
 use std::any::TypeId;
 
 use bevy::{
-    camera::visibility::{SetViewVisibility, VisibilitySystems, VisibleEntities, check_visibility},
+    camera::visibility::{SetViewVisibility, VisibilitySystems, VisibleEntities},
     math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
     prelude::*,
 };
@@ -57,8 +57,7 @@ impl Plugin for VisibilityPlugin {
             PostUpdate,
             (mark_visible_lights, mark_visible_occluders)
                 .chain()
-                .in_set(VisibilitySystems::CheckVisibility)
-                .after(check_visibility),
+                .in_set(VisibilitySystems::CheckVisibility),
         );
     }
 }

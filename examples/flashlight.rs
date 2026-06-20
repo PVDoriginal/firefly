@@ -1,6 +1,6 @@
 use std::f32::consts::{FRAC_PI_2, TAU};
 
-use bevy::{input::mouse::MouseWheel, prelude::*, render::view::Hdr, window::PrimaryWindow};
+use bevy::{camera::Hdr, input::mouse::MouseWheel, prelude::*, window::PrimaryWindow};
 use bevy_firefly::prelude::*;
 
 fn main() {

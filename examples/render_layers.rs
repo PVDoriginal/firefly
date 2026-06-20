@@ -1,8 +1,7 @@
 use bevy::{
-    camera::{RenderTarget, visibility::RenderLayers},
+    camera::{Hdr, RenderTarget, visibility::RenderLayers},
     color::palettes::css::{BLUE, RED},
     prelude::*,
-    render::view::Hdr,
     window::WindowRef,
 };
 use bevy_firefly::prelude::*;

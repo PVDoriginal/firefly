@@ -2,7 +2,7 @@
 
 use bevy::{
     camera::visibility::RenderLayers,
-    platform::collections::HashSet,
+    platform::collections::{HashSet, hash_map::Entry},
     prelude::*,
     render::{
         Extract, RenderApp,
@@ -73,7 +73,13 @@ fn extract_camera_phases(
         // This is the main camera, so we use the first subview index (0)
         let retained_view_entity = RetainedViewEntity::new(main_entity.into(), None, 0);
 
-        sprite_phases.insert_or_clear(retained_view_entity);
+        // sprite_phases
+        match sprite_phases.entry(retained_view_entity) {
+            Entry::Occupied(mut entry) => entry.get_mut().clear(),
+            Entry::Vacant(entry) => {
+                entry.insert(default());
+            }
+        }
 
         let gpu_preprocessing_mode = gpu_preprocessing_support.min(if !no_indirect_drawing {
             GpuPreprocessingMode::Culling

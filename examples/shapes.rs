@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::RED, input::mouse::MouseWheel, prelude::*, render::view::Hdr,
+    camera::Hdr, color::palettes::css::RED, input::mouse::MouseWheel, prelude::*,
     window::PrimaryWindow,
 };
 use bevy_firefly::prelude::*;

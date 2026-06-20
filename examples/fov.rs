@@ -1,10 +1,9 @@
 //! This example demonstrates using multiple lightmaps and render layers.
 
 use bevy::{
-    camera::{CameraOutputMode, visibility::RenderLayers},
+    camera::{CameraOutputMode, Hdr, visibility::RenderLayers},
     color::palettes::css::{BLUE, RED},
     prelude::*,
-    render::view::Hdr,
     window::PrimaryWindow,
 };
 use bevy_firefly::prelude::*;

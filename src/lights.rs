@@ -15,6 +15,7 @@ use bevy::{
     render::{
         Render, RenderApp, RenderSystems,
         batching::sort_binned_render_phase,
+        camera::ExtractedCamera,
         render_phase::{
             AddRenderCommand, BinnedRenderPhaseType, DrawFunctions, InputUniformIndex, PhaseItem,
             RenderCommand, RenderCommandResult, SetItemPipeline, TrackedRenderPass,
@@ -365,6 +366,7 @@ fn queue_lights(
     mut lightmap_phases: ResMut<ViewBinnedRenderPhases<LightmapPhase>>,
     views: Query<(
         &ExtractedView,
+        &ExtractedCamera,
         &RenderVisibleEntities,
         &Msaa,
         Option<&Tonemapping>,
@@ -375,22 +377,35 @@ fn queue_lights(
 ) {
     let draw_lightmap_function = light_draw_functions.read().id::<DrawLightmap>();
 
-    for (view, visible_entities, msaa, tonemapping, dither, combined_lightmap) in &views {
+    for (view, camera, visible_entities, msaa, tonemapping, dither, combined_lightmap) in &views {
         let Some(lightmap_phase) = lightmap_phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
-        let (hdr, msaa) = if let Some(combined_lightmap) = combined_lightmap {
+        let (target_format, msaa) = if let Some(combined_lightmap) = combined_lightmap {
             let view = views.get(combined_lightmap.0).unwrap();
-            (view.0.hdr, view.2)
+            (view.0.target_format, view.3)
         } else {
-            (view.hdr, msaa)
+            (view.target_format, msaa)
         };
 
         let msaa_key = LightPipelineKey::from_msaa_samples(msaa.samples());
-        let mut view_key = LightPipelineKey::from_hdr(hdr) | msaa_key;
+        let mut view_key = LightPipelineKey::from_target_format(target_format) | msaa_key;
 
-        if !hdr {
+        if camera
+            .compositing_space
+            .is_some_and(|s| s == CompositingSpace::Srgb)
+        {
+            view_key |= LightPipelineKey::SRGB_COMPOSITING;
+        }
+        if camera
+            .compositing_space
+            .is_some_and(|s| s == CompositingSpace::Oklab)
+        {
+            view_key |= LightPipelineKey::OKLAB_COMPOSITING;
+        }
+
+        if !camera.hdr {
             if let Some(tonemapping) = tonemapping {
                 view_key |= LightPipelineKey::TONEMAP_IN_SHADER;
                 view_key |= match tonemapping {
@@ -406,6 +421,7 @@ fn queue_lights(
                     }
                     Tonemapping::TonyMcMapface => LightPipelineKey::TONEMAP_METHOD_TONY_MC_MAPFACE,
                     Tonemapping::BlenderFilmic => LightPipelineKey::TONEMAP_METHOD_BLENDER_FILMIC,
+                    Tonemapping::KhronosPbrNeutral => LightPipelineKey::TONEMAP_METHOD_PBR_NEUTRAL,
                 };
             }
             if let Some(DebandDither::Enabled) = dither {
@@ -415,7 +431,11 @@ fn queue_lights(
 
         let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);
 
-        for (render_entity, visible_entity) in visible_entities.iter::<PointLight2d>() {
+        for (render_entity, visible_entity) in visible_entities
+            .get::<PointLight2d>()
+            .unwrap()
+            .iter_visible()
+        {
             let batch_set_key = LightBatchSetKey {
                 pipeline,
                 draw_function: draw_lightmap_function,
@@ -427,7 +447,6 @@ fn queue_lights(
                 (*render_entity, *visible_entity),
                 InputUniformIndex::default(),
                 BinnedRenderPhaseType::NonMesh,
-                Tick::new(10),
             );
         }
     }

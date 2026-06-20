@@ -21,7 +21,10 @@ use bevy::{
             },
         },
         renderer::RenderDevice,
-        view::{ViewTarget, ViewUniform},
+        view::{
+            COLOR_TARGET_FORMAT_MASK_BITS, ViewTarget, ViewUniform, texture_format_from_code,
+            texture_format_to_code,
+        },
     },
     shader::{ShaderDefVal, load_shader_library},
 };
@@ -152,9 +155,11 @@ bitflags::bitflags! {
     // MSAA uses the highest 3 bits for the MSAA log2(sample count) to support up to 128x MSAA.
     pub struct LightPipelineKey: u32 {
         const NONE                              = 0;
-        const HDR                               = 1 << 0;
-        const TONEMAP_IN_SHADER                 = 1 << 1;
-        const DEBAND_DITHER                     = 1 << 2;
+        const TONEMAP_IN_SHADER                 = 1 << 0;
+        const DEBAND_DITHER                     = 1 << 1;
+        const SRGB_COMPOSITING                  = 1 << 2;
+        const OKLAB_COMPOSITING                 = 1 << 3;
+        const COLOR_TARGET_FORMAT_RESERVED_BITS = Self::COLOR_TARGET_FORMAT_MASK_BITS << Self::COLOR_TARGET_FORMAT_SHIFT_BITS;
         const MSAA_RESERVED_BITS                = Self::MSAA_MASK_BITS << Self::MSAA_SHIFT_BITS;
         const TONEMAP_METHOD_RESERVED_BITS      = Self::TONEMAP_METHOD_MASK_BITS << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_NONE               = 0 << Self::TONEMAP_METHOD_SHIFT_BITS;
@@ -165,15 +170,19 @@ bitflags::bitflags! {
         const TONEMAP_METHOD_SOMEWHAT_BORING_DISPLAY_TRANSFORM = 5 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_TONY_MC_MAPFACE    = 6 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_BLENDER_FILMIC     = 7 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_PBR_NEUTRAL        = 8 << Self::TONEMAP_METHOD_SHIFT_BITS;
+
         const COMBINE_LIGHTMAPS                 = 1 << 31;
         const LIGHTMAP_FILTERING                = 1 << 30;
     }
 }
 
 impl LightPipelineKey {
+    const COLOR_TARGET_FORMAT_MASK_BITS: u32 = COLOR_TARGET_FORMAT_MASK_BITS;
+    const COLOR_TARGET_FORMAT_SHIFT_BITS: u32 = 4;
     const MSAA_MASK_BITS: u32 = 0b111;
     const MSAA_SHIFT_BITS: u32 = 16 - Self::MSAA_MASK_BITS.count_ones();
-    const TONEMAP_METHOD_MASK_BITS: u32 = 0b111;
+    const TONEMAP_METHOD_MASK_BITS: u32 = 0b1111;
     const TONEMAP_METHOD_SHIFT_BITS: u32 =
         Self::MSAA_SHIFT_BITS - Self::TONEMAP_METHOD_MASK_BITS.count_ones();
 
@@ -190,12 +199,20 @@ impl LightPipelineKey {
     }
 
     #[inline]
-    pub const fn from_hdr(hdr: bool) -> Self {
-        if hdr {
-            LightPipelineKey::HDR
-        } else {
-            LightPipelineKey::NONE
-        }
+    pub fn from_target_format(format: TextureFormat) -> Self {
+        let code = texture_format_to_code(format)
+            .expect("Texture format is not supported by the pipeline") as u32;
+        Self::from_bits_retain(
+            (code & Self::COLOR_TARGET_FORMAT_MASK_BITS) << Self::COLOR_TARGET_FORMAT_SHIFT_BITS,
+        )
+    }
+
+    #[inline]
+    pub fn target_format(&self) -> TextureFormat {
+        let code = ((self.bits() >> Self::COLOR_TARGET_FORMAT_SHIFT_BITS)
+            & Self::COLOR_TARGET_FORMAT_MASK_BITS) as u8;
+        texture_format_from_code(code)
+            .expect("Unknown bits in `COLOR_TARGET_FORMAT_MASK_BITS` of the pipeline key")
     }
 }
 
@@ -242,11 +259,7 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
             }
         }
 
-        let format = match key.contains(LightPipelineKey::HDR) {
-            true => ViewTarget::TEXTURE_FORMAT_HDR,
-            false => TextureFormat::bevy_default(),
-        };
-
+        let format = key.target_format();
         RenderPipelineDescriptor {
             label: Some(Cow::Borrowed("lightmap creation pipeline")),
             layout: vec![self.lut_layout.clone(), self.layout.clone()],
@@ -268,14 +281,13 @@ impl SpecializedRenderPipeline for LightmapCreationPipeline {
                 shader_defs,
                 entry_point: Some(Cow::Borrowed("fragment")),
             }),
-            push_constant_ranges: default(),
             primitive: default(),
             depth_stencil: default(),
             multisample: MultisampleState {
                 count: 1,
                 ..default()
             },
-            zero_initialize_workgroup_memory: default(),
+            ..default()
         }
     }
 }
@@ -349,14 +361,12 @@ fn init_lightmap_application_pipeline(
     let filtering_sampler = render_device.create_sampler(&SamplerDescriptor {
         mag_filter: FilterMode::Linear,
         min_filter: FilterMode::Linear,
-        mipmap_filter: FilterMode::Linear,
         ..default()
     });
 
     let non_filtering_sampler = render_device.create_sampler(&SamplerDescriptor {
         mag_filter: FilterMode::Nearest,
         min_filter: FilterMode::Nearest,
-        mipmap_filter: FilterMode::Nearest,
         ..default()
     });
 
@@ -375,10 +385,7 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
     type Key = LightPipelineKey;
 
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
-        let format = match key.contains(LightPipelineKey::HDR) {
-            true => ViewTarget::TEXTURE_FORMAT_HDR,
-            false => TextureFormat::bevy_default(),
-        };
+        let format = key.target_format();
 
         let mut shader_defs = vec![];
         let mut combined = false;
@@ -408,14 +415,13 @@ impl SpecializedRenderPipeline for LightmapApplicationPipeline {
                 shader_defs,
                 entry_point: Some(Cow::Borrowed("fragment")),
             }),
-            push_constant_ranges: default(),
             primitive: default(),
             depth_stencil: default(),
             multisample: MultisampleState {
                 count: key.msaa_samples(),
                 ..default()
             },
-            zero_initialize_workgroup_memory: default(),
+            ..default()
         }
     }
 }
@@ -465,11 +471,7 @@ impl SpecializedRenderPipeline for LightmapCombinationPipeline {
     type Key = LightPipelineKey;
 
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
-        let format = match key.contains(LightPipelineKey::HDR) {
-            true => ViewTarget::TEXTURE_FORMAT_HDR,
-            false => TextureFormat::bevy_default(),
-        };
-
+        let format = key.target_format();
         RenderPipelineDescriptor {
             label: Some(Cow::Borrowed("lightmap combination pipeline")),
             layout: vec![self.layout.clone()],
@@ -484,14 +486,13 @@ impl SpecializedRenderPipeline for LightmapCombinationPipeline {
                 shader_defs: default(),
                 entry_point: Some(Cow::Borrowed("fragment")),
             }),
-            push_constant_ranges: default(),
             primitive: default(),
             depth_stencil: default(),
             multisample: MultisampleState {
                 count: key.msaa_samples(),
                 ..default()
             },
-            zero_initialize_workgroup_memory: default(),
+            ..default()
         }
     }
 }
@@ -684,8 +685,8 @@ impl SpecializedRenderPipeline for SpritePipeline {
             depth_stencil: None,
             multisample: default(),
             label: Some("sprite_stencil_pipeline".into()),
-            push_constant_ranges: Vec::new(),
             zero_initialize_workgroup_memory: false,
+            ..default()
         }
     }
 }
@@ -697,9 +698,11 @@ bitflags::bitflags! {
     // MSAA uses the highest 3 bits for the MSAA log2(sample count) to support up to 128x MSAA.
     pub struct SpritePipelineKey: u32 {
         const NONE                              = 0;
-        const HDR                               = 1 << 0;
-        const TONEMAP_IN_SHADER                 = 1 << 1;
-        const DEBAND_DITHER                     = 1 << 2;
+        const TONEMAP_IN_SHADER                 = 1 << 0;
+        const DEBAND_DITHER                     = 1 << 1;
+        const SRGB_COMPOSITING                  = 1 << 2;
+        const OKLAB_COMPOSITING                 = 1 << 3;
+        const COLOR_TARGET_FORMAT_RESERVED_BITS = Self::COLOR_TARGET_FORMAT_MASK_BITS << Self::COLOR_TARGET_FORMAT_SHIFT_BITS;
         const MSAA_RESERVED_BITS                = Self::MSAA_MASK_BITS << Self::MSAA_SHIFT_BITS;
         const TONEMAP_METHOD_RESERVED_BITS      = Self::TONEMAP_METHOD_MASK_BITS << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_NONE               = 0 << Self::TONEMAP_METHOD_SHIFT_BITS;
@@ -710,14 +713,18 @@ bitflags::bitflags! {
         const TONEMAP_METHOD_SOMEWHAT_BORING_DISPLAY_TRANSFORM = 5 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_TONY_MC_MAPFACE    = 6 << Self::TONEMAP_METHOD_SHIFT_BITS;
         const TONEMAP_METHOD_BLENDER_FILMIC     = 7 << Self::TONEMAP_METHOD_SHIFT_BITS;
+        const TONEMAP_METHOD_PBR_NEUTRAL        = 8 << Self::TONEMAP_METHOD_SHIFT_BITS;
+
         const ENABLED_32BIT_STENCIL = 1 << 31;
     }
 }
 
 impl SpritePipelineKey {
+    const COLOR_TARGET_FORMAT_MASK_BITS: u32 = COLOR_TARGET_FORMAT_MASK_BITS;
+    const COLOR_TARGET_FORMAT_SHIFT_BITS: u32 = 4;
     const MSAA_MASK_BITS: u32 = 0b111;
-    const MSAA_SHIFT_BITS: u32 = 30 - Self::MSAA_MASK_BITS.count_ones();
-    const TONEMAP_METHOD_MASK_BITS: u32 = 0b111;
+    const MSAA_SHIFT_BITS: u32 = 20 - Self::MSAA_MASK_BITS.count_ones();
+    const TONEMAP_METHOD_MASK_BITS: u32 = 0b1111;
     const TONEMAP_METHOD_SHIFT_BITS: u32 =
         Self::MSAA_SHIFT_BITS - Self::TONEMAP_METHOD_MASK_BITS.count_ones();
 
@@ -733,12 +740,22 @@ impl SpritePipelineKey {
         1 << ((self.bits() >> Self::MSAA_SHIFT_BITS) & Self::MSAA_MASK_BITS)
     }
 
+    /// Create a pipeline key from the view's color target format.
     #[inline]
-    pub const fn from_hdr(hdr: bool) -> Self {
-        if hdr {
-            SpritePipelineKey::HDR
-        } else {
-            SpritePipelineKey::NONE
-        }
+    pub fn from_target_format(format: TextureFormat) -> Self {
+        let code = texture_format_to_code(format)
+            .expect("Texture format is not supported by the pipeline") as u32;
+        Self::from_bits_retain(
+            (code & Self::COLOR_TARGET_FORMAT_MASK_BITS) << Self::COLOR_TARGET_FORMAT_SHIFT_BITS,
+        )
+    }
+
+    /// Color target format of the main pass for this pipeline key.
+    #[inline]
+    pub fn target_format(&self) -> TextureFormat {
+        let code = ((self.bits() >> Self::COLOR_TARGET_FORMAT_SHIFT_BITS)
+            & Self::COLOR_TARGET_FORMAT_MASK_BITS) as u8;
+        texture_format_from_code(code)
+            .expect("Unknown bits in `COLOR_TARGET_FORMAT_MASK_BITS` of the pipeline key")
     }
 }

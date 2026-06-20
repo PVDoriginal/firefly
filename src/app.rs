@@ -4,12 +4,9 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     color::palettes::css::{GREY, PINK, WHITE},
-    core_pipeline::core_2d::graph::{Core2d, Node2d},
+    core_pipeline::{Core2d, core_2d::main_transparent_pass_2d, tonemapping::tonemapping},
     prelude::*,
-    render::{
-        RenderApp,
-        render_graph::{RenderGraphExt, ViewNodeRunner},
-    },
+    render::RenderApp,
 };
 
 use crate::{
@@ -17,7 +14,7 @@ use crate::{
     change::ChangePlugin,
     extract::ExtractPlugin,
     lights::LightPlugin,
-    nodes::{ApplyLightmapNode, CreateLightmapNode, SpriteNode},
+    nodes::{apply_lightmap, create_lightmap, sprite},
     occluders::{Occluder2dShape, OccluderPlugin, translate_vertices},
     pipelines::PipelinePlugin,
     sprites::SpritesPlugin,
@@ -48,24 +45,12 @@ impl Plugin for FireflyPlugin {
         };
 
         render_app
-            .add_render_graph_node::<ViewNodeRunner<CreateLightmapNode>>(
+            .add_systems(Core2d, sprite.after(main_transparent_pass_2d))
+            .add_systems(Core2d, create_lightmap.after(sprite))
+            .add_systems(
                 Core2d,
-                CreateLightmapLabel,
-            )
-            .add_render_graph_node::<ViewNodeRunner<ApplyLightmapNode>>(Core2d, ApplyLightmapLabel)
-            .add_render_graph_node::<ViewNodeRunner<SpriteNode>>(Core2d, SpriteLabel);
-        // render_app.add_render_graph_edges(Core2d, (, CreateLightmapLabel));
-
-        render_app.add_render_graph_edges(
-            Core2d,
-            (
-                Node2d::StartMainPassPostProcessing,
-                SpriteLabel,
-                CreateLightmapLabel,
-                ApplyLightmapLabel,
-                Node2d::Tonemapping,
-            ),
-        );
+                apply_lightmap.after(create_lightmap).before(tonemapping),
+            );
     }
 }
 

@@ -14,6 +14,7 @@ use crate::utils::{compute_slices_on_asset_event, compute_slices_on_sprite_chang
 use bevy::asset::{AssetEventSystems, AssetPath};
 use bevy::image::ImageLoaderSettings;
 use bevy::render::RenderSystems;
+use bevy::render::camera::ExtractedCamera;
 use bevy::sprite_render::{SpriteSystems, queue_material2d_meshes};
 use bevy::{
     core_pipeline::{
@@ -290,6 +291,7 @@ fn queue_sprites(
     mut views: Query<(
         &FireflyConfig,
         &RenderVisibleEntities,
+        &ExtractedCamera,
         &ExtractedView,
         &Msaa,
         Option<&Tonemapping>,
@@ -298,15 +300,15 @@ fn queue_sprites(
 ) {
     let draw_function = draw_functions.read().id::<DrawSprite>();
 
-    for (config, visible_entities, view, msaa, tonemapping, dither) in &mut views {
+    for (config, visible_entities, camera, view, msaa, tonemapping, dither) in &mut views {
         let Some(phase) = phases.get_mut(&view.retained_view_entity) else {
             continue;
         };
 
         let msaa_key = SpritePipelineKey::from_msaa_samples(msaa.samples());
-        let mut view_key = SpritePipelineKey::from_hdr(view.hdr) | msaa_key;
+        let mut view_key = SpritePipelineKey::from_target_format(view.target_format) | msaa_key;
 
-        if !view.hdr {
+        if !camera.hdr {
             if let Some(tonemapping) = tonemapping {
                 view_key |= SpritePipelineKey::TONEMAP_IN_SHADER;
                 view_key |= match tonemapping {
@@ -322,6 +324,7 @@ fn queue_sprites(
                     }
                     Tonemapping::TonyMcMapface => SpritePipelineKey::TONEMAP_METHOD_TONY_MC_MAPFACE,
                     Tonemapping::BlenderFilmic => SpritePipelineKey::TONEMAP_METHOD_BLENDER_FILMIC,
+                    Tonemapping::KhronosPbrNeutral => SpritePipelineKey::TONEMAP_METHOD_PBR_NEUTRAL,
                 };
             }
             if let Some(DebandDither::Enabled) = dither {
@@ -336,11 +339,13 @@ fn queue_sprites(
         let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);
 
         view_entities.clear();
-        view_entities.extend(
-            visible_entities
-                .iter::<Sprite>()
-                .map(|(_, e)| e.index_u32() as usize),
-        );
+        if let Some(visible_entities) = visible_entities.get::<Sprite>() {
+            view_entities.extend(
+                visible_entities
+                    .iter_visible()
+                    .map(|(_, e)| e.index_u32() as usize),
+            );
+        }
 
         phase.items.reserve(extracted_sprites.sprites.len());
 
@@ -355,7 +360,7 @@ fn queue_sprites(
             let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
 
             // Add the item to the render phase
-            phase.add(SpritePhase {
+            phase.add_transient(SpritePhase {
                 draw_function,
                 pipeline,
                 entity: (

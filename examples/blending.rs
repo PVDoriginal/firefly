@@ -1,7 +1,7 @@
 use bevy::{
-    color::palettes::css::{BLUE, RED},
+    camera::Hdr,
+    color::palettes::css::{BLUE, RED, WHITE},
     prelude::*,
-    render::view::Hdr,
 };
 use bevy_firefly::prelude::*;
 
@@ -29,10 +29,10 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         PointLight2d {
-            radius: 50.0,
-            intensity: 4.0,
-            color: Color::Srgba(RED),
-            core: LightCore::from_radius_boost(5.0, 5.0),
+            radius: 100.0,
+            intensity: 1.0,
+            color: Color::Srgba(WHITE),
+            core: LightCore::from_radius_boost(5.0, 3.0),
             ..default()
         },
         Transform::from_translation(vec3(-30.0, 0.0, 0.0)),
@@ -40,10 +40,10 @@ fn setup(mut commands: Commands) {
 
     commands.spawn((
         PointLight2d {
-            radius: 50.0,
-            intensity: 4.0,
-            color: Color::Srgba(BLUE),
-            core: LightCore::from_radius_boost(10.0, 4.0),
+            radius: 100.0,
+            intensity: 1.0,
+            color: Color::Srgba(WHITE),
+            core: LightCore::from_radius_boost(5.0, 3.0),
             ..default()
         },
         Transform::from_translation(vec3(30.0, 0.0, 0.0)),

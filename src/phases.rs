@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use bevy::ecs::entity::EntityHash;
 use bevy::math::FloatOrd;
 use bevy::prelude::*;
 use bevy::render::render_phase::{
@@ -10,6 +11,8 @@ use bevy::render::render_phase::{
 };
 use bevy::render::render_resource::CachedRenderPipelineId;
 use bevy::render::sync_world::MainEntity;
+use bevy::render::view::ExtractedView;
+use indexmap::IndexMap;
 
 /// Binned Render Phase that uses lights to render the lightmap texture.
 pub struct LightmapPhase {
@@ -156,11 +159,15 @@ impl SortedPhaseItem for SpritePhase {
     }
 
     #[inline]
-    fn sort(items: &mut [Self]) {
-        // bevy normally uses radsort instead of the std slice::sort_by_key
-        // radsort is a stable radix sort that performed better than `slice::sort_by_key` or `slice::sort_unstable_by_key`.
-        // Since it is not re-exported by bevy, we just use the std sort for the purpose of the example
-        items.sort_by_key(SortedPhaseItem::sort_key);
+    fn sort(items: &mut IndexMap<(Entity, MainEntity), SpritePhase, EntityHash>) {
+        items.sort_by_key(|_, phase_item| phase_item.sort_key);
+    }
+
+    fn recalculate_sort_keys(
+        _: &mut IndexMap<(Entity, MainEntity), Self, EntityHash>,
+        _: &ExtractedView,
+    ) {
+        // Sort keys are precalculated for 2D phase items.
     }
 
     #[inline]
