@@ -107,6 +107,7 @@ Also you can ask any questions over on [discord](https://discord.com/channels/69
 
 | bevy | bevy_firefly  |
 |------|---------------|
+| 0.19 | 0.19          |
 | 0.18 | 0.18          |
 | 0.17 | 0.17          |
 | 0.16 | 0.16          |
