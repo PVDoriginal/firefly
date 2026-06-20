@@ -1,3 +1,5 @@
+//! NOTE: This example hasn't been updated to bevy 0.19 yet!
+//!
 //! This example demonstrates how to apply a shader over the lightmap before it is being applied to the camera's output.
 //!
 //! This is greatly inspired by Bevy's post processing example: https://bevy.org/examples/shaders/custom-post-processing/.
