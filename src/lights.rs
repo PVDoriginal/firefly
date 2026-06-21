@@ -431,23 +431,21 @@ fn queue_lights(
 
         let pipeline = pipelines.specialize(&pipeline_cache, &pipeline, view_key);
 
-        for (render_entity, visible_entity) in visible_entities
-            .get::<PointLight2d>()
-            .unwrap()
-            .iter_visible()
-        {
-            let batch_set_key = LightBatchSetKey {
-                pipeline,
-                draw_function: draw_lightmap_function,
-            };
+        if let Some(visible_entities) = visible_entities.get::<PointLight2d>() {
+            for (render_entity, visible_entity) in visible_entities.iter_visible() {
+                let batch_set_key = LightBatchSetKey {
+                    pipeline,
+                    draw_function: draw_lightmap_function,
+                };
 
-            lightmap_phase.add(
-                batch_set_key,
-                (),
-                (*render_entity, *visible_entity),
-                InputUniformIndex::default(),
-                BinnedRenderPhaseType::NonMesh,
-            );
+                lightmap_phase.add(
+                    batch_set_key,
+                    (),
+                    (*render_entity, *visible_entity),
+                    InputUniformIndex::default(),
+                    BinnedRenderPhaseType::NonMesh,
+                );
+            }
         }
     }
 }
