@@ -14,7 +14,7 @@ use bevy::{
 use crate::{
     data::FireflyConfig,
     lights::{LightHeight, PointLight2d},
-    occluders::Occluder2dShape,
+    occluders::{Occluder2dEnabled, Occluder2dShape},
     prelude::Occluder2d,
 };
 
@@ -132,7 +132,12 @@ fn mark_visible_lights(
 }
 
 fn mark_visible_occluders(
-    mut occluders: Query<(&OccluderAabb, &mut ViewVisibility, &mut VisibilityTimer)>,
+    mut occluders: Query<(
+        &OccluderAabb,
+        &Occluder2dEnabled,
+        &mut ViewVisibility,
+        &mut VisibilityTimer,
+    )>,
     light_rect: Res<LightRect>,
     time: Res<Time>,
 ) {
@@ -141,8 +146,8 @@ fn mark_visible_occluders(
         max: light_rect.0.max,
     };
 
-    for (aabb, mut visibility, mut visibility_timer) in &mut occluders {
-        if aabb.0.intersects(&light_rect_aabb) && !visibility.get() {
+    for (aabb, enabled, mut visibility, mut visibility_timer) in &mut occluders {
+        if enabled.0 && aabb.0.intersects(&light_rect_aabb) && !visibility.get() {
             visibility.set_visible();
 
             // let visible_occluders = camera.get_mut(TypeId::of::<Occluder2d>());

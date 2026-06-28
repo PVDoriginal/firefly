@@ -10,7 +10,7 @@ use bevy::{
     prelude::*,
     window::PresentMode,
 };
-use bevy_firefly::prelude::*;
+use bevy_firefly::{occluders::Occluder2dEnabled, prelude::*};
 use rand::{Rng, rng, seq::IndexedRandom};
 
 #[derive(Resource)]

@@ -25,6 +25,7 @@ use crate::{buffers::BufferIndex, change::Changes};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[require(
     SyncToRenderWorld,
+    Occluder2dEnabled,
     Transform,
     VisibilityClass,
     ViewVisibility,
@@ -57,6 +58,16 @@ pub struct Occluder2d {
     ///
     /// **Default**: [Vec3::ZERO].
     pub offset: Vec3,
+}
+
+#[derive(Debug, Component, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Occluder2dEnabled(pub bool);
+
+impl Default for Occluder2dEnabled {
+    fn default() -> Self {
+        Self(true)
+    }
 }
 
 impl Occluder2d {

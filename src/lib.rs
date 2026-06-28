@@ -122,7 +122,7 @@ pub mod prelude {
         NormalMode,
     };
     pub use crate::lights::{Falloff, LightAngle, LightCore, LightHeight, PointLight2d};
-    pub use crate::occluders::Occluder2d;
+    pub use crate::occluders::{Occluder2d, Occluder2dEnabled};
     pub use crate::sprites::{NormalMap, SpriteHeight};
 }
 
