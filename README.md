@@ -32,7 +32,7 @@ Video of the [flashlight example](https://github.com/PVDoriginal/firefly/blob/ma
 
 https://github.com/user-attachments/assets/4c525c50-39a6-4604-904e-65f38676f4c7
 
-Video of the [crates example](https://github.com/PVDoriginal/firefly/blob/main/examples/shapes.rs), showcasing normal maps and z-sorting.
+Video of the [crates example](https://github.com/PVDoriginal/firefly/blob/main/examples/crates.rs), showcasing normal maps and z-sorting.
 
 https://github.com/user-attachments/assets/fd9453ba-e42a-4155-b96b-889bfdceea48
 
