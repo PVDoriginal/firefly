@@ -29,7 +29,7 @@ fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
 #ifdef IS_COMBINED
     for (var i = 0u; i < config.n_combined_lightmaps; i += 1) {
-        let extra_light_frag = textureSample(light_map_textures, texture_sampler, vo.uv, i);
+        let extra_light_frag = textureSample(light_map_textures, texture_sampler2, vo.uv, i);
         if config.combination_mode == 0u {
             light_frag *= extra_light_frag;
         }
@@ -51,5 +51,5 @@ fn fragment(vo: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     let scene_frag = textureSample(screen_texture, texture_sampler, vo.uv);
     
-    return scene_frag * light_frag;
+    return vec4f(scene_frag.rgb * light_frag.rgb, scene_frag.a);
 }
