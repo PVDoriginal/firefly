@@ -28,7 +28,7 @@
 //!     commands.spawn((
 //!         PointLight2d {
 //!             color: Color::srgb(1.0, 0.0, 0.0),
-//!             range: 100.0,
+//!             radius: 100.0,
 //!             ..default()
 //!         },
 //!     ));
