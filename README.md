@@ -1,9 +1,20 @@
 # Firefly - 2D Lighting for Bevy 
-
 [![Discord](https://img.shields.io/discord/805147867924267018?logo=discord&color=7289DA)](https://discord.com/channels/691052431525675048/1447681362722033816)
 [![crates.io](https://img.shields.io/crates/v/bevy_firefly)](https://crates.io/crates/bevy_firefly)
 [![docs](https://docs.rs/bevy_firefly/badge.svg)](https://docs.rs/bevy_firefly/)
 [![downloads](https://img.shields.io/crates/d/bevy_firefly)](https://crates.io/crates/bevy_firefly)
+
+# READ THIS
+Firefly is officially unmaintained. I have no plans to return to it. All the recent Bevy AI drama was too much for me. Both the policy change in itself and being repeatedly harassed by certain members 
+and driven out of the community over the last few months. I have simply lost my trust and faith in the Bevy project and don't see that changing; in fact it gets worse each time I take a look at the main community space. I am left feeling betrayed and physically sick at the thought of writing Bevy-related code. I am sorry for breaking my promises to the users of this library, but I really don't see a way to continue working on it. Now or in the foreseeable future. 
+
+I have no hard feelings for anyone still holding hope in Bevy, and consider it a respectable position. If you wish to maintain this library, feel free to reach out to me and I will pass ownership to you.
+
+If you're curious what I am working on, I am developing a Haskell game engine called Mischief, which you may find [here](https://codeberg.org/mischief/mischief). It's not something I'm doing out of spite for Bevy (in fact, I started working on it months before the whole AI situtation). Feel free to support me there.  
+
+Have a nice day. 
+
+## Firefly
 
 [Firefly](https://crates.io/crates/bevy_firefly) is an open-source, **2d lighting** crate for the [Bevy game engine](https://bevy.org/). 
 
