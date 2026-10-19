@@ -168,7 +168,11 @@ pub fn apply_lightmap(
                 post_process.source,
                 &light_map_texture.0.default_view,
                 &pipeline.filtering_sampler,
-                &pipeline.filtering_sampler,
+                if pipeline_id.filter_lightmap {
+                    &pipeline.filtering_sampler
+                } else {
+                    &pipeline.non_filtering_sampler
+                },
                 config,
                 &combined_view,
             )),
